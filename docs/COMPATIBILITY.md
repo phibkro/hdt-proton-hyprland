@@ -9,15 +9,15 @@ Desktop session tested on 2026-11-15: NixOS, Hyprland 0.56.2 (`efb50993780079460
 | HDT startup | Verified | Native Microsoft CLR mapped in the real tracker process; tracker stayed open after earlier Wine Mono crashes |
 | Game detection | Verified | Correct log directory, fresh Power.log consumption and automatic import of an existing complete Arena deck |
 | Standard match recording | Verified | Two saved Ranked/Standard results; one was observed through an HDT-only restart during the match |
-| Arena match recording | Failed earlier test | Game log completed, but HDT stopped progressing mid-match and saved no result. No later completed Arena retest |
+| Arena match recording | Failed | Two observed Arena completions were not saved while HDT stopped progressing. The later history still contained only the two Standard results; recovery restart does not prove Arena recording fixed |
 | Live Arena draft offers and picks | Untested | A completed-deck import does not prove live offer/pick reads. Requires an operator-controlled offer screen and pick |
-| ArenaSmith ratings | Untested | Separate HSReplay/account feature; no entitlement or displayed-rating test |
+| ArenaSmith ratings | Unavailable for tested account | Operator reports no Premium. After recovery, HDT's UpdateChoices handler logged that the deck was not registered for a trial and aborted the helper. This is distinct from proving live offer/pick accuracy |
 | Transparent overlay | Verified with workaround | Software-rendering profile plus 1/255 black background; faint tint is intentional |
 | Hover preview clearing | Verified | Operator confirmed overlay and main-window previews disappear. WPF requested hide while the X11 surface retained old content before the alpha-floor test; the exact defective graphics function was not identified |
 | Movement/resizing/Alt-Tab | Verified for preceding visual profile | Operator confirmed deck follows and game input works. Final control gate was not separately subjected to the full transition sequence |
 | Selective control input | Verified for one control and ordinary pass-through | Operator closed the blue Mulligan Guide announcement and confirmed transparent space still interacts with Hearthstone. WPF mouse-event counters also advanced; every HDT control was not individually tested |
 | Stacking/flicker | Usable in tested session | Overlay remains above the active game; slight flicker accepted, not proven eliminated |
-| Self-updating HDT | Untested | Manually extracted build reports a caught Velopack NotInstalledException. No claim that Squirrel/msdelta instructions fix this build |
+| HDT update check | Verified after full installation | Same verified 1.60.1 installer, complete Velopack layout, same prefix/Proton. Update check reports “No new update available”; previous NotInstalledException absent. Future version download/application remains untested |
 | Long-session UI liveness | Failed later observation | After successful visual/control tests, both UI heartbeat and control export timestamps stopped progressing while the process stayed alive. Current log also stopped; no matching HearthMirror RPC exception was found. Cause unisolated; stale regions expired as designed |
 
 “Verified” combines named observations: operator visual/click acceptance, process maps, selected logs, saved results, or geometry. It does not mean automated end-to-end coverage of every combination. Raw local evidence includes private session/game material and is deliberately not published.

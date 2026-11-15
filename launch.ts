@@ -3,7 +3,9 @@ import { dirname, join } from "node:path";
 import { projectRoot as root, prefix, appDirectory } from "./config";
 
 const canonicalPrefix=await realpath(prefix);
-const exe = join(appDirectory, "HearthstoneDeckTracker.exe");
+// Velopack locates Update.exe relative to the installed executable's directory.
+// Resolve an app -> managed/current link before crossing into Wine.
+const exe = await realpath(join(appDirectory, "HearthstoneDeckTracker.exe"));
 await mkdir(join(root,"evidence"),{recursive:true,mode:0o700});
 async function environment(pid: string): Promise<Record<string, string>> {
   return Object.fromEntries((await readFile(`/proc/${pid}/environ`, "utf8"))

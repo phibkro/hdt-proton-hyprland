@@ -62,7 +62,11 @@ This applies exact-title compositor rules and launches HDT in the running sessio
 
 ## Tested installer extraction
 
-Prefer a complete HDT application directory you already have. For the **specific tested** HDT 1.60.1 installer, the SHA-256 was `25a83214b2bde1a290ba7bb2f1979f23ad374280ce90f1fff2c1da1d053a2e95`, with an embedded ZIP at `0x770400`. Do not apply that offset to any different installer.
+Prefer a **full installed layout** when using HDT's updater. The extraction below starts HDT but omits Velopack's installation machinery: it produced `Velopack.Exceptions.NotInstalledException` and the “Updating to latest version failed” banner. In the tested session, running the verified installer in the same live Proton namespace with `--silent --installto <project-owned Windows path>` created `Update.exe`, `packages/` and `current/`; its next update check successfully reported “No new update available.” A future version download/application has not been tested. The compatibility plugin remains in HDT's Roaming data directory. Keep the entire installation, and select its `current/` directory with `HDT_APP_DIR`, or link `app` to it; the launcher resolves the executable's physical path before invoking Wine. Close only HDT and back up its data before changing layouts.
+
+These installer options were checked against the actual verified executable's `--help` and the [Velopack setup reference](https://docs.velopack.io/reference/cli/content/setup-windows). This repository does not yet provide an automated full-install command. Do not run a different Wine/Proton session against an already-running prefix.
+
+For the **specific tested** HDT 1.60.1 installer, the SHA-256 was `25a83214b2bde1a290ba7bb2f1979f23ad374280ce90f1fff2c1da1d053a2e95`, with an embedded ZIP at `0x770400`. Do not apply that offset to any different installer. The following is useful for inspection or a deliberately extracted application, with the updater limitation above:
 
 From a project shell, with `HDT_INSTALLER` set to its absolute path and `app/` not already present:
 
