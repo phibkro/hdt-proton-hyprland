@@ -11,6 +11,8 @@
     cc -Wall -Wextra -Werror "$REA_PROJECT/x-surface-probe.c" -o "$REA_PROJECT/evidence/x-surface-probe" $(pkg-config --cflags --libs x11 xcomposite xrender)
   '';
   scripts.hdt-overlay-launch.exec = ''
+    mkdir -p "$REA_PROJECT/evidence" || exit $?
+    cc -Wall -Wextra -Werror "$REA_PROJECT/overlay-link.c" -o "$REA_PROJECT/evidence/overlay-link" $(pkg-config --cflags --libs x11) || exit $?
     bun "$REA_PROJECT/overlay-rule.ts" || exit $?
     export HDT_DIRECT=1 HDT_SOFTWARE_RENDER=1
     export HDT_RENDERER="''${HDT_RENDERER:-dxvk-software}"

@@ -3,6 +3,8 @@ import { windowClass } from "./config";
 const root=dirname(import.meta.path),session=process.argv[2];
 if(!session) throw Error("Expected control-region session nonce");
 let running=true,lastFailure="";
+let linkedPair="";
+const links: {pid:number;overlay:number;game:number;original:number}[]=[];
 process.on("SIGTERM",()=>{running=false;});
 async function command(args:string[]) {
   const p=Bun.spawn(args,{stdout:"pipe",stderr:"pipe"});
@@ -18,6 +20,21 @@ while(running) {
     const overlays=clients.filter((x:any)=>x.title==="HearthstoneOverlay" && x.class===windowClass);
     const mains=clients.filter((x:any)=>x.title==="Hearthstone Deck Tracker" && x.class===windowClass);
     if(overlays.length!==1 || mains.length!==1 || overlays[0].pid!==mains[0].pid) throw Error("Ambiguous HDT identity");
+    const games=clients.filter((x:any)=>x.title==="Hearthstone" && x.class===windowClass);
+    if(games.length===1) {
+      const pair=`${overlays[0].pid}:${overlays[0].address}:${games[0].pid}:${games[0].address}`;
+      if(pair!==linkedPair) {
+        const link=JSON.parse(await command([join(root,"evidence/overlay-link"),"apply",String(overlays[0].pid),String(games[0].pid),windowClass]));
+        if(![link.overlay,link.game,link.original].every(x=>Number.isInteger(x)&&x>=0&&x<=4294967295) || !link.overlay || !link.game)
+          throw Error("Invalid overlay relationship readback");
+        links.push({pid:overlays[0].pid,...link});
+        // Hyprland now raises the overlay with the game in one transient stack.
+        // Keep the active-window handler; stop polling raises only after readback.
+        await command(["hyprctl","eval","if hdtProtonStackTimer then hdtProtonStackTimer:set_enabled(false) end"]);
+        linkedPair=pair;
+        console.log("HDT overlay linked to game stack; periodic raising disabled.");
+      }
+    }
     const [width,height]=overlays[0].size;
     const fresh=Number.isFinite(data.observedMS) && Math.abs(Date.now()-data.observedMS)<1500 && width===data.width && height===data.height;
     const rectangles=fresh?data.rectangles:[];
@@ -39,3 +56,9 @@ while(running) {
 }
 // Return to pass-through on normal shutdown; the compositor TTL covers an abrupt exit.
 await command(["hyprctl","eval","hdtProtonControls=nil; hdtProtonControlTicks=0; if hdtProtonControlRule then hdtProtonControlRule:set_enabled(false) end; hdtProtonControlActive=false"]);
+// Restore only our own overlay relationship, and only if its identity/current
+// value still match. Closed/replaced overlay windows require no restoration.
+await command(["hyprctl","eval","if hdtProtonStackTimer then hdtProtonStackTimer:set_enabled(true) end"]);
+for(const link of links.reverse()) {
+  await command([join(root,"evidence/overlay-link"),"restore",String(link.pid),windowClass,String(link.overlay),String(link.game),String(link.original)]);
+}

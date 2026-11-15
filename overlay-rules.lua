@@ -51,8 +51,9 @@ hdtProtonControlTimer = hl.timer(function()
         hdtProtonControlRule:set_enabled(hit)
     end
 end, { timeout = 25, type = "repeat" })
--- Wine's topmost state does not reliably preserve compositor stacking after clicks.
--- Raise only the overlay, without activation, while this game's window is active.
+-- Focus transitions handle Alt-Tab. The host links the overlay's X11 transient
+-- parent to the game, then disables this startup/failure polling fallback.
+-- Wine's topmost state alone did not preserve stacking after game clicks.
 if hdtProtonStackTimer then hdtProtonStackTimer:set_enabled(false) end
 if hdtProtonStackSubscription then hdtProtonStackSubscription:remove() end
 local function stackOverlay(game)

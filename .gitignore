@@ -12,6 +12,7 @@
 !/launch.ts
 !/autostart.sh
 !/control-input.ts
+!/overlay-link.c
 !/overlay-rule.ts
 !/overlay-rules.lua
 !/ProtonCompatibility.cs
@@ -29,3 +30,4 @@
 /docs/specs/*
 !/docs/specs/publish-compatibility.md
 !/docs/specs/automatic-startup.md
+!/docs/specs/overlay-stacking.md

@@ -15,7 +15,7 @@ The tested profile provides a shared Steam Proton session, transparent overlay r
 | Overlay drops behind the game | Exact-title Hyprland rules and overlay-only stacking; lower it when another app is active |
 | Blank space blocks Hearthstone, or controls cannot receive clicks | Export HDT's marked clickable rectangles and allow compositor input only while the pointer is over a control |
 
-Slight flicker was accepted in testing; zero flicker is not established. The tested button was the close button on the blue Mulligan Guide announcement. Do not infer every control works.
+The original 100ms restacking workaround caused a brief hide/reappearance after clicks. A later operator-confirmed fix links the X11 overlay as a transient of the game and disables repeated raising after verifying that relationship. Hover clearing, control input and Alt-Tab passed that test. Separate stale-deck/stray-visual and main-window input complaints remain under investigation. The originally tested button was the close button on the blue Mulligan Guide announcement. Do not infer every control works.
 
 Later in the same desktop session, HDT stayed alive while its UI heartbeat/control exports stopped updating. The control bridge expired stale data as designed. This remains an unresolved stability limitation; the repository publishes the observed compatibility workarounds, not a fully stable Linux port.
 
