@@ -32,9 +32,29 @@ If a project-owned seed already exists, add `--reuse` to validate its CLR and HD
 2. Confirm exit status zero and the printed evidence directory.
 3. Inspect that directory's `result.json`, `supervisor.log`, state snapshots, and screenshots. `result.json` records the source commit and whether the checkout had changes at run start.
 
-Each run creates a fresh prefix and app directory from the seed. The sequence opens Settings with native mouse input, enters the Arena lobby, displays two synthetic offers, returns to the menu, resizes the main window, shows and hides a WPF popup, and executes HDT's New command. The New command must open HDT's actual deck-type dialog.
+Each run creates a fresh prefix and app directory from the seed. The sequence opens Settings with native mouse input, enters the Arena lobby, alternates two synthetic offers across 12 decisions, returns to the menu, resizes the main window, shows and hides a WPF popup, and executes HDT's New command. The New command must open HDT's actual deck-type dialog. `transitions.jsonl` records each scene and its card models.
 
-The host checks card identities, displayed score text, panel visibility, Settings state, and dialog type. Screenshots support visual inspection. The test does not automatically prove pixel clearing after every popup.
+The host checks card identities, displayed score text, actual plaque levels, visible particle emitters, panel visibility, Settings state, and dialog type. Screenshots support visual inspection. The test does not automatically prove pixel clearing after every popup.
+
+## Compare the Arena particle workaround
+
+Run the current compatibility plugin with three level-five badges:
+
+```sh
+devenv shell -- hdt-replay run --with-plugin --plaque-level 5
+```
+
+Expect status zero. The state snapshots must retain three level-five models and their scores, with zero visible particle emitters. The plugin's input snapshot must report suppressed emitters.
+
+To test the original particle path without the plugin, run:
+
+```sh
+devenv shell -- hdt-replay run --plaque-level 5
+```
+
+This command reproduced `88980406` in the tested environment and is expected to fail there. The score graphics can freeze while exported model state still advances. Keep its logs and failure screenshot as regression evidence.
+
+To retain level-five artwork while suppressing particles in the fixture alone, add `--without-particles`. To compare badges without the level-five particle effect, use `--plaque-level 4`. Omitting `--plaque-level` tests levels 1, 3, and 5 together.
 
 ## Check failure handling
 
@@ -52,4 +72,4 @@ The host uses the installed HDT assembly, WPF resources, main window, overlay, A
 
 The run owns a separate PID namespace, network namespace, home directory, prefix, and Xvfb display. It mounts selected system paths and this project, leaving unrelated host volumes outside the test environment. The live prefix and desktop sockets are masked. A timeout bounds execution, and namespace exit terminates the test descendants. Commands reject simultaneous access to the lab.
 
-A passing replay establishes that the exercised WPF path works under the isolated X11 configuration. It does not establish a fix for the live Arena failure. HearthMirror polling, watcher dispatch, ArenaSmith requests, real picks, the compatibility plugin, and Hyprland composition are outside this fixture's coverage. The generic popup is not HDT's card-preview implementation.
+A passing replay establishes that the exercised WPF path works under the isolated X11 configuration. It does not establish a fix for the live Arena failure. HearthMirror polling, watcher dispatch, ArenaSmith requests, real picks, and Hyprland composition are outside this fixture's coverage. The compatibility plugin runs only with `--with-plugin`; its updates run on the fixture's UI timer rather than HDT's plugin scheduler. The generic popup is not HDT's card-preview implementation.

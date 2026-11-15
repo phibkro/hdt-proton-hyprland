@@ -2,7 +2,7 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 lab=$root/local/replay
-usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure]'; }
+usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles]'; }
 fail() { echo "HDT replay: $*" >&2; exit 1; }
 action=${1:-help}
 if (( $# )); then shift; fi
@@ -73,7 +73,19 @@ if [[ "$action" == prepare ]]; then
     exit 0
 fi
 expected=false
-if (( $# )); then [[ $# == 1 && "$1" == --inject-failure ]] || { usage; exit 2; }; expected=true; fi
+plugin=false
+level=mixed
+particles=true
+while (( $# )); do
+    case "$1" in
+        --inject-failure) expected=true ;;
+        --with-plugin) plugin=true ;;
+        --without-particles) particles=false ;;
+        --plaque-level) (( $# >= 2 )) && [[ "$2" =~ ^[0-5]$ ]] || fail 'Plaque level must be 0..5.'; level=$2; shift ;;
+        *) usage; exit 2 ;;
+    esac
+    shift
+done
 [[ -f "$manifest" ]] || fail 'Run prepare first.'
 jq -e --arg root "$root" '.schema==2 and .kind=="hdt-ui-replay" and .project==$root' "$manifest" >/dev/null || fail 'Invalid environment ownership.'
 proton=$(jq -er .proton "$manifest")
@@ -102,12 +114,12 @@ timeout 120 bwrap --die-with-parent --unshare-net --unshare-pid \
     --setenv PATH "$PATH" --setenv HDT_REPLAY_TOOLS_PATH "$PATH" \
     --setenv HOME "$run/home" --setenv USER steamuser --setenv LANG C.UTF-8 \
     --setenv PRESSURE_VESSEL_VARIABLE_DIR "$run/pv-var" \
-    steam-run "$lab/runtime/run" -- bash "$root/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" \
+    steam-run "$lab/runtime/run" -- bash "$root/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" \
     >"$run/supervisor.log" 2>&1
 status=$?
 set -e
 jq -n --argjson status "$status" --argjson negative "$expected" --arg run "$run" \
-    --arg revision "$revision" --argjson dirty "$source_dirty" \
-    '{exitStatus:$status,negativeAssertionTest:$negative,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty}' >"$run/result.json"
+    --arg revision "$revision" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" \
+    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty}' >"$run/result.json"
 echo "Replay exit status: $status. Evidence: $run"
 exit "$status"

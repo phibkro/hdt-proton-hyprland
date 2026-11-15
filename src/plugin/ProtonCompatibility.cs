@@ -16,10 +16,10 @@ using Api = Hearthstone_Deck_Tracker.API.Core;
 
 public sealed class ProtonCompatibility : IPlugin {
     public string Name { get { return "Proton desktop compatibility"; } }
-    public string Description { get { return "Refresh overlay geometry; optional input and hover diagnostics."; } }
+    public string Description { get { return "Refresh overlay geometry, suppress incompatible Arena particles, and export input diagnostics."; } }
     public string ButtonText { get { return "No settings"; } }
     public string Author { get { return "Local investigation"; } }
-    public Version Version { get { return new Version(0,4,2); } }
+    public Version Version { get { return new Version(0,5,0); } }
     public MenuItem MenuItem { get { return null; } }
     bool pending;
     int moves;
@@ -38,8 +38,22 @@ public sealed class ProtonCompatibility : IPlugin {
     string lastMouseTargetType;
     bool mainDiagnosticsAttached;
     int mainMouseDowns, mainMouseUps;
+    static bool particleHandlerRegistered;
+    static bool suppressArenaParticles;
+    static int arenaParticleEmittersSuppressed;
     public void OnLoad() {
         RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+        suppressArenaParticles=true;
+        if(!particleHandlerRegistered) {
+            // Run before the emitter's instance Loaded handler. That handler
+            // builds RenderTargetBitmap-backed 3D particle systems, which
+            // reproduce UCEERR_RENDERTHREADFAILURE under the tested Proton.
+            // Keep the score and badge artwork; skip only cosmetic particles.
+            EventManager.RegisterClassHandler(
+                typeof(Hearthstone_Deck_Tracker.Controls.Overlay.Arena.ParticleEmitter),
+                FrameworkElement.LoadedEvent,new RoutedEventHandler(SuppressArenaParticleEmitter));
+            particleHandlerRegistered=true;
+        }
         // The filter runs before HDT's handler opens its modal crash dialog.
         // Observe only: never change RequestCatch or exception handling.
         Application.Current.Dispatcher.UnhandledExceptionFilter += ObserveDispatcherFailure;
@@ -48,6 +62,7 @@ public sealed class ProtonCompatibility : IPlugin {
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged += ObserveTooltip;
     }
     public void OnUnload() {
+        suppressArenaParticles=false;
         Application.Current.Dispatcher.UnhandledExceptionFilter -= ObserveDispatcherFailure;
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged -= ObserveTooltip;
         var overlay=Api.OverlayWindow;
@@ -63,6 +78,16 @@ public sealed class ProtonCompatibility : IPlugin {
             mouseDiagnosticsAttached=false;
         }
         Log.Info("Local Proton compatibility stopped; layout refreshes="+moves);
+    }
+    static void SuppressArenaParticleEmitter(object sender,RoutedEventArgs e) {
+        if(!suppressArenaParticles) return;
+        // Loaded is a direct routed event. Marking it handled prevents the
+        // normal instance handler from initializing the 3D systems or timer.
+        e.Handled=true;
+        ((FrameworkElement)sender).SetCurrentValue(UIElement.VisibilityProperty,Visibility.Collapsed);
+        arenaParticleEmittersSuppressed++;
+        if(arenaParticleEmittersSuppressed==1)
+            Log.Info("Proton compatibility suppressed cosmetic Arena score particles");
     }
     void ObserveTooltip(Func<FrameworkElement> tooltip, DependencyObject owner) {
         // Observe the request; never invoke the factory or alter tooltip state.
@@ -219,7 +244,8 @@ public sealed class ProtonCompatibility : IPlugin {
                         arenaVisualVisibility=arenaVisual==null?null:arenaVisual.Visibility.ToString(),
                         arenaVisualOpacity=arenaVisual==null?(double?)null:arenaVisual.Opacity,
                         mainActive=main!=null && main.IsActive, mainEnabled=main!=null && main.IsEnabled,
-                        mainMouseDowns=mainMouseDowns, mainMouseUps=mainMouseUps
+                        mainMouseDowns=mainMouseDowns, mainMouseUps=mainMouseUps,
+                        arenaParticleEmittersSuppressed=arenaParticleEmittersSuppressed
                     }
                 });
                 File.WriteAllText(output+".next",json);

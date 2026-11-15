@@ -69,7 +69,7 @@ These environment variables affect HDT on its next launch. They do not change th
 | `HDT_HOVER_DIAGNOSTICS` | Unset | A value of `1` exports tooltip, preview, UI-update, and mouse-counter diagnostics |
 | `HDT_DEBUG` | Unset | A value of `1` enables CLR and exception traces through `WINEDEBUG` |
 
-The plugin requests WPF software rendering. `HDT_ELEMENT_INPUT=1` is a rejected XShape experiment and causes a launch error.
+The plugin requests WPF software rendering. Version 0.5.0 also prevents cosmetic Arena score particle emitters from initializing. Scores and badge artwork remain enabled. `HDT_ELEMENT_INPUT=1` is a rejected XShape experiment and causes a launch error.
 
 ## HDT installation
 
