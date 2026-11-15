@@ -47,6 +47,7 @@ The later saved Arena wins establish successful recording after the earlier fail
 | Stale deck list | Resolved by deck selection | The user confirmed that the wrong deck had been selected in HDT |
 | White main and crash windows during drafting | Failed in later tests | New, repeated Settings clicks, and a floating-state change were associated with failures. A live dispatcher capture recorded COMException `88980406`. The overlay remained drawn, but repainting was not established |
 | Fresh offer after a draft pick | Failed in a later user observation | The previous offer's ratings remained visible. UI exports continued. The failing stage remains unknown |
+| Battlegrounds menu and match | Verified by user observation | The operator reports working main-window interaction in both contexts and a working in-game overlay. This comparison did not instrument every Battlegrounds update |
 
 The rendering and input mechanisms are described in [HDT compatibility design](EXPLANATION.md).
 
@@ -79,6 +80,12 @@ The source checks at commit `6bddf1e` passed from a clean worktree. They covered
 The [Nix installation guide](NIX.md) covers the package, module, and desktop actions. These results do not extend the earlier visual tests to every control or monitor configuration.
 
 ## Evidence limits
+
+### Isolated UI replay
+
+Two fresh replay runs on 2026-11-15 passed synthetic lobby → first offer → second offer → menu transitions under Proton Experimental. Each run used the actual HDT main window and Arena control, verified changed card models and displayed scores, and accepted native Settings clicks in each phase. Resize, generic popup state, and the actual New deck-type dialog also passed. A deliberate assertion failure returned status 1 and retained evidence. No `ReplayHost.exe` or Xvfb process remained after that failure.
+
+This fixture did not reproduce the live Arena stall. It bypasses normal HDT startup, HearthMirror, watcher dispatch, and ArenaSmith requests. It excludes the compatibility plugin and uses Xvfb with Openbox rather than Hyprland. Passing these checks does not establish a live fix or isolate which omitted path causes the failure. See [Replay HDT UI transitions in isolation](UI-REPLAY.md) for the procedure.
 
 Raw logs and saved game records remain private because they contain account or game data. The public record contains selected facts rather than the raw files.
 
