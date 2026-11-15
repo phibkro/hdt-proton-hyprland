@@ -8,6 +8,7 @@ The [tested configuration](docs/COMPATIBILITY.md#tested-environment) uses Proton
 
 | Task or question | Document |
 |---|---|
+| Install through Nix and register the desktop app | [Install the compatibility tools with Nix](docs/NIX.md) |
 | Apply the plugin and start HDT with Steam | [Apply HDT compatibility fixes](docs/INSTALL.md) |
 | Build the plugin or diagnose an overlay problem | [Check and diagnose HDT](docs/DEVELOPMENT.md) |
 | Test tracking, draft updates, or another Proton version | [Test HDT with Hearthstone](docs/TESTING.md) |

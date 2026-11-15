@@ -1,6 +1,6 @@
 # Apply HDT compatibility fixes
 
-Use this guide to apply the plugin to an existing HDT installation and start HDT alongside Hearthstone.
+Use this guide for the devenv checkout workflow. For an installed package and desktop entry, use [Install the compatibility tools with Nix](NIX.md).
 
 ## Prepare the installation
 

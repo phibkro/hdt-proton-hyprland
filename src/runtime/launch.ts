@@ -1,6 +1,6 @@
 import { readdir, readFile, readlink, realpath, stat, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { projectRoot as root, prefix, appDirectory } from "./config";
+import { projectRoot as root, sourceRoot, prefix, appDirectory } from "./config";
 
 const canonicalPrefix=await realpath(prefix);
 // Velopack locates Update.exe relative to the installed executable's directory.
@@ -47,7 +47,7 @@ if (inside) {
       "/r:System.Web.Extensions.dll",
       "/r:"+win(join(appDirectory,"MahApps.Metro.dll")),
       ...["PresentationCore.dll","PresentationFramework.dll","WindowsBase.dll"].map(x=>"/r:"+wpf+x),
-      win(join(root,"src/plugin/ProtonCompatibility.cs"))];
+      win(join(sourceRoot,"src/plugin/ProtonCompatibility.cs"))];
     const p = Bun.spawn([join(dirname(proton),"files/bin/wine"),"C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe",...args],
       {cwd:root,env:e,stdout:"inherit",stderr:"inherit"});
     process.exit(await p.exited);
@@ -58,7 +58,7 @@ if (inside) {
     const win = (path: string) => "Z:" + path.replaceAll("/", "\\");
     const output = join(root, "evidence/window-probe.exe");
     const build = Bun.spawn([wine, "C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe",
-      "/nologo", "/target:winexe", "/platform:x64", "/out:" + win(output), win(join(root,"src/diagnostics/window-probe.cs"))],
+      "/nologo", "/target:winexe", "/platform:x64", "/out:" + win(output), win(join(sourceRoot,"src/diagnostics/window-probe.cs"))],
       {cwd: root, env: e, stdout:"inherit", stderr:"inherit"});
     if(await build.exited) throw Error("Window probe compilation failed");
     const run = Bun.spawn([wine, output, win(join(root,"evidence/window-probe.json"))],
@@ -124,7 +124,7 @@ let bridge: ReturnType<typeof Bun.spawn> | undefined;
 if(process.env.HDT_ELEMENT_INPUT === "1") throw Error("X11 input-shape experiment retired; use HDT_CONTROL_INPUT=1 for compositor control gating.");
 if(process.env.HDT_CONTROL_INPUT === "1" && !probe && !buildPlugin) {
   process.env.HDT_INPUT_SESSION=crypto.randomUUID();
-  bridge=Bun.spawn([process.execPath,join(root,"src/hyprland/control-input.ts"),process.env.HDT_INPUT_SESSION],{cwd:root,env:{...process.env},stdout:"inherit",stderr:"inherit"});
+  bridge=Bun.spawn([process.execPath,join(sourceRoot,"src/hyprland/control-input.ts"),process.env.HDT_INPUT_SESSION],{cwd:root,env:{...process.env},stdout:"inherit",stderr:"inherit"});
   bridge.exited.then(code=>{if(code) console.error(`HDT input-region helper failed (${code}); selective input is not verified.`);});
 }
 const p = Bun.spawn([nsenter, "--target", candidates[0], "--user", "--mount", "--preserve-credentials", "--root", "--", process.execPath, import.meta.path, "--inside", candidates[0], ...(probe ? ["--window-probe"] : []), ...(buildPlugin ? ["--build-plugin"] : [])], {

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { appendFile } from "node:fs/promises";
-import { projectRoot as root, windowClass } from "../runtime/config";
+import { projectRoot as root, nativeDirectory, windowClass } from "../runtime/config";
 async function command(args:string[]) {
   const p=Bun.spawn(args,{stdout:"pipe",stderr:"pipe"});
   const [out,err]=await Promise.all([new Response(p.stdout).text(),new Response(p.stderr).text()]);
@@ -21,7 +21,7 @@ if(overlays.length!==1 || mains.length!==1 || overlays[0].pid!==mains[0].pid) th
 const tree=await command(["xwininfo","-root","-tree"]);
 const ids=[...tree.matchAll(/^\s*(0x[0-9a-f]+) "HearthstoneOverlay":/gm)].map(x=>x[1]);
 if(ids.length!==1) throw Error("Ambiguous X11 overlay identity");
-const surface=JSON.parse(await command([join(root,"evidence/x-surface-probe"),ids[0],String(overlays[0].pid),...bounds.map(String)]));
+const surface=JSON.parse(await command([join(nativeDirectory,"x-surface-probe"),ids[0],String(overlays[0].pid),...bounds.map(String)]));
 const result={observedUTC:new Date().toISOString(),bounds,regionSource:args.length?"explicit":"lastPreview",state,surface};
 await Bun.write(join(root,"evidence/surface-check.json"),JSON.stringify(result,null,2));
 await appendFile(join(root,"evidence/surface-samples.jsonl"),JSON.stringify(result)+"\n");

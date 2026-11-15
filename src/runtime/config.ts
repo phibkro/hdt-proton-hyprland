@@ -1,6 +1,12 @@
 import { join, resolve } from "node:path";
 
-export const projectRoot = resolve(import.meta.dir, "../..");
+export const sourceRoot = resolve(import.meta.dir, "../..");
+if(process.env.HDT_PROJECT_DIR && !process.env.HDT_PROJECT_DIR.startsWith("/"))
+  throw Error("HDT_PROJECT_DIR must be an absolute directory outside the Nix store.");
+export const projectRoot = resolve(process.env.HDT_PROJECT_DIR ?? sourceRoot);
+if(projectRoot === "/nix/store" || projectRoot.startsWith("/nix/store/")) throw Error("Set HDT_PROJECT_DIR to a writable directory outside the Nix store.");
+export const nativeDirectory = process.env.HDT_NATIVE_DIR ?? join(projectRoot,"evidence");
+if(!nativeDirectory.startsWith("/")) throw Error("HDT_NATIVE_DIR must be an absolute directory.");
 export function parseAppId(value: unknown): string {
   if(typeof value!=="string" || !/^[1-9][0-9]{0,9}$/.test(value) || BigInt(value)>4294967295n)
     throw Error("Set HS_APP_ID to the numeric Steam shortcut app ID (uint32).");
