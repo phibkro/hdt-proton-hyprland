@@ -7,6 +7,7 @@ if (( $# )); then shift; fi
 data_root=${HDT_PROJECT_DIR:-$source_root}
 native_dir=${HDT_NATIVE_DIR:-$data_root/evidence}
 case "$command" in
+    trace-export) exec bun "$source_root/src/diagnostics/trace-export.ts" "$@" ;;
     open|restart) exec bash "$source_root/scripts/desktop.sh" "$command" "$@" ;;
     watch) exec bash "$source_root/scripts/autostart.sh" "$@" ;;
     setup) exec bash "$source_root/scripts/setup.sh" "$@" ;;
@@ -38,5 +39,5 @@ case "$command" in
         export HDT_CONTROL_INPUT="${HDT_CONTROL_INPUT:-1}"
         exec bun "$source_root/src/runtime/launch.ts" "$@"
         ;;
-    *) echo 'Usage: hdt-proton [open|restart|watch|setup|status|raw-launch|overlay-launch|steam-options|steam-run|build-surface-probe]' >&2; exit 2 ;;
+    *) echo 'Usage: hdt-proton [open|restart|watch|setup|status|trace-export|raw-launch|overlay-launch|steam-options|steam-run|build-surface-probe]' >&2; exit 2 ;;
 esac

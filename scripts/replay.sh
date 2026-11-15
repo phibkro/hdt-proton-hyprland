@@ -2,7 +2,7 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 lab=$root/local/replay
-usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles]'; }
+usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles] [--battlegrounds-tabs] [--diagnostics]'; }
 fail() { echo "HDT replay: $*" >&2; exit 1; }
 action=${1:-help}
 if (( $# )); then shift; fi
@@ -76,16 +76,21 @@ expected=false
 plugin=false
 level=mixed
 particles=true
+battlegrounds_tabs=false
+diagnostics=false
 while (( $# )); do
     case "$1" in
         --inject-failure) expected=true ;;
         --with-plugin) plugin=true ;;
+        --battlegrounds-tabs) battlegrounds_tabs=true ;;
+        --diagnostics) diagnostics=true ;;
         --without-particles) particles=false ;;
         --plaque-level) (( $# >= 2 )) && [[ "$2" =~ ^[0-5]$ ]] || fail 'Plaque level must be 0..5.'; level=$2; shift ;;
         *) usage; exit 2 ;;
     esac
     shift
 done
+[[ "$diagnostics" == false || "$plugin" == true ]] || fail '--diagnostics requires --with-plugin.'
 [[ -f "$manifest" ]] || fail 'Run prepare first.'
 jq -e --arg root "$root" '.schema==2 and .kind=="hdt-ui-replay" and .project==$root' "$manifest" >/dev/null || fail 'Invalid environment ownership.'
 proton=$(jq -er .proton "$manifest")
@@ -95,6 +100,13 @@ source_dirty=false
 [[ -z $(git -C "$root" status --porcelain) ]] || source_dirty=true
 run=$lab/runs/$(date -u +%Y%m%dT%H%M%S)-$$
 mkdir -p "$run/home" "$run/runtime"
+mkdir "$run/source"
+cp -R "$root/src" "$root/tests" "$root/scripts" "$run/source/"
+(
+    cd "$run/source"
+    rg --files --hidden --no-ignore -0 | sort -z | xargs -0 sha256sum
+) >"$run/source-sha256.txt"
+snapshot_hash=$(sha256sum "$run/source-sha256.txt"); snapshot_hash=${snapshot_hash%% *}
 chmod 700 "$run" "$run/runtime"
 for part in prefix app; do cp -a --reflink=auto "$lab/seed/$part" "$run/$part"; done
 [[ $(realpath "$run/prefix") == "$run/prefix" && "$run/prefix" != "$source_prefix" ]] || fail 'Unsafe replay prefix.'
@@ -109,17 +121,18 @@ timeout 120 bwrap --die-with-parent --unshare-net --unshare-pid \
     --ro-bind /run/opengl-driver /run/opengl-driver --ro-bind "$root" "$root" \
     --proc /proc --dev /dev --tmpfs /dev/shm --dev-bind /dev/dri /dev/dri \
     --bind "$lab" "$lab" --ro-bind "$lab/seed" "$lab/seed" \
+    --ro-bind "$run/source" "$run/source" \
     --tmpfs "$HOME" --ro-bind "$proton" "$proton" --tmpfs "$source_prefix" \
     --tmpfs /run/user --tmpfs /tmp --clearenv \
     --setenv PATH "$PATH" --setenv HDT_REPLAY_TOOLS_PATH "$PATH" \
     --setenv HOME "$run/home" --setenv USER steamuser --setenv LANG C.UTF-8 \
     --setenv PRESSURE_VESSEL_VARIABLE_DIR "$run/pv-var" \
-    steam-run "$lab/runtime/run" -- bash "$root/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" \
+    steam-run "$lab/runtime/run" -- bash "$run/source/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" "$battlegrounds_tabs" "$diagnostics" \
     >"$run/supervisor.log" 2>&1
 status=$?
 set -e
 jq -n --argjson status "$status" --argjson negative "$expected" --arg run "$run" \
-    --arg revision "$revision" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" \
-    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty}' >"$run/result.json"
+    --arg revision "$revision" --arg snapshot "$snapshot_hash" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" --argjson bgs "$battlegrounds_tabs" --argjson diagnostics "$diagnostics" \
+    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,battlegroundsTabs:$bgs,diagnostics:$diagnostics,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty,sourceManifestSHA256:$snapshot}' >"$run/result.json"
 echo "Replay exit status: $status. Evidence: $run"
 exit "$status"

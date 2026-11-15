@@ -6,6 +6,8 @@ The [tested configuration](docs/COMPATIBILITY.md#tested-environment) uses Proton
 
 Plugin 0.5.0 prevents Arena score particles from triggering the reproduced WPF rendering failure. Ratings, scores, and badge artwork remain enabled. The operator completed the current draft with the workaround. Existing Nix installations must [update their package before rebuilding the plugin](docs/NIX.md#update-an-existing-home-manager-installation).
 
+Plugin 0.5.1 adds local UI-stall recordings and trace export. It does not establish a fix for the reported Battlegrounds freeze. See [freeze diagnostics](docs/DIAGNOSTICS.md).
+
 ## Documentation
 
 | Task or question | Document |

@@ -101,3 +101,5 @@ Microsoft documents one render thread per WPF process and explains that a modal 
 The existing `input-region.json` describes cached HDT state and control rectangles. Fresh timestamps establish that the exporter ran. They do not establish watcher progress, correct ratings, completed commands, or healthy rendering. A modal dispatcher can keep the exporter running.
 
 All diagnostic files remain in the private `evidence` directory. Neither a missing exception record nor a static overlay establishes healthy rendering. Visual repainting, input handling, choice detection, and rating responses require separate observations.
+
+See [freeze diagnostics](DIAGNOSTICS.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.

@@ -49,3 +49,7 @@ Nix builds the native helpers before installation. The package supplies their pa
 ## Isolated WPF replay
 
 The replay host uses C# to instantiate HDT's actual .NET Framework WPF classes. Bash composes Bubblewrap, the selected Steam runtime, Xvfb, and native X11 input tools. These are the existing project shell and HDT interfaces. The harness adds no TypeScript supervisor or Python source. Its lifecycle is bounded by a timeout and a PID namespace; it does not replace the live launcher.
+
+## Local diagnostics
+
+The recorder uses .NET Framework APIs inside HDT. The exporter is a bounded Bun CLI using the existing runtime exception. No installed Effect guidance or house overlay was found. Perfetto supplies the trace format and viewer. OpenTelemetry remains deferred until its Framework and Proton behavior is tested. Both plugin builds derive their C# source list from the plugin directory.
