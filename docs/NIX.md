@@ -45,10 +45,10 @@ Create the link only if that desktop entry does not already exist. Home Manager 
 
 Use the module to install the package, register its desktop entry, and declare the watcher service.
 
-1. Add the repository to your flake inputs. Before the feature is merged, use its published branch:
+1. Add the repository's default branch to your flake inputs:
 
    ```nix
-   inputs.hdt-proton.url = "github:phibkro/hdt-proton-hyprland/feat/nix-desktop";
+   inputs.hdt-proton.url = "github:phibkro/hdt-proton-hyprland";
    ```
 
 2. Import the module in your Home Manager configuration:
@@ -67,6 +67,20 @@ Use the module to install the package, register its desktop entry, and declare t
 The module leaves `hdt.local.json` under your control. It does not copy the file, the game prefix, or account data into the Nix store.
 
 For a user-profile installation without Home Manager, configure `hdt-proton-autostart.service` separately. The desktop Open and Restart actions require that service. The command that the service runs is `hdt-proton watch`. Its environment must select the same data directory as the desktop entry.
+
+## Update an existing Home Manager installation
+
+1. If your input selects `feat/nix-desktop`, change its URL to the default-branch URL above.
+2. Update that input from your configuration repository:
+
+   ```sh
+   nix flake update hdt-proton
+   ```
+
+3. Apply your Home Manager configuration through your normal deployment process.
+4. Follow [Apply the plugin](#apply-the-plugin) to compile and install the updated plugin against your HDT installation.
+
+Update the package before rebuilding the plugin. An older pinned package contains older plugin source and can overwrite a manually installed fix. Plugin version 0.5.0 includes the Arena particle workaround. See the [compatibility record](COMPATIBILITY.md) for its verification limits.
 
 ## Apply the plugin
 
