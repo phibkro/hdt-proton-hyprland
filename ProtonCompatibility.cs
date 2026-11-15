@@ -19,7 +19,7 @@ public sealed class ProtonCompatibility : IPlugin {
     public string Description { get { return "Refresh overlay geometry; optional input and hover diagnostics."; } }
     public string ButtonText { get { return "No settings"; } }
     public string Author { get { return "Local investigation"; } }
-    public Version Version { get { return new Version(0,4,0); } }
+    public Version Version { get { return new Version(0,4,1); } }
     public MenuItem MenuItem { get { return null; } }
     bool pending;
     int moves;
@@ -34,6 +34,8 @@ public sealed class ProtonCompatibility : IPlugin {
     bool mouseDiagnosticsAttached;
     int overlayMouseDowns,overlayMouseUps;
     string lastMouseTargetType;
+    bool mainDiagnosticsAttached;
+    int mainMouseDowns, mainMouseUps;
     public void OnLoad() {
         RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
         Log.Info("Local Proton compatibility enabled; WPF software rendering requested");
@@ -43,6 +45,12 @@ public sealed class ProtonCompatibility : IPlugin {
     public void OnUnload() {
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged -= ObserveTooltip;
         var overlay=Api.OverlayWindow;
+        var main=(Window)(object)Api.MainWindow;
+        if(main!=null && mainDiagnosticsAttached) {
+            main.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMainMouseDown));
+            main.RemoveHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMainMouseUp));
+            mainDiagnosticsAttached=false;
+        }
         if(overlay!=null && mouseDiagnosticsAttached) {
             overlay.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMouseDown));
             overlay.RemoveHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMouseUp));
@@ -90,6 +98,11 @@ public sealed class ProtonCompatibility : IPlugin {
             }
         }
         var main = (Window)(object)Api.MainWindow;
+        if(main!=null && !mainDiagnosticsAttached) {
+            main.AddHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMainMouseDown),true);
+            main.AddHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMainMouseUp),true);
+            mainDiagnosticsAttached=true;
+        }
         // Ask WPF to refresh its own mouse-over state; no synthetic native clicks/movement.
         // Covers templated/native tooltip hosts without a second tree/tooltip state model.
         if(main != null && main.IsVisible && main.IsActive) Mouse.Synchronize();
@@ -118,10 +131,23 @@ public sealed class ProtonCompatibility : IPlugin {
                 var clip = Rect.Transform(new Rect(0,0,overlay.ActualWidth,overlay.ActualHeight),matrix);
                 var regions = new List<int[]>();
                 if(overlay.IsContentVisible) CollectControls(overlay,overlay,matrix,clip,regions);
+                var arena=overlay.ArenaPickHelperViewModel;
+                var arenaVisual=overlay.FindName("ArenaPickHelper") as FrameworkElement;
                 var json = new JavaScriptSerializer().Serialize(new {
                     session=Environment.GetEnvironmentVariable("HDT_INPUT_SESSION"),
                     observedMS=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    width=(int)Math.Round(clip.Width), height=(int)Math.Round(clip.Height), rectangles=regions
+                    width=(int)Math.Round(clip.Width), height=(int)Math.Round(clip.Height), rectangles=regions,
+                    state=new {
+                        mode=Api.Game.CurrentMode.ToString(), inMenu=Api.Game.IsInMenu,
+                        setupDone=Api.Game.SetupDone, hasSelectedDeck=Api.Game.CurrentSelectedDeck!=null,
+                        arenaClientState=arena.ClientState.ToString(), arenaSessionState=arena.SessionState.ToString(),
+                        arenaDrafting=arena.IsDrafting, arenaAvailable=arena.IsArenasmithAvailable,
+                        arenaRequestedVisible=arena.IsOverlayVisible,
+                        arenaVisualVisibility=arenaVisual==null?null:arenaVisual.Visibility.ToString(),
+                        arenaVisualOpacity=arenaVisual==null?(double?)null:arenaVisual.Opacity,
+                        mainActive=main!=null && main.IsActive, mainEnabled=main!=null && main.IsEnabled,
+                        mainMouseDowns=mainMouseDowns, mainMouseUps=mainMouseUps
+                    }
                 });
                 File.WriteAllText(output+".next",json);
                 // Same-directory replacement keeps readers from observing a half-written snapshot.
@@ -134,6 +160,8 @@ public sealed class ProtonCompatibility : IPlugin {
     void ObserveMouseDown(object sender,MouseButtonEventArgs e) {
         overlayMouseDowns++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;
     }
+    void ObserveMainMouseDown(object sender,MouseButtonEventArgs e) { mainMouseDowns++; }
+    void ObserveMainMouseUp(object sender,MouseButtonEventArgs e) { mainMouseUps++; }
     void ObserveMouseUp(object sender,MouseButtonEventArgs e) {
         overlayMouseUps++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;
     }

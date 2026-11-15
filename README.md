@@ -101,6 +101,8 @@ To remove the plugin, close HDT and remove only `ProtonCompatibility.dll` from i
 
 The retired `HDT_ELEMENT_INPUT=1` XShape-only experiment is rejected by the launcher. It did not establish working control routing. The current bridge has a session nonce, exact window identity/geometry/freshness checks and a roughly one-second expiry if updates stop. It emits no synthetic clicks and does not modify game memory.
 
+The private input-region snapshot also records cached scene/menu/draft-panel state and main-window mouse-event counters. These distinguish a stopped UI thread from input/repaint symptoms without extra HearthMirror polling or account/card identifiers. They are diagnostic observations, not a fix for every reported freeze or stale visual.
+
 ## Development and provenance
 
 ```sh

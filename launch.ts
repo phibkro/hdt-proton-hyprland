@@ -43,6 +43,7 @@ if (inside) {
     const wpf = "C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\WPF\\";
     const args = ["/nologo", "/target:library", "/platform:x64", "/out:"+win(join(root,"evidence/ProtonCompatibility.dll")),
       "/r:"+win(exe), "/r:System.Drawing.dll", "/r:System.Xaml.dll",
+      "/r:"+win(join(appDirectory,"HearthMirror.dll")),
       "/r:System.Web.Extensions.dll",
       "/r:"+win(join(appDirectory,"MahApps.Metro.dll")),
       ...["PresentationCore.dll","PresentationFramework.dll","WindowsBase.dll"].map(x=>"/r:"+wpf+x),

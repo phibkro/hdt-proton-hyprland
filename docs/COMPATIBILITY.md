@@ -10,8 +10,8 @@ Desktop session tested on 2026-11-15: NixOS, Hyprland 0.56.2 (`efb50993780079460
 | Game detection | Verified | Correct log directory, fresh Power.log consumption and automatic import of an existing complete Arena deck |
 | Standard match recording | Verified | Two saved Ranked/Standard results; one was observed through an HDT-only restart during the match |
 | Arena match recording | Failed | Two observed Arena completions were not saved while HDT stopped progressing. The later history still contained only the two Standard results; recovery restart does not prove Arena recording fixed |
-| Live Arena draft offers and picks | Untested | A completed-deck import does not prove live offer/pick reads. Requires an operator-controlled offer screen and pick |
-| ArenaSmith ratings | Unavailable for tested account | Operator reports no Premium. After recovery, HDT's UpdateChoices handler logged that the deck was not registered for a trial and aborted the helper. This is distinct from proving live offer/pick accuracy |
+| Live Arena redraft recording | Verified for saved events | After the operator's redraft, HDT saved five picks with three choices each. Individual displayed card identities were not compared; a fresh full draft remains untested |
+| ArenaSmith ratings | Verified for recorded redraft | Operator upgraded to Premium. All five recorded picks report ArenaSmith available and overlay visible, with 15 nonzero rating entries. Earlier unregistered-trial observations predate the upgrade |
 | Transparent overlay | Verified with workaround | Software-rendering profile plus 1/255 black background; faint tint is intentional |
 | Hover preview clearing | Verified | Operator confirmed overlay and main-window previews disappear. WPF requested hide while the X11 surface retained old content before the alpha-floor test; the exact defective graphics function was not identified |
 | Movement/resizing/Alt-Tab | Verified for preceding visual profile | Operator confirmed deck follows and game input works. Final control gate was not separately subjected to the full transition sequence |
