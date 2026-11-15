@@ -58,6 +58,8 @@ For later launches, start Battle.net through Steam first, then simply run:
 devenv shell -- hdt-overlay-launch
 ```
 
+For automatic startup, `devenv shell -- bash autostart.sh` watches the configured Steam-class Hearthstone window every two seconds and invokes that same launcher once per game process. An existing HDT is reused; closing HDT manually does not cause repeated relaunches during that game session. A runtime lock prevents duplicate monitors. It never starts or changes Hearthstone. Run this monitor from your desktop session's startup mechanism. In the tested NixOS setup, a Hyprland-session Home Manager user service owns it; its canonical declaration belongs to the operator's homelab configuration, outside this portable repository. Disable that integration with `systemctl --user disable --now hdt-proton-autostart.service`. The real current-game launch and existing-HDT guard were tested; a fresh login/new game launch is still an operator test.
+
 This applies exact-title compositor rules and launches HDT in the running session. It never intentionally starts another Wine server or restarts Hearthstone. If no unique matching live server exists, it fails rather than guessing. A deleted fsync shared-memory file requires fully restarting the Steam game session yourself; do not delete shared-memory files underneath a live server.
 
 ## Tested installer extraction

@@ -1,6 +1,6 @@
 { pkgs, config, ... }:
 {
-  packages = with pkgs; [ bun nodejs_24 protontricks winetricks steam-run util-linux ripgrep jq unzip git rsync gitleaks xorg.xwininfo xorg.xprop gcc pkg-config xorg.libX11 xorg.libXcomposite xorg.libXrender ];
+  packages = with pkgs; [ bash shellcheck bun nodejs_24 protontricks winetricks steam-run util-linux ripgrep jq unzip git rsync gitleaks xorg.xwininfo xorg.xprop gcc pkg-config xorg.libX11 xorg.libXcomposite xorg.libXrender ];
   env.REA_PROJECT = config.devenv.root;
   env.W_CACHE = "${config.devenv.root}/cache/winetricks";
   env.npm_config_cache = "${config.devenv.root}/cache/npm";

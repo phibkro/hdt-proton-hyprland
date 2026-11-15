@@ -10,6 +10,7 @@
 !/config.test.ts
 !/hdt.local.example.json
 !/launch.ts
+!/autostart.sh
 !/control-input.ts
 !/overlay-rule.ts
 !/overlay-rules.lua
@@ -27,3 +28,4 @@
 !/docs/specs/
 /docs/specs/*
 !/docs/specs/publish-compatibility.md
+!/docs/specs/automatic-startup.md
