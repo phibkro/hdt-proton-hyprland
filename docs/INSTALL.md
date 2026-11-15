@@ -1,77 +1,106 @@
-# Install and start
+# Apply HDT compatibility fixes
 
-## Before setup
+Use this guide to apply the plugin to an existing HDT installation and start HDT alongside Hearthstone.
 
-Use the **existing Battle.net Steam shortcut, prefix and Proton version**. The tested profile is **Proton Experimental / Wine 11.0**, HDT 1.60.1 and Hyprland 0.56.2 with XWayland. Native Wayland is untested. The launcher discovers the actual running wineserver and derives its Proton path; it does not hardcode Experimental or switch versions.
+## Prepare the installation
 
-You need Nix/devenv, native Steam, Hyprland with its Lua API, and working native Microsoft .NET Framework 4.8 in the game's prefix. Wine Mono failed in this investigation. Installing .NET modifies the prefix: stop its processes and preserve a recoverable copy first. This project does not silently install .NET or alter the game prefix. See the evaluated [Linux Proton install guide](https://github.com/Bakedpotato-99/Hearthstone-Deck-Tracker-linux-proton-install) and [protonfixes work](https://github.com/Open-Wine-Components/umu-protonfixes/pull/557); neither establishes this project's Hyprland behavior.
+Before you start, confirm that you have these prerequisites:
 
-Copy `hdt.local.example.json` to `hdt.local.json` and set the actual numeric Steam shortcut ID. This private file is the configuration root. Optional `steamRoot` selects another absolute Steam directory. `HS_APP_ID` and `STEAM_ROOT` override those values; `HDT_APP_DIR` selects the complete HDT application directory. The default app directory is `app/` under the checkout.
+- Nix and devenv.
+- Native Steam with the existing Battle.net shortcut and Hearthstone installation.
+- Hyprland with its Lua API and XWayland.
+- Native Microsoft .NET Framework 4.8 in the game's prefix.
+- A complete HDT installation with its companion files and Velopack updater.
 
-Use the authentic HDT installer to obtain a **complete installed Velopack layout** (`Update.exe`, `packages/`, `current/`). Point `app` at `managed/current`, or set `HDT_APP_DIR` to the installation's `current/` directory. Keep companion files and the installation parent. The launcher resolves physical paths so the updater can locate `Update.exe`. An extracted `lib/app` alone starts HDT but produced “Updating to latest version failed.”
+Keep the existing Steam shortcut and Proton selection. The [tested environment](COMPATIBILITY.md#tested-environment) uses Proton Experimental. For a version comparison, use [Test stable Proton](TESTING.md#test-stable-proton).
 
-The inspected installer for HDT 1.60.1 had SHA-256 `25a83214b2bde1a290ba7bb2f1979f23ad374280ce90f1fff2c1da1d053a2e95`. Its checked CLI supports `--silent --installto <Windows-path> --log <Windows-path>`; see [Velopack setup reference](https://docs.velopack.io/reference/cli/content/setup-windows). It must run in the same live Steam namespace/prefix. The investigation's full installation already exists; setup below preserves it. A portable full-install/.NET bootstrap is **not yet supplied**. No HDT binaries or accounts are distributed here.
+This guide starts after HDT and .NET installation. For the installation requirements, see the [HDT installation reference](REFERENCE.md#hdt-installation).
 
-## Apply the compatibility plugin
+1. Open a terminal in the repository checkout.
+2. If `hdt.local.json` does not exist, copy the example:
 
-Start Battle.net through its existing Steam shortcut. HDT must have been opened once to create its Roaming settings. If necessary, initialize it with `HDT_DIRECT=1 devenv shell -- hdt-launch` after installing HDT, then leave it open or close it normally.
+   ```sh
+   cp hdt.local.example.json hdt.local.json
+   ```
 
-From the checkout:
+3. Set `steamAppId` in `hdt.local.json` to the numeric ID of the existing Battle.net Steam shortcut.
+4. If Steam uses another directory, set `steamRoot` to its absolute path. See [Configuration](REFERENCE.md#configuration).
+5. If `app` already points to the complete HDT installation, keep that link. Otherwise, set `HDT_APP_DIR` to its `current/` directory before each command:
 
-```sh
-devenv shell -- hdt-setup
-```
+   ```sh
+   export HDT_APP_DIR="$PWD/managed/current"
+   ```
 
-This compiles against your actual HDT companion assemblies using the prefix's native .NET compiler, normally closes only the identified HDT window if open, backs up/replaces its compatibility plugin, enables its plugin entry, and backs up/sets the three overlay background/menu visibility settings. It fails if the tracker refuses to exit; close HDT yourself and retry. It never force-stops a process. Other plugins/settings remain intact. Private recovery files stay under `backups/`.
+   Use that command only when `managed/current` contains your installed HDT application.
 
-Start the patched profile:
+## Apply the plugin
 
-```sh
-devenv shell -- hdt-overlay-launch
-```
+Setup can close HDT. Finish any tracking test before you run setup.
 
-No HDT executable patch is required: the compatibility changes are a plugin, process-local rendering flags, and compositor integration. Detailed observed coverage is in [COMPATIBILITY.md](COMPATIBILITY.md).
+1. Start Battle.net through the existing Steam shortcut.
+2. If HDT has not created its Roaming settings, start HDT once:
 
-## Start alongside the Steam shortcut
+   ```sh
+   HDT_DIRECT=1 devenv shell -- hdt-launch
+   ```
 
-The startup chain is:
+3. Leave HDT open or close HDT normally.
+4. Apply the compatibility plugin and settings:
 
-```text
-Steam Battle.net shortcut → existing desktop HDT watcher service
-                        ↘ original Steam/Proton command → Battle.net → Hearthstone
-                                                          ↓ window detected
-                                                     patched HDT launcher
-```
+   ```sh
+   devenv shell -- hdt-setup
+   ```
 
-The tested machine already has `hdt-proton-autostart.service`. Its canonical Home Manager declaration is [homelab PR #92](https://github.com/phibkro/homelab/pull/92). It runs the same project watcher, starts HDT once per game process and reuses an existing tracker. Manually closing HDT does not trigger repeated relaunches in that game session. The root `autostart.sh` forwards to `scripts/autostart.sh` for existing service declarations.
+   On success, the command prints `Compatibility setup complete.` followed by the launch command. If HDT refuses to exit, close HDT manually and retry. Setup does not force-stop HDT.
 
-To obtain the exact line for your checkout:
+5. Start HDT with the compatibility settings:
 
-```sh
-devenv shell -- hdt-steam-options
-```
+   ```sh
+   devenv shell -- hdt-overlay-launch
+   ```
 
-Paste its output into **Steam → existing Battle.net shortcut → Properties → Launch Options**. The generated line has this shape:
+6. Start Hearthstone from Battle.net when you are ready.
+7. Run the [desktop checks](TESTING.md#test-the-overlay).
 
-```sh
-bash '/absolute/path/to/hdt-proton/scripts/steam-launch.sh' %command%
-```
+## Start HDT from the Steam shortcut
 
-This belongs to **Steam's shortcut Launch Options**. Battle.net's per-game additional arguments are passed to Hearthstone and cannot launch this host integration. Keep the Steam shortcut target, app ID and compatibility selection unchanged. If you already use a wrapper, compose it around `%command%` rather than discarding it. No Steam configuration is edited by these tools.
+This procedure requires `hdt-proton-autostart.service` in your desktop session. The tested machine's Home Manager declaration is in [homelab PR #92](https://github.com/phibkro/homelab/pull/92).
 
-The wrapper requests the existing systemd user service, then execs Steam's original command with its original arguments. If the service is unavailable it warns and still starts the game. It requires the separately configured desktop service; it is not a portable service installer. The service's session startup remains useful when Battle.net outlives its initial launcher process. Repeated service starts are idempotent.
+1. Confirm that the desktop service exists:
 
-Remove the wrapper from Launch Options to undo that integration. To disable desktop startup entirely, disable its declaration (Home Manager on the tested machine) and stop the service when you're finished playing. Do not stop it mid-match: its cgroup can own HDT. For a temporary stop outside play: `systemctl --user stop hdt-proton-autostart.service`.
+   ```sh
+   systemctl --user status hdt-proton-autostart.service
+   ```
 
-Steam-client launch acceptance for the new wrapper is pending. Its actual subprocess argument/exit behavior and activation of the already-running desktop service are checked independently.
+   If the unit is missing, configure the service before you continue. The Steam wrapper does not install a service.
 
-## Comparing stable Proton
+2. Generate the Launch Options line for your checkout:
 
-As of this investigation, **only Experimental is installed locally**. Valve distinguishes [stable, Next and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions). Stable is a comparison candidate, not a demonstrated fix. Check Steam's available numbered releases at test time; do not infer the current stable version from a stale guide.
+   ```sh
+   devenv shell -- hdt-steam-options
+   ```
 
-1. Finish play, close HDT and all Battle.net/Hearthstone processes, and stop the watcher. Verify the prefix has no live wineserver. Preserve a consistent copy of the **entire compatdata directory**, including metadata outside `pfx`, plus the shortcut's current compatibility selection and HDT data. The existing pre-.NET recovery copy predates later settings and is not a substitute for this new checkpoint.
-2. Install the desired stable Proton through Steam. For maximum isolation, make a separate test Steam shortcut/prefix copy and configure this project with that new app ID. This uses extra disk and may require Battle.net authentication. A direct same-prefix test instead needs the stopped checkpoint above and deliberate rollback of the whole directory; avoid an unprotected prefix downgrade.
-3. Launch through Steam yourself. The HDT launcher derives that session's Proton automatically. Verify native CLR loading, startup/game detection, fresh Power.log, overlay transparency, move/resize, game clicks, controls, hover clearing and Alt-Tab. Check an actual saved Arena match, live offer/pick updates and Premium ratings separately.
-4. If anything regresses, stop the test processes before restoring the checkpoint and Experimental selection. Never copy registry files or switch wineservers underneath a running game.
+3. In Steam, open the existing Battle.net shortcut's **Properties**.
+4. Paste the generated line into **Launch Options**. Keep `%command%` in the line.
+5. If you already use a wrapper, preserve that wrapper around `%command%`.
+6. Keep the shortcut target, app ID, and compatibility selection unchanged.
+7. On the next launch, run [Test automatic startup](TESTING.md#test-automatic-startup).
 
-No stable switch or prefix copy was performed for the repository reorganization.
+Use Steam's **Launch Options** field. Battle.net's per-game arguments go to Hearthstone and cannot start the host service.
+
+## Remove automatic startup
+
+To remove the Steam integration, delete the wrapper from the shortcut's **Launch Options**.
+
+To stop desktop startup, follow these steps outside play:
+
+1. Disable the service declaration in your desktop configuration. On the tested machine, edit the Home Manager declaration.
+2. Stop the service:
+
+   ```sh
+   systemctl --user stop hdt-proton-autostart.service
+   ```
+
+The service can own HDT's processes. Stopping the service can close HDT.
+
+For plugin removal, see [Remove the compatibility plugin](DEVELOPMENT.md#remove-the-compatibility-plugin).
