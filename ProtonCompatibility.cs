@@ -1,0 +1,167 @@
+// Local HDT plugin, using HDT's existing plugin lifecycle and layout APIs.
+// No game writes, injected game code, window activation, or additional hooks.
+using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Interop;
+using System.Collections.Generic;
+using System.IO;
+using System.Web.Script.Serialization;
+using Hearthstone_Deck_Tracker.Utility.Extensions;
+using Hearthstone_Deck_Tracker.Plugins;
+using Hearthstone_Deck_Tracker.Utility.Logging;
+using Api = Hearthstone_Deck_Tracker.API.Core;
+
+public sealed class ProtonCompatibility : IPlugin {
+    public string Name { get { return "Proton desktop compatibility"; } }
+    public string Description { get { return "Refresh overlay geometry; optional input and hover diagnostics."; } }
+    public string ButtonText { get { return "No settings"; } }
+    public string Author { get { return "Local investigation"; } }
+    public Version Version { get { return new Version(0,4,0); } }
+    public MenuItem MenuItem { get { return null; } }
+    bool pending;
+    int moves;
+    DateTime lastRegionWrite = DateTime.MinValue;
+    DateTime lastHoverWrite = DateTime.MinValue;
+    string hoverOutput;
+    int tooltipShows, tooltipHides;
+    bool tooltipRequested;
+    DateTime lastTooltipEvent = DateTime.MinValue;
+    int[] lastPreviewBounds;
+    bool alphaFloorApplied;
+    bool mouseDiagnosticsAttached;
+    int overlayMouseDowns,overlayMouseUps;
+    string lastMouseTargetType;
+    public void OnLoad() {
+        RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+        Log.Info("Local Proton compatibility enabled; WPF software rendering requested");
+        hoverOutput = Environment.GetEnvironmentVariable("HDT_HOVER_DIAGNOSTICS_FILE");
+        if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged += ObserveTooltip;
+    }
+    public void OnUnload() {
+        if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged -= ObserveTooltip;
+        var overlay=Api.OverlayWindow;
+        if(overlay!=null && mouseDiagnosticsAttached) {
+            overlay.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMouseDown));
+            overlay.RemoveHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMouseUp));
+            mouseDiagnosticsAttached=false;
+        }
+        Log.Info("Local Proton compatibility stopped; layout refreshes="+moves);
+    }
+    void ObserveTooltip(Func<FrameworkElement> tooltip, DependencyObject owner) {
+        // Observe the request; never invoke the factory or alter tooltip state.
+        tooltipRequested = tooltip != null;
+        if(tooltipRequested) tooltipShows++; else tooltipHides++;
+        lastTooltipEvent = DateTime.UtcNow;
+    }
+    public void OnButtonPress() { }
+    public void OnUpdate() {
+        var overlay = Api.OverlayWindow;
+        if(overlay == null || pending) return;
+        if(overlay.Dispatcher.CheckAccess()) UpdateUi();
+        else {
+            pending = true;
+            overlay.Dispatcher.BeginInvoke((Action)(() => { try { UpdateUi(); } finally { pending = false; } }));
+        }
+    }
+    void UpdateUi() {
+        var overlay = Api.OverlayWindow;
+        if(overlay!=null && !mouseDiagnosticsAttached && !String.IsNullOrEmpty(hoverOutput)) {
+            overlay.AddHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMouseDown),true);
+            overlay.AddHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMouseUp),true);
+            mouseDiagnosticsAttached=true;
+        }
+        if(overlay!=null && !alphaFloorApplied && Environment.GetEnvironmentVariable("HDT_ALPHA_FLOOR")=="1") {
+            // Experiment: avoid exactly zero-alpha background in Wine's layered-window path.
+            // Local to this window; a restart without the flag restores HDT's own background.
+            overlay.Background=new SolidColorBrush(Color.FromArgb(1,0,0,0));
+            alphaFloorApplied=true;
+            Log.Info("Local Proton overlay alpha-floor experiment enabled (1/255 black)");
+        }
+        if(overlay != null && overlay.IsContentVisible) {
+            var rect = Hearthstone_Deck_Tracker.User32.GetHearthstoneRect(true);
+            if(rect.Width > 0 && rect.Height > 0 &&
+                (overlay.Left != rect.Left || overlay.Top != rect.Top || overlay.Width != rect.Width || overlay.Height != rect.Height)) {
+                overlay.UpdatePosition();
+                moves++;
+                if(moves == 1 || moves % 20 == 0) Log.Info("Local Proton overlay layout refresh "+moves);
+            }
+        }
+        var main = (Window)(object)Api.MainWindow;
+        // Ask WPF to refresh its own mouse-over state; no synthetic native clicks/movement.
+        // Covers templated/native tooltip hosts without a second tree/tooltip state model.
+        if(main != null && main.IsVisible && main.IsActive) Mouse.Synchronize();
+        if(!String.IsNullOrEmpty(hoverOutput) && (DateTime.UtcNow-lastHoverWrite).TotalMilliseconds>=500) {
+            int openTooltips=0, visibleCardPreviews=0;
+            foreach(PresentationSource source in PresentationSource.CurrentSources) {
+                var root = source.RootVisual;
+                if(root != null) CountPreviews(root,ref openTooltips,ref visibleCardPreviews);
+            }
+            var json = new JavaScriptSerializer().Serialize(new {
+                observedUTC=DateTime.UtcNow.ToString("o"), tooltipShows, tooltipHides, tooltipRequested,
+                lastTooltipEventUTC=lastTooltipEvent.ToString("o"), openTooltips, visibleCardPreviews,
+                overlayVisible=overlay!=null && overlay.IsVisible, lastPreviewBounds, alphaFloorApplied,
+                overlayMouseDowns, overlayMouseUps, lastMouseTargetType
+            });
+            File.WriteAllText(hoverOutput+".next",json);
+            if(File.Exists(hoverOutput)) File.Replace(hoverOutput+".next",hoverOutput,null);
+            else File.Move(hoverOutput+".next",hoverOutput);
+            lastHoverWrite=DateTime.UtcNow;
+        }
+        var output = Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
+        if(overlay != null && !String.IsNullOrEmpty(output) && (DateTime.UtcNow-lastRegionWrite).TotalMilliseconds>=200) {
+            var source = PresentationSource.FromVisual(overlay);
+            if(source != null && source.CompositionTarget != null) {
+                var matrix = source.CompositionTarget.TransformToDevice;
+                var clip = Rect.Transform(new Rect(0,0,overlay.ActualWidth,overlay.ActualHeight),matrix);
+                var regions = new List<int[]>();
+                if(overlay.IsContentVisible) CollectControls(overlay,overlay,matrix,clip,regions);
+                var json = new JavaScriptSerializer().Serialize(new {
+                    session=Environment.GetEnvironmentVariable("HDT_INPUT_SESSION"),
+                    observedMS=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    width=(int)Math.Round(clip.Width), height=(int)Math.Round(clip.Height), rectangles=regions
+                });
+                File.WriteAllText(output+".next",json);
+                // Same-directory replacement keeps readers from observing a half-written snapshot.
+                if(File.Exists(output)) File.Replace(output+".next",output,null);
+                else File.Move(output+".next",output);
+                lastRegionWrite=DateTime.UtcNow;
+            }
+        }
+    }
+    void ObserveMouseDown(object sender,MouseButtonEventArgs e) {
+        overlayMouseDowns++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;
+    }
+    void ObserveMouseUp(object sender,MouseButtonEventArgs e) {
+        overlayMouseUps++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;
+    }
+    void CountPreviews(DependencyObject node, ref int openTooltips, ref int visibleCardPreviews) {
+        var tooltip=node as ToolTip;
+        if(tooltip!=null && tooltip.IsOpen) openTooltips++;
+        var element=node as FrameworkElement;
+        if(element!=null && element.IsVisible && element.GetType().Name=="CardTooltip") {
+            visibleCardPreviews++;
+            var a=element.PointToScreen(new Point(0,0));
+            var b=element.PointToScreen(new Point(element.ActualWidth,element.ActualHeight));
+            lastPreviewBounds=new[]{(int)Math.Floor(a.X),(int)Math.Floor(a.Y),(int)Math.Ceiling(b.X-a.X),(int)Math.Ceiling(b.Y-a.Y)};
+        }
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)
+            CountPreviews(VisualTreeHelper.GetChild(node,i),ref openTooltips,ref visibleCardPreviews);
+    }
+    void CollectControls(DependencyObject node,Window overlay,Matrix device,Rect clip,List<int[]> regions) {
+        var e=node as FrameworkElement;
+        if(e!=null && (!e.IsVisible || e.Opacity==0)) return;
+        if(e!=null && OverlayExtensions.GetIsOverlayHitTestVisible(e) && e.ActualWidth>0 && e.ActualHeight>0) {
+            var bounds=Rect.Transform(e.TransformToAncestor(overlay).TransformBounds(new Rect(e.RenderSize)),device);
+            bounds.Intersect(clip);
+            if(!bounds.IsEmpty) {
+                int left=(int)Math.Floor(bounds.Left),top=(int)Math.Floor(bounds.Top);
+                int right=(int)Math.Ceiling(bounds.Right),bottom=(int)Math.Ceiling(bounds.Bottom);
+                if(right>left && bottom>top) regions.Add(new[]{left,top,right-left,bottom-top});
+            }
+        }
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++) CollectControls(VisualTreeHelper.GetChild(node,i),overlay,device,clip,regions);
+    }
+}

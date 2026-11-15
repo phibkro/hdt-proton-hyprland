@@ -1,0 +1,11 @@
+# Temporary exception: preserve the tested investigation runtime
+
+Scope: the existing Bun/TypeScript command-line supervisor and diagnostics, plus the minimal configuration extraction needed to publish them. Owner: repository maintainer. Recorded 2026-11-15.
+
+The house default is native Effect. This investigation has no installed Effect package, guidance, house overlay or application scaffold. Its tested runtime uses Bun's process API to enter an existing Steam user/mount namespace and supervises the compositor helper. Publication preserves that runtime rather than introducing a framework migration into a working desktop session. This is a deliberate temporary exception, not a claim that Effect lacks process or filesystem capabilities. Native Effect/platform services would be the first option for a semantic rewrite; wrapping every existing promise without redesigning supervision would not establish that migration.
+
+Verification: configuration rejection tests, clean-checkout TypeScript bundling, native read-only probe compilation and compilation of the plugin against the real installed HDT/.NET assemblies. Desktop behavior was operator-observed before publication; the configuration refactor is checked against the same running setup without restarting it. Bun 1.4.4 is the observed runtime; devenv.lock pins the toolchain. A later change to process supervision, configuration authority or runtime dependencies reopens this exception and requires examining the then-installed Effect guidance.
+
+The existing shell session's private prefix tree makes unbounded test discovery unsuitable; the documented test command explicitly selects config.test.ts. A broad initial discovery run was stopped and the bounded run passed.
+
+C# is required by HDT's .NET Framework plugin interface. The small C diagnostic uses Xlib/XComposite/XRender directly; it reads only the identified overlay's backing pixmap. No web application or infrastructure scaffold is applicable. No Python source is shipped.
