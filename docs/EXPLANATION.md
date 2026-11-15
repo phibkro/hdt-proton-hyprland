@@ -42,7 +42,7 @@ The level-five Arena score badge contains a WPF `ParticleEmitter`. Its Loaded ha
 
 The isolated replay reproduced `88980406` with level-five particles, including without the compatibility plugin. Internal card models advanced while the displayed scores remained on the first offer. Level-four badges passed. Level-five badges also passed when the emitter's Loaded handler was prevented from running.
 
-Plugin version 0.5.0 registers a class handler before future emitters load. It handles that event and collapses the emitter, preventing its particle initialization and timer. Ratings, badge artwork, and scoring requests remain in HDT's own implementation. Existing emitters require an HDT restart to remove.
+Plugin version 0.5.0 registers a class handler before future emitters load. It handles that event and collapses the emitter, preventing its particle initialization and timer. WPF invokes class handlers before instance handlers; normally registered instance handlers skip handled events. See [WPF class handling](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/events/marking-routed-events-as-handled-and-class-handling). Ratings, badge artwork, and scoring requests remain in HDT's own implementation. Existing emitters require an HDT restart to remove.
 
 This comparison isolates the particle path under the tested Proton configuration. It does not identify a specific Wine, Direct3D, or driver function. The workaround removes cosmetic particles. It does not disable Arenasmith or hide scores.
 

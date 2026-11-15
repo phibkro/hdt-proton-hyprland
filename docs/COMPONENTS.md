@@ -39,6 +39,7 @@ The diagram combines live observations, project source, and inspected upstream s
 | Crash dialog | Error display and modal lifetime | Runtime identified `CrashDialog`. REA inspection of the installed handler confirms that `ShowDialog` precedes report-file creation and writing. A stuck dialog can therefore prevent a fresh report file |
 | Arena watchers | Cached draft state and emitted changes | Installed `HearthWatcher.dll` contains `PollingWatcher.RunLoopAsync` and `Dispatch`. Method inventory alone does not prove a running watcher remains healthy |
 | Arena view model | Detected choices, availability, ratings, and visibility | Exported state can show the view model and visual as active. That does not establish that choices or ratings match the current offer |
+| Arena score particles | Cosmetic 3D particle systems on level-five badges | Isolated replay reproduced `88980406` with particles and passed when their initialization was suppressed. Plugin 0.5.0 applies that workaround. Scores and badge artwork remain enabled |
 | Compatibility plugin | Geometry refresh, input rectangles, and diagnostic observations | [Plugin source](../src/plugin/ProtonCompatibility.cs). The plugin does not make additional HearthMirror queries |
 | Input bridge and Hyprland rules | Validated rectangles, overlay focus permission, and stacking | [Bridge](../src/hyprland/control-input.ts) and [rules](../src/hyprland/overlay-rules.lua). Game state is not their source of truth |
 | Proton presentation | Windows graphics and window calls | The tested HDT process loaded native CLR and Direct3D components. Component loading does not identify the defective call |
@@ -58,6 +59,8 @@ The overlay is one window with several views. Classify a test by its update path
 | Arena draft | Successive offers, picks, ratings, and departure from drafting | Operator reports the first offer appears, then previous ratings persist and main-window controls become unresponsive |
 
 This comparison concentrates the investigation on Arena draft transitions. It does not yet establish whether the failure begins in a watcher, ratings work, a UI callback, or presentation. White main and crash windows remain separately observed symptoms.
+
+The later corrected replay isolated a presentation failure in the level-five score particle path. Internal card models advanced while pixels remained on the first offer, so the earlier stale display did not prove stalled watcher events. After the particle workaround was installed, the operator confirmed multiple live offer updates and responsive main-window controls. This establishes the tested workaround, not the absence of other watcher or rendering defects.
 
 The relevant test state is a combination of dimensions, rather than a single Arena-mode flag.
 
