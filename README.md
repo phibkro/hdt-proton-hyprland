@@ -15,6 +15,7 @@ The [tested configuration](docs/COMPATIBILITY.md#tested-environment) uses Proton
 | Look up commands, settings, or source files | [Command and configuration reference](docs/REFERENCE.md) |
 | Check what passed and what remains untested | [Observed compatibility](docs/COMPATIBILITY.md) |
 | Understand the rendering, input, and window fixes | [HDT compatibility design](docs/EXPLANATION.md) |
+| Distinguish window, draft-state, and rendering failures | [HDT windows, state, and failure observations](docs/COMPONENTS.md) |
 
 ## Scope
 

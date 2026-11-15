@@ -19,12 +19,14 @@ public sealed class ProtonCompatibility : IPlugin {
     public string Description { get { return "Refresh overlay geometry; optional input and hover diagnostics."; } }
     public string ButtonText { get { return "No settings"; } }
     public string Author { get { return "Local investigation"; } }
-    public Version Version { get { return new Version(0,4,1); } }
+    public Version Version { get { return new Version(0,4,2); } }
     public MenuItem MenuItem { get { return null; } }
     bool pending;
     int moves;
     DateTime lastRegionWrite = DateTime.MinValue;
     DateTime lastHoverWrite = DateTime.MinValue;
+    DateTime lastWindowWrite = DateTime.MinValue;
+    int failureSequence;
     string hoverOutput;
     int tooltipShows, tooltipHides;
     bool tooltipRequested;
@@ -38,11 +40,15 @@ public sealed class ProtonCompatibility : IPlugin {
     int mainMouseDowns, mainMouseUps;
     public void OnLoad() {
         RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+        // The filter runs before HDT's handler opens its modal crash dialog.
+        // Observe only: never change RequestCatch or exception handling.
+        Application.Current.Dispatcher.UnhandledExceptionFilter += ObserveDispatcherFailure;
         Log.Info("Local Proton compatibility enabled; WPF software rendering requested");
         hoverOutput = Environment.GetEnvironmentVariable("HDT_HOVER_DIAGNOSTICS_FILE");
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged += ObserveTooltip;
     }
     public void OnUnload() {
+        Application.Current.Dispatcher.UnhandledExceptionFilter -= ObserveDispatcherFailure;
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged -= ObserveTooltip;
         var overlay=Api.OverlayWindow;
         var main=(Window)(object)Api.MainWindow;
@@ -65,6 +71,63 @@ public sealed class ProtonCompatibility : IPlugin {
         lastTooltipEvent = DateTime.UtcNow;
     }
     public void OnButtonPress() { }
+    void ObserveDispatcherFailure(object sender, System.Windows.Threading.DispatcherUnhandledExceptionFilterEventArgs e) {
+        var regionFile=Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
+        if(String.IsNullOrEmpty(regionFile) || failureSequence>=32) return;
+        var sequence=++failureSequence;
+        try {
+            var exceptions=new List<object>();
+            for(var error=e.Exception;error!=null && exceptions.Count<8;error=error.InnerException) {
+                var methods=new List<string>();
+                var frames=new System.Diagnostics.StackTrace(error,false).GetFrames();
+                if(frames!=null) foreach(var frame in frames) {
+                    var method=frame.GetMethod();
+                    if(method!=null) methods.Add((method.DeclaringType==null?"":method.DeclaringType.FullName+".")+method.Name);
+                }
+                exceptions.Add(new {type=error.GetType().FullName,hresult=error.HResult.ToString("X8"),methods});
+            }
+            var windows=new List<object>();
+            foreach(Window window in Application.Current.Windows) {
+                if(!window.Dispatcher.CheckAccess()) {
+                    windows.Add(new {type=window.GetType().FullName,uiThread=window.Dispatcher.Thread.ManagedThreadId,inspectedOnOwner=false});
+                    continue;
+                }
+                windows.Add(new {type=window.GetType().FullName,width=window.ActualWidth,height=window.ActualHeight,
+                    visible=window.IsVisible,active=window.IsActive,allowsTransparency=window.AllowsTransparency});
+            }
+            var output=Path.Combine(Path.GetDirectoryName(regionFile),"dispatcher-failures-"+System.Diagnostics.Process.GetCurrentProcess().Id+".jsonl");
+            File.AppendAllText(output,new JavaScriptSerializer().Serialize(new {
+                observedUTC=DateTime.UtcNow.ToString("o"),sequence,captureLimit=32,exceptions,windows,
+                processRenderMode=RenderOptions.ProcessRenderMode.ToString(),sources=DescribeSources()
+            })+Environment.NewLine);
+        } catch {
+            // A diagnostic write failure must not replace HDT's original exception.
+            Log.Warn("Could not save local dispatcher failure diagnostics");
+        }
+    }
+    List<object> DescribeSources() {
+        var sources=new List<object>();
+        foreach(PresentationSource source in PresentationSource.CurrentSources) {
+            if(!source.Dispatcher.CheckAccess()) {
+                sources.Add(new {sourceType=source.GetType().FullName,uiThread=source.Dispatcher.Thread.ManagedThreadId,inspectedOnOwner=false});
+                continue;
+            }
+            var root=source.RootVisual;
+            if(root==null) continue;
+            if(!root.Dispatcher.CheckAccess()) {
+                sources.Add(new {rootType=root.GetType().FullName,uiThread=root.Dispatcher.Thread.ManagedThreadId,inspectedOnOwner=false});
+                continue;
+            }
+            var target=source.CompositionTarget as HwndTarget;
+            var element=root as FrameworkElement;
+            sources.Add(new {rootType=root.GetType().FullName,uiThread=root.Dispatcher.Thread.ManagedThreadId,inspectedOnOwner=true,
+                renderMode=target==null?null:target.RenderMode.ToString(),
+                width=element==null?(double?)null:element.ActualWidth,
+                height=element==null?(double?)null:element.ActualHeight,
+                visible=element==null?(bool?)null:element.IsVisible});
+        }
+        return sources;
+    }
     public void OnUpdate() {
         var overlay = Api.OverlayWindow;
         if(overlay == null || pending) return;
@@ -124,6 +187,16 @@ public sealed class ProtonCompatibility : IPlugin {
             lastHoverWrite=DateTime.UtcNow;
         }
         var output = Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
+        if(!String.IsNullOrEmpty(output) && (DateTime.UtcNow-lastWindowWrite).TotalMilliseconds>=1000) {
+            var snapshot=Path.Combine(Path.GetDirectoryName(output),"presentation-state.json");
+            var json=new JavaScriptSerializer().Serialize(new {
+                observedUTC=DateTime.UtcNow.ToString("o"),processRenderMode=RenderOptions.ProcessRenderMode.ToString(),sources=DescribeSources()
+            });
+            File.WriteAllText(snapshot+".next",json);
+            if(File.Exists(snapshot)) File.Replace(snapshot+".next",snapshot,null);
+            else File.Move(snapshot+".next",snapshot);
+            lastWindowWrite=DateTime.UtcNow;
+        }
         if(overlay != null && !String.IsNullOrEmpty(output) && (DateTime.UtcNow-lastRegionWrite).TotalMilliseconds>=200) {
             var source = PresentationSource.FromVisual(overlay);
             if(source != null && source.CompositionTarget != null) {
