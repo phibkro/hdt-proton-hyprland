@@ -63,6 +63,9 @@ export class InputJournal {
     await this.record(kind,{source:cursor.name,previousOffset:cursor.offset,generation:++cursor.generation,continuity:"unknown"});
     cursor.offset=0;cursor.anchor=undefined;
   }
+  protected openSource(path:string) {
+    return open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+  }
   async poll() {
     if(this.closed) throw Error("Journal is closed.");
     const before=this.seq;
@@ -84,12 +87,23 @@ export class InputJournal {
         }
       }
       if(!cursor.handle && pathStat) {
-        const handle=await open(cursor.path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
-        const actual=await handle.stat();
-        if(!actual.isFile() || `${actual.dev}:${actual.ino}`!==identity) {await handle.close();throw Error(`Source ${cursor.name} changed while opening.`);}
-        cursor.handle=handle;cursor.identity=identity;
+        let handle:FileHandle;
+        try {handle=await this.openSource(cursor.path);}
+        catch(error) {
+          if((error as NodeJS.ErrnoException).code!=="ENOENT") throw error;
+          await this.reset(cursor,"source.open-raced");cursor.unavailable=true;continue;
+        }
+        let actual;
+        try {
+          actual=await handle.stat();
+          if(!actual.isFile()) throw Error(`Source ${cursor.name} must be a regular file.`);
+          // The descriptor identifies what we read. Atomic replacement after
+          // lstat is normal for UI snapshots and must not stop other sources.
+          if(`${actual.dev}:${actual.ino}`!==identity) await this.reset(cursor,"source.open-raced");
+        } catch(error) {await handle.close();throw error;}
+        cursor.handle=handle;cursor.identity=`${actual.dev}:${actual.ino}`;
         if(cursor.generation===0 && cursor.unavailable===undefined && this.from==="end") cursor.offset=actual.size;
-        await this.record("source.open",{source:cursor.name,identity,offset:cursor.offset,generation:cursor.generation});
+        await this.record("source.open",{source:cursor.name,identity:cursor.identity,offset:cursor.offset,generation:cursor.generation});
         cursor.unavailable=false;
         await this.drain(cursor);
       } else if(!pathStat && !cursor.unavailable) {

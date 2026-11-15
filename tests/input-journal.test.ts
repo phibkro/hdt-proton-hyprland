@@ -11,6 +11,33 @@ async function fixture(run:(root:string)=>Promise<void>) {
 const records=async(root:string)=> (await readFile(join(root,"journal.jsonl"),"utf8")).trim().split("\n").map(s=>JSON.parse(s));
 const recovered=(rows:any[],generation:number)=>Buffer.concat(rows.filter(r=>r.kind==="source.bytes" && r.data.generation===generation).map(r=>Buffer.from(r.data.base64,"base64")));
 
+for(const replacement of [false,true]) test(`collector survives a source ${replacement?"replacement":"disappearance"} between stat and open`,()=>fixture(async root=>{
+  const source=join(root,"state.json"),output=join(root,"journal");
+  await writeFile(source,"old");
+  let raced=false;
+  class RacingJournal extends InputJournal {
+    protected override async openSource(path:string) {
+      if(!raced) {
+        raced=true;await rename(path,path+".old");
+        if(replacement) await writeFile(path,"new");
+      }
+      return super.openSource(path);
+    }
+  }
+  const journal=new RacingJournal(output,[{name:"state",path:source}],"end",1048576);
+  await journal.start();
+  try {
+    await journal.poll();
+    expect(raced).toBe(true);
+    if(!replacement) await writeFile(source,"new");
+    await journal.poll();await journal.close("test");
+    const rows=await records(output);
+    expect(rows.some(r=>r.kind==="source.open-raced" && r.data.continuity==="unknown")).toBe(true);
+    expect(recovered(rows,1).toString()).toBe("new");
+    expect(rows.at(-1)).toMatchObject({kind:"journal.stop",data:{reason:"test"}});
+  } finally {await journal.close("cleanup");}
+}));
+
 test("journal preserves exact bytes across partial UTF-8 writes and rotation",()=>fixture(async root=>{
   const source=join(root,"hdt.log"),output=join(root,"journal");
   const bytes=Buffer.from("Info|Game ended\r\n雪\n");

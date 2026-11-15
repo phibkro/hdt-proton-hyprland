@@ -84,6 +84,12 @@ continuity unknown. Rewrites between polls can escape detection if their checked
 bytes are unchanged. Backlogs remain visible in source offsets; acquisition time
 is not the time Hearthstone generated an event.
 
+An input that disappears or changes between the path check and descriptor open
+produces `source.open-raced` with unknown continuity. The collector resumes at
+byte zero of the next opened generation. Other sources continue. The opened
+descriptor supplies the authoritative file identity. Symlinks and nonregular
+files remain errors.
+
 Storage capacity is explicit. Exhaustion stops collection with a failure record
 and nonzero exit status. The collector retains existing evidence. Disk errors
 can prevent a final record; stderr and the command's exit status remain the
