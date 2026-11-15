@@ -71,6 +71,7 @@
 !/docs/COMPONENTS.md
 !/docs/UI-REPLAY.md
 !/docs/specs/ui-replay.md
+!/docs/specs/arena-freeze-investigation.md
 !/src/replay/
 /src/replay/*
 !/src/replay/ReplayHost.cs

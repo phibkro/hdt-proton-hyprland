@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-root=$1 run=$2 proton=$3 negative=$4
+root=$1 run=$2 proton=$3 negative=$4 plugin=$5 level=$6 particles=$7
 export PATH=$HDT_REPLAY_TOOLS_PATH
 [[ "$run" == "$root/local/replay/runs/"* ]]
 jq -e --arg run "$run" '.kind=="hdt-ui-replay-run" and .run==$run' "$run/ownership.json" >/dev/null
@@ -10,7 +10,7 @@ source_prefix=$(jq -er .sourcePrefix "$root/local/replay/ownership.json")
 awk -F: 'NR>2 {gsub(/ /,"",$1); if($1!="lo") bad=1} END {exit bad}' /proc/net/dev
 for tool in Xvfb openbox xcompmgr xdotool xwininfo magick; do command -v "$tool" >/dev/null; done
 export WINEPREFIX=$run/prefix XDG_RUNTIME_DIR=$run/runtime
-export WINEDLLOVERRIDES='mscoree=n,b' WINEDEBUG=-all
+export WINEDLLOVERRIDES='mscoree=n,b;d3d9=n' WINEDEBUG=-all
 export DXVK_CONFIG='d3d9.shaderModel = 1' DXVK_LOG_PATH=$run
 Xvfb -displayfd 3 -screen 0 2560x1440x24 -nolisten tcp -ac 3>"$run/display" >"$run/xvfb.log" 2>&1 &
 xvfb_pid=$!
@@ -28,11 +28,19 @@ cd "$run/app"
 cp HearthstoneDeckTracker.exe.config ReplayHost.exe.config
 winpath() { printf 'Z:%s' "${1//\//\\}"; }
 wpf='C:\windows\Microsoft.NET\Framework64\v4.0.30319\WPF'
+if [[ "$plugin" == true ]]; then
+    timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
+        /nologo /target:library /platform:x64 /out:ProtonCompatibility.dll /r:HearthstoneDeckTracker.exe \
+        /r:HearthMirror.dll /r:MahApps.Metro.dll /r:System.Drawing.dll /r:System.Xaml.dll /r:System.Web.Extensions.dll \
+        /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
+        "$(winpath "$root/src/plugin/ProtonCompatibility.cs")" >"$run/plugin-compile.log" 2>&1
+    export HDT_ALPHA_FLOOR=1 HDT_INPUT_SESSION=isolated-replay HDT_INPUT_REGION_FILE=$run/plugin-input.json
+fi
 timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
     /nologo /target:winexe /platform:x64 /out:ReplayHost.exe /r:System.Xaml.dll /r:System.Web.Extensions.dll \
     /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
     "$(winpath "$root/src/replay/ReplayHost.cs")" >"$run/compile.log" 2>&1
-timeout 70 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" >"$run/wine.log" 2>&1 &
+timeout 70 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" "$plugin" "$level" "$particles" >"$run/wine.log" 2>&1 &
 host_pid=$!
 for ((i=0;i<200;i++)); do
     [[ -s "$run/state.json" ]] && break
@@ -64,16 +72,32 @@ settings() {
     send settings-close
 }
 settings
-for phase in arena-lobby draft-1 draft-2 menu; do
+for phase in arena-lobby draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 menu; do
     send "$phase"
     sleep 1
     cp "$run/state.json" "$run/$phase.json"
+    jq -c '{observedUTC,commandId,scene,cards,plaqueLevels,visibleScores}' "$run/state.json" >>"$run/transitions.jsonl"
     magick import -window root "$run/$phase.png"
     settings
 done
-jq -e '.cards==["CS2_029","CS2_032","CS2_172"] and .visibleScores==["60","61","62"]' "$run/draft-1.json" >/dev/null
-jq -e '.cards==["CS2_024","CS2_025","CS2_182"] and .visibleScores==["80","81","82"]' "$run/draft-2.json" >/dev/null
+jq -se '[.[] | select(.scene | startswith("draft-"))] | length==12' "$run/transitions.jsonl" >/dev/null
+levels='[1,3,5]' emitters=1
+if [[ "$level" != mixed ]]; then
+    levels="[$level,$level,$level]"; emitters=0
+    [[ "$level" != 5 ]] || emitters=3
+fi
+[[ "$particles" == true ]] || emitters=0
+[[ "$plugin" == false ]] || emitters=0
+jq -e --argjson levels "$levels" --argjson emitters "$emitters" '.cards==["CS2_029","CS2_032","CS2_172"] and .visibleScores==["60","61","62"] and .plaqueLevels==$levels and .visibleEmitters==$emitters' "$run/draft-1.json" >/dev/null
+jq -e --argjson levels "$levels" --argjson emitters "$emitters" '.cards==["CS2_024","CS2_025","CS2_182"] and .visibleScores==["80","81","82"] and .plaqueLevels==$levels and .visibleEmitters==$emitters' "$run/draft-2.json" >/dev/null
 jq -e '.cards==[] and .arenaVisibility=="Collapsed" and .visibleScores==[]' "$run/menu.json" >/dev/null
+if [[ "$plugin" == true ]]; then
+    jq -e '.pluginUpdates>0' "$run/draft-2.json" >/dev/null
+    jq -e '.state.arenaClientState=="None"' "$run/plugin-input.json" >/dev/null
+    if [[ "$particles" == true && ( "$level" == mixed || "$level" == 5 ) ]]; then
+        jq -e '.state.arenaParticleEmittersSuppressed>=1' "$run/plugin-input.json" >/dev/null
+    fi
+fi
 mapfile -t mains < <(xdotool search --onlyvisible --name '^Hearthstone Deck Tracker$')
 [[ ${#mains[@]} == 1 ]]
 xdotool windowsize "${mains[0]}" 1280 720

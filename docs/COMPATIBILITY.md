@@ -47,6 +47,7 @@ The later saved Arena wins establish successful recording after the earlier fail
 | Stale deck list | Resolved by deck selection | The user confirmed that the wrong deck had been selected in HDT |
 | White main and crash windows during drafting | Failed in later tests | New, repeated Settings clicks, and a floating-state change were associated with failures. A live dispatcher capture recorded COMException `88980406`. The overlay remained drawn, but repainting was not established |
 | Fresh offer after a draft pick | Failed in a later user observation | The previous offer's ratings remained visible. UI exports continued. The failing stage remains unknown |
+| Arena score particle path | Reproduced and suppressed in isolation | Actual level-five badges reproduced `88980406`, stale pixels, and white window regions without the compatibility plugin. Version 0.5.0 prevented particle initialization and passed 12 simulated decisions with native Settings clicks. Live acceptance remains pending |
 | Battlegrounds menu and match | Verified by user observation | The operator reports working main-window interaction in both contexts and a working in-game overlay. This comparison did not instrument every Battlegrounds update |
 
 The rendering and input mechanisms are described in [HDT compatibility design](EXPLANATION.md).
@@ -85,7 +86,9 @@ The [Nix installation guide](NIX.md) covers the package, module, and desktop act
 
 Two fresh replay runs on 2026-11-15 passed synthetic lobby → first offer → second offer → menu transitions under Proton Experimental. Each run used the actual HDT main window and Arena control, verified changed card models and displayed scores, and accepted native Settings clicks in each phase. Resize, generic popup state, and the actual New deck-type dialog also passed. A deliberate assertion failure returned status 1 and retained evidence. No `ReplayHost.exe` or Xvfb process remained after that failure.
 
-This fixture did not reproduce the live Arena stall. It bypasses normal HDT startup, HearthMirror, watcher dispatch, and ArenaSmith requests. It excludes the compatibility plugin and uses Xvfb with Openbox rather than Hyprland. Passing these checks does not establish a live fix or isolate which omitted path causes the failure. See [Replay HDT UI transitions in isolation](UI-REPLAY.md) for the procedure.
+Those initial runs covered level-zero badges: HDT preferred the fixture's default dynamic-score object. The corrected fixture asserts actual plaque levels and particle visibility. With native Direct3D 9 selected and the HDT-only DXVK shader-model setting applied, level-five particles reproduced `88980406` without the plugin. Version 0.5.0 passed 12 decisions with three level-five badges and zero active emitters. Direct3D selection and the shader setting were confirmed in DXVK's log. The private Xvfb environment used Vulkan llvmpipe, so this does not identify a hardware-driver defect.
+
+The replay bypasses normal HDT startup, HearthMirror, watcher dispatch, and ArenaSmith requests. Plugin coverage requires `--with-plugin`. It uses Xvfb with Openbox rather than Hyprland. Passing these checks does not establish a live fix. See [Replay HDT UI transitions in isolation](UI-REPLAY.md) for the procedure.
 
 Raw logs and saved game records remain private because they contain account or game data. The public record contains selected facts rather than the raw files.
 

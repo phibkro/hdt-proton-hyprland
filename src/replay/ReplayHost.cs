@@ -23,6 +23,9 @@ class ReplayHost {
     static bool finished;
     static string scene="menu";
     static Popup popup;
+    static object compatibilityPlugin;
+    static int pluginUpdates;
+    static int? plaqueLevel;
     static JavaScriptSerializer serializer=new JavaScriptSerializer();
     static void Record(string phase, Exception error) {
         for(var current=error;current!=null;current=current.InnerException)
@@ -39,12 +42,20 @@ class ReplayHost {
         return runner.Run(args);
     }
     public static int Run(string[] args) {
-        if(args.Length!=1) return 2;
+        if(args.Length!=4) return 2;
         output=args[0];
+        plaqueLevel=args[2]=="mixed"?(int?)null:int.Parse(args[2]);
         try {
             RenderOptions.ProcessRenderMode=System.Windows.Interop.RenderMode.SoftwareOnly;
             directory=Path.GetDirectoryName(output);
             hdt=Assembly.LoadFrom("HearthstoneDeckTracker.exe");
+            if(!bool.Parse(args[3])) {
+                var emitter=hdt.GetType("Hearthstone_Deck_Tracker.Controls.Overlay.Arena.ParticleEmitter",true);
+                EventManager.RegisterClassHandler(emitter,FrameworkElement.LoadedEvent,new RoutedEventHandler((sender,e)=> {
+                    e.Handled=true;
+                    ((FrameworkElement)sender).Visibility=Visibility.Collapsed;
+                }));
+            }
             Application.ResourceAssembly=hdt;
             var app=(Application)Activator.CreateInstance(hdt.GetType("Hearthstone_Deck_Tracker.App",true));
             app.GetType().GetMethod("InitializeComponent").Invoke(app,null);
@@ -61,6 +72,11 @@ class ReplayHost {
             overlay.Background=new SolidColorBrush(Color.FromArgb(1,0,0,0));
             overlay.GetType().GetMethod("ShowOverlay").Invoke(overlay,new object[]{true});
             arena=Get(overlay,"ArenaPickHelperViewModel");
+            if(bool.Parse(args[1])) {
+                var assembly=Assembly.LoadFrom("ProtonCompatibility.dll");
+                compatibilityPlugin=Activator.CreateInstance(assembly.GetType("ProtonCompatibility",true));
+                compatibilityPlugin.GetType().GetMethod("OnLoad").Invoke(compatibilityPlugin,null);
+            }
             main.AddHandler(System.Windows.Input.Mouse.PreviewMouseDownEvent,new System.Windows.Input.MouseButtonEventHandler((sender,e)=>mouseDowns++),true);
             var timer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(100)};
             bool firstTick=true;
@@ -69,6 +85,10 @@ class ReplayHost {
                     if(firstTick) File.AppendAllText(output,"first-tick"+Environment.NewLine);
                     ProcessCommand();
                     if(finished) return;
+                    if(compatibilityPlugin!=null) {
+                        compatibilityPlugin.GetType().GetMethod("OnUpdate").Invoke(compatibilityPlugin,null);
+                        pluginUpdates++;
+                    }
                     Snapshot();
                     if(firstTick) File.AppendAllText(output,"first-snapshot"+Environment.NewLine);
                     firstTick=false;
@@ -118,7 +138,12 @@ class ReplayHost {
         var data=Activator.CreateInstance(ctor.GetParameters()[1].ParameterType);
         var scores=EnsureChild(data,"Arenasmith");
         Set(scores,"Score",(scene=="draft-1"?60+index:80+index).ToString());
-        Set(scores,"Plaque",index*2+1);
+        Set(scores,"Plaque",plaqueLevel??index*2+1);
+        // The installed model initializes dynamic scores with a level-zero
+        // plaque. Its constructor prefers that plaque over the static score.
+        var dynamicScores=EnsureChild(data,"ArenasmithDyn");
+        Set(dynamicScores,"Score",(scene=="draft-1"?60+index:80+index).ToString());
+        Set(dynamicScores,"Plaque",plaqueLevel??index*2+1);
         EnsureChild(data,"Messages");
         var related=EnsureChild(data,"RelatedCards");
         var generated=EnsureChild(related,"GeneratedCardIds");
@@ -177,6 +202,7 @@ class ReplayHost {
                 newDeckCommand.Execute("Mage");break;
             case "finish":
                 commandId=id;Snapshot();finished=true;
+                if(compatibilityPlugin!=null) compatibilityPlugin.GetType().GetMethod("OnUnload").Invoke(compatibilityPlugin,null);
                 hdt.GetType("Hearthstone_Deck_Tracker.Core").GetProperty("IsShuttingDown").SetValue(null,true,null);
                 Application.Current.Shutdown(exitCode);return;
             default:throw new InvalidOperationException("Unknown replay command");
@@ -194,11 +220,17 @@ class ReplayHost {
         var view=overlay.FindName("ArenaPickHelper") as FrameworkElement;
         var cards=Get(arena,"CardStats") as IEnumerable;
         var ids=new List<string>();
-        if(cards!=null) foreach(var card in cards) ids.Add((string)Get(Get(card,"Card"),"Id"));
-        var data=new {observedUTC=DateTime.UtcNow.ToString("o"),commandId,scene,mouseDowns,
+        var plaqueLevels=new List<int>();
+        if(cards!=null) foreach(var card in cards) {
+            ids.Add((string)Get(Get(card,"Card"),"Id"));
+            plaqueLevels.Add((int)Get(Get(card,"PlaqueViewModel"),"Level"));
+        }
+        var data=new {observedUTC=DateTime.UtcNow.ToString("o"),commandId,scene,mouseDowns,pluginUpdates,
             mainWin32Handle=new WindowInteropHelper(main).Handle.ToInt64(),mainWidth=main.ActualWidth,mainHeight=main.ActualHeight,
             settingsButton=bounds,settingsOpen=(bool)Get(main.FindName("FlyoutOptions"),"IsOpen"),
-            arenaVisibility=view.Visibility.ToString(),arenaOpacity=view.Opacity,cards=ids,
+            arenaVisibility=view.Visibility.ToString(),arenaOpacity=view.Opacity,cards=ids,plaqueLevels,
+            renderingTier=RenderCapability.Tier,
+            visibleEmitters=Children<FrameworkElement>(overlay).Count(e=>e.IsVisible && e.GetType().Name=="ParticleEmitter"),
             popupOpen=popup!=null && popup.IsOpen,
             visibleDialogTypes=Children<FrameworkElement>(main).Where(e=>e.IsVisible && e.GetType().Name.EndsWith("Dialog")).Select(e=>e.GetType().FullName).Distinct().ToArray(),
             visibleScores=Children<FrameworkElement>(overlay).Where(t=>t.IsVisible && t.GetType().Name=="HearthstoneTextBlock")
