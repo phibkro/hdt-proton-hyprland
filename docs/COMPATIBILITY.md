@@ -8,7 +8,7 @@ Desktop session tested on 2026-11-15: NixOS, Hyprland 0.56.2 (`efb50993780079460
 |---|---|---|
 | HDT startup | Verified | Native Microsoft CLR mapped in the real tracker process; tracker stayed open after earlier Wine Mono crashes |
 | Game detection | Verified | Correct log directory, fresh Power.log consumption and automatic import of an existing complete Arena deck |
-| Standard match recording | Verified | Two saved Ranked/Standard results; one was observed through an HDT-only restart during the match |
+| Standard match recording | Verified | Three saved Ranked/Standard results at cleanup; one earlier match was observed through an HDT-only restart |
 | Arena match recording | Failed | Two observed Arena completions were not saved while HDT stopped progressing. The later history still contained only the two Standard results; recovery restart does not prove Arena recording fixed |
 | Live Arena redraft recording | Verified for saved events | After the operator's redraft, HDT saved five picks with three choices each. Individual displayed card identities were not compared; a fresh full draft remains untested |
 | ArenaSmith ratings | Verified for recorded redraft | Operator upgraded to Premium. All five recorded picks report ArenaSmith available and overlay visible, with 15 nonzero rating entries. Earlier unregistered-trial observations predate the upgrade |
@@ -16,7 +16,9 @@ Desktop session tested on 2026-11-15: NixOS, Hyprland 0.56.2 (`efb50993780079460
 | Hover preview clearing | Verified | Operator confirmed overlay and main-window previews disappear. WPF requested hide while the X11 surface retained old content before the alpha-floor test; the exact defective graphics function was not identified |
 | Movement/resizing/Alt-Tab | Verified for preceding visual profile | Operator confirmed deck follows and game input works. Final control gate was not separately subjected to the full transition sequence |
 | Selective control input | Verified for one control and ordinary pass-through | Operator closed the blue Mulligan Guide announcement and confirmed transparent space still interacts with Hearthstone. WPF mouse-event counters also advanced; every HDT control was not individually tested |
-| Stacking/flicker | Verified in transient-link test | Linking only the overlay's X11 transient parent to the game lets Hyprland raise them together; repeated raising disabled after readback. Operator confirmed no flicker, clearing and control input, including after relaunch. Separate stale-deck/stray-visual and main-window input complaints remain under investigation |
+| Stacking/flicker | Verified in transient-link test | Linking only the overlay's X11 transient parent to the game lets Hyprland raise them together; repeated raising disabled after readback. Operator confirmed no flicker, clearing and control input, including after relaunch |
+| Automatic startup | Verified for current session | Enabled Hyprland-session user service detects the real game, reuses an existing tracker and launches the compatibility profile without duplicates. Fresh-login/new-game transition remains untested |
+| Residual Arena analysis / main-window input | Not reproduced after recovery | User confirmed normal operation after restart and leaving Arena. WPF reported the Arena panel Collapsed outside Arena. Wrong deck selection explained the stale list; the earlier residual visual and apparent freeze have no isolated root-cause fix |
 | HDT update check | Verified after full installation | Same verified 1.60.1 installer, complete Velopack layout, same prefix/Proton. Update check reports “No new update available”; previous NotInstalledException absent. Future version download/application remains untested |
 | Long-session UI liveness | Failed later observation | After successful visual/control tests, both UI heartbeat and control export timestamps stopped progressing while the process stayed alive. Current log also stopped; no matching HearthMirror RPC exception was found. Cause unisolated; stale regions expired as designed |
 
@@ -40,8 +42,10 @@ Blanket no_focus prevented compositor selection of HDT controls. Enabling focus 
 
 1. Play and finish an existing Arena match; confirm a saved Arena result independently of Power.log completion.
 2. When an Arena offer is available, pause before selecting. Compare the displayed options with HDT's automatic detection, then let the operator pick and verify the next offer/pick state.
-3. Check ArenaSmith ratings separately from detection, including account availability and HSReplay errors.
+3. Extend the successful redraft/rating test to a fresh initial draft and compare displayed individual offers with detected cards.
 4. Exercise more overlay controls, drag/resize/Alt-Tab under the final input gate, and additional monitor/scale configurations.
 5. Isolate the later UI/export stall and complete a sustained session with fresh heartbeats. No claim that matched WINEFSYNC or the visual fixes resolve this stall.
 
 Arena entry, picks and gameplay remain operator actions. No game patch, injected rendering, automatic picks or account bypass is implemented.
+
+At cleanup the operator reported that everything seemed to work. Live read-only checks still found native CLR, advancing UI/input snapshots, enabled automatic startup and the Arena panel Collapsed during gameplay. This is acceptance of the current profile, not evidence that an unretaken Arena match or a future long-session test has passed.

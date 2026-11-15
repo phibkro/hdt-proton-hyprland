@@ -2,7 +2,7 @@
 
 A local compatibility plugin and launcher for **HSReplay's Hearthstone Deck Tracker (HDT)** alongside Hearthstone launched through a Battle.net Steam shortcut. Tested with HDT 1.60.1, Proton Experimental / Wine 11.0, and Hyprland 0.56.2 using **XWayland**. This is not a general native-Wayland port or an official HearthSim project.
 
-The tested profile provides a shared Steam Proton session, transparent overlay rendering, clearing hover previews, geometry updates, foreground stacking and selective control input. **Arena match recording failed an earlier test; live draft offers/picks and ArenaSmith ratings remain untested.** See [observed compatibility and limitations](docs/COMPATIBILITY.md).
+The operator accepted the current desktop profile after testing transparent rendering, preview clearing, geometry, stacking and interactive controls. Automatic redraft recording and ArenaSmith ratings were also observed. The authoritative results and remaining gaps are in [observed compatibility and limitations](docs/COMPATIBILITY.md), including earlier Arena match-recording and session-liveness failures that have not been conclusively resolved.
 
 ## What the fixes do
 
@@ -15,7 +15,7 @@ The tested profile provides a shared Steam Proton session, transparent overlay r
 | Overlay drops behind the game | Exact-title Hyprland rules and overlay-only stacking; lower it when another app is active |
 | Blank space blocks Hearthstone, or controls cannot receive clicks | Export HDT's marked clickable rectangles and allow compositor input only while the pointer is over a control |
 
-The original 100ms restacking workaround caused a brief hide/reappearance after clicks. A later operator-confirmed fix links the X11 overlay as a transient of the game and disables repeated raising after verifying that relationship. Hover clearing, control input and Alt-Tab passed that test. Separate stale-deck/stray-visual and main-window input complaints remain under investigation. The originally tested button was the close button on the blue Mulligan Guide announcement. Do not infer every control works.
+The original 100ms restacking workaround caused a brief hide/reappearance after clicks. The accepted fix links the X11 overlay as a transient of the game and disables repeated raising after verifying that relationship. Hover clearing, control input and Alt-Tab passed that test. Selecting a different deck resolved the reported stale deck list. The reported residual Arena analysis and main-window input symptoms cleared after restart; their underlying causes were not isolated. The originally tested button was the close button on the blue Mulligan Guide announcement. Do not infer every control works.
 
 Later in the same desktop session, HDT stayed alive while its UI heartbeat/control exports stopped updating. The control bridge expired stale data as designed. This remains an unresolved stability limitation; the repository publishes the observed compatibility workarounds, not a fully stable Linux port.
 
@@ -102,6 +102,10 @@ To remove the plugin, close HDT and remove only `ProtonCompatibility.dll` from i
 The retired `HDT_ELEMENT_INPUT=1` XShape-only experiment is rejected by the launcher. It did not establish working control routing. The current bridge has a session nonce, exact window identity/geometry/freshness checks and a roughly one-second expiry if updates stop. It emits no synthetic clicks and does not modify game memory.
 
 The private input-region snapshot also records cached scene/menu/draft-panel state and main-window mouse-event counters. These distinguish a stopped UI thread from input/repaint symptoms without extra HearthMirror polling or account/card identifiers. They are diagnostic observations, not a fix for every reported freeze or stale visual.
+
+Automatic deck detection is separate from clicking a deck in Hearthstone's menus: it can identify a matching deck from in-match cards and ask when candidates are ambiguous. The observed configuration kept automatic detection enabled. HDT's `AutoUseDeck` setting concerns selecting a deck inside HDT, not mirroring every Hearthstone menu click. Arena draft recording and ArenaSmith access are separate from this selection.
+
+Keep `app/` (or `HDT_APP_DIR`), the complete installed updater layout, `hdt.local.json`, `local/systemd/`, and active `evidence/` runtime files in place. The automatic-start service may reference the project-owned generated unit under `local/systemd/`. Old investigation outputs are archived locally; account data, recovery copies, third-party references and raw evidence are ignored by Git and are not release contents.
 
 ## Development and provenance
 
