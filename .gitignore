@@ -87,3 +87,10 @@
 !/tests/desktop.test.ts
 !/nix/desktop-entry.desktop.in
 !/docs/NIX.md
+
+!/src/plugin/FlightRecorder.cs
+!/src/diagnostics/trace-export.ts
+!/tests/FlightRecorderChecks.cs
+!/tests/trace-export.test.ts
+!/docs/DIAGNOSTICS.md
+!/docs/specs/local-flight-recorder.md

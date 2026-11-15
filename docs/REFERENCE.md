@@ -126,3 +126,5 @@ Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service decl
 | `devenv.nix`, `devenv.yaml`, and `devenv.lock` | Commands and toolchain dependencies |
 
 The checkout root also contains private installation, configuration, and investigation files. Git excludes `app`, `managed`, `hdt.local.json`, `backups`, `evidence`, `cache`, `reference`, and `local`. Runtime helper paths remain under `evidence/`.
+
+See [freeze diagnostics](DIAGNOSTICS.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.

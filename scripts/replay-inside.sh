@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root=$1 run=$2 proton=$3 negative=$4 plugin=$5 level=$6 particles=$7
+snapshot=$run/source
+battlegrounds_tabs=${8:-false}
+diagnostics=${9:-false}
 export PATH=$HDT_REPLAY_TOOLS_PATH
 [[ "$run" == "$root/local/replay/runs/"* ]]
 jq -e --arg run "$run" '.kind=="hdt-ui-replay-run" and .run==$run' "$run/ownership.json" >/dev/null
@@ -29,17 +32,25 @@ cp HearthstoneDeckTracker.exe.config ReplayHost.exe.config
 winpath() { printf 'Z:%s' "${1//\//\\}"; }
 wpf='C:\windows\Microsoft.NET\Framework64\v4.0.30319\WPF'
 if [[ "$plugin" == true ]]; then
+    plugin_sources=()
+    for source in "$snapshot"/src/plugin/*.cs; do plugin_sources+=("$(winpath "$source")"); done
     timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
         /nologo /target:library /platform:x64 /out:ProtonCompatibility.dll /r:HearthstoneDeckTracker.exe \
         /r:HearthMirror.dll /r:MahApps.Metro.dll /r:System.Drawing.dll /r:System.Xaml.dll /r:System.Web.Extensions.dll \
         /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
-        "$(winpath "$root/src/plugin/ProtonCompatibility.cs")" >"$run/plugin-compile.log" 2>&1
+        "${plugin_sources[@]}" >"$run/plugin-compile.log" 2>&1
     export HDT_ALPHA_FLOOR=1 HDT_INPUT_SESSION=isolated-replay HDT_INPUT_REGION_FILE=$run/plugin-input.json
+fi
+if [[ "$diagnostics" == true ]]; then
+    timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
+        /nologo /target:exe /platform:x64 /out:FlightRecorderChecks.exe /r:System.Web.Extensions.dll \
+        "$(winpath "$snapshot/tests/FlightRecorderChecks.cs")" "$(winpath "$snapshot/src/plugin/FlightRecorder.cs")" >"$run/recorder-compile.log" 2>&1
+    timeout --kill-after=3s 10 "$proton/files/bin/wine" "$run/app/FlightRecorderChecks.exe" "$(winpath "$run/recorder-checks")" >"$run/recorder-checks.log" 2>&1
 fi
 timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
     /nologo /target:winexe /platform:x64 /out:ReplayHost.exe /r:System.Xaml.dll /r:System.Web.Extensions.dll \
     /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
-    "$(winpath "$root/src/replay/ReplayHost.cs")" >"$run/compile.log" 2>&1
+    "$(winpath "$snapshot/src/replay/ReplayHost.cs")" >"$run/compile.log" 2>&1
 timeout 70 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" "$plugin" "$level" "$particles" >"$run/wine.log" 2>&1 &
 host_pid=$!
 for ((i=0;i<200;i++)); do
@@ -72,6 +83,33 @@ settings() {
     send settings-close
 }
 settings
+if [[ "$diagnostics" == true ]]; then
+    # Give the independent writer time to post a ping before blocking WPF.
+    sleep 1.2
+    send diagnostic-ui-stall
+    sleep 1.5
+    recorder_root=$(dirname "$HDT_INPUT_REGION_FILE")
+    recorder_files=("$recorder_root"/flight-recorder-*/events.jsonl)
+    [[ ${#recorder_files[@]} == 1 && -f ${recorder_files[0]} ]]
+    jq -se 'any(.[]; .name=="ui.stall") and any(.[]; .name=="ui.recovered") and any(.[]; .name=="ui.dispatch" and .data.durationMS>=2000) and any(.[]; .name=="render.sample" and .data.callbacks>0) and any(.[]; .name=="build.identity")' "${recorder_files[0]}" >/dev/null
+    [[ -s $(dirname "${recorder_files[0]}")/first-stall-events.jsonl ]]
+fi
+if [[ "$battlegrounds_tabs" == true ]]; then
+    send bgs-start
+    for ((toggle=0;toggle<6;toggle++)); do
+        send bgs-minions-toggle
+        sleep 0.5
+        cp "$run/state.json" "$run/bgs-tab-$toggle.json"
+        if (( toggle % 2 == 0 )); then
+            jq -e '.battlegroundsActiveTab=="BattlegroundsMinionsViewModel" and .battlegroundsContent.visible and .battlegroundsContent.height>0 and .battlegroundsContent.minionViews==1 and .battlegroundsContent.groupViews>0' "$run/state.json" >/dev/null
+        else
+            jq -e '.battlegroundsActiveTab==null' "$run/state.json" >/dev/null
+        fi
+        magick import -window root "$run/bgs-tab-$toggle.png"
+        settings
+    done
+    send bgs-end
+fi
 for phase in arena-lobby draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 draft-1 draft-2 menu; do
     send "$phase"
     sleep 1
@@ -121,6 +159,12 @@ if [[ "$negative" == true ]]; then
 fi
 send finish
 wait "$host_pid"
+if [[ "$diagnostics" == true ]]; then
+    if [[ "$battlegrounds_tabs" == true ]]; then
+        jq -se '([.[]|select(.name=="battlegrounds.tab.changed")]|length)==6 and ([.[]|select(.name=="battlegrounds.minions.pointer.down")]|length)==6' "${recorder_files[0]}" >/dev/null
+    fi
+    bun "$snapshot/src/diagnostics/trace-export.ts" "$run/trace.json" "${recorder_files[0]}"
+fi
 if rg -q '^(dispatcher|command|startup) ' "$run/host.log"; then
     echo 'The fixture host recorded an exception.' >&2
     exit 1

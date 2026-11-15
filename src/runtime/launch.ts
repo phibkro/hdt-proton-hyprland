@@ -47,7 +47,8 @@ if (inside) {
       "/r:System.Web.Extensions.dll",
       "/r:"+win(join(appDirectory,"MahApps.Metro.dll")),
       ...["PresentationCore.dll","PresentationFramework.dll","WindowsBase.dll"].map(x=>"/r:"+wpf+x),
-      win(join(sourceRoot,"src/plugin/ProtonCompatibility.cs"))];
+      ...(await readdir(join(sourceRoot,"src/plugin"))).filter(x=>x.endsWith(".cs")).sort()
+        .map(x=>win(join(sourceRoot,"src/plugin",x)))];
     const p = Bun.spawn([join(dirname(proton),"files/bin/wine"),"C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe",...args],
       {cwd:root,env:e,stdout:"inherit",stderr:"inherit"});
     process.exit(await p.exited);
@@ -85,6 +86,8 @@ if (inside) {
     e.WINEDEBUG = "-all,+winediag";
   }
   if (process.env.HDT_DEBUG === "1") e.WINEDEBUG = "+mscoree,+seh";
+  e.HDT_FLIGHT_RECORDER=process.env.HDT_FLIGHT_RECORDER ?? "1";
+  if(!["0","1"].includes(e.HDT_FLIGHT_RECORDER)) throw Error("HDT_FLIGHT_RECORDER must be 0 or 1");
   if (process.env.HDT_HOVER_DIAGNOSTICS === "1") e.HDT_HOVER_DIAGNOSTICS_FILE = join(root,"evidence/hover-state.json");
   if (process.env.HDT_ALPHA_FLOOR === "1") e.HDT_ALPHA_FLOOR="1";
   if(process.env.HDT_CONTROL_INPUT === "1") {

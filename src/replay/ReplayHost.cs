@@ -2,6 +2,9 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Windows.Data;
+using System.Windows.Input;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,6 +28,7 @@ class ReplayHost {
     static Popup popup;
     static object compatibilityPlugin;
     static int pluginUpdates;
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool MoveFileEx(string source,string destination,int flags);
     static int? plaqueLevel;
     static JavaScriptSerializer serializer=new JavaScriptSerializer();
     static void Record(string phase, Exception error) {
@@ -190,6 +194,41 @@ class ReplayHost {
         switch(op) {
             case "menu":case "arena-lobby":case "draft-1":case "draft-2":SetScene(op);break;
             case "settings-close":Set(main.FindName("FlyoutOptions"),"IsOpen",false);break;
+            case "bgs-start":
+                scene="battlegrounds";
+                var minions=Get(overlay,"BattlegroundsMinionsVM");
+                Set(minions,"ActiveTier",(int?)1);
+                File.AppendAllText(output,"bgs-tier-buttons="+((IEnumerable)Get(minions,"TierButtons")).Cast<object>().Count()+
+                    " groups="+((IEnumerable)Get(minions,"Groups")).Cast<object>().Count()+Environment.NewLine);
+                ((FrameworkElement)overlay.FindName("BgsTopBar")).Visibility=Visibility.Visible;
+                ((FrameworkElement)overlay.FindName("GuidesTabs")).Visibility=Visibility.Visible;
+                ((FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent")).MaxHeight=overlay.ActualHeight-54;
+                break;
+            case "bgs-minions-toggle":
+                var tabs=Get(overlay,"BattlegroundsGuidesTabsViewModel");
+                var minionsCommand=(System.Windows.Input.ICommand)Get(tabs,"ShowMinionsCommand");
+                if(!minionsCommand.CanExecute(null)) throw new InvalidOperationException("Battlegrounds minion tab unavailable");
+                var minionsButton=Children<FrameworkElement>(overlay).FirstOrDefault(b=> {
+                    if(b.GetType().Name!="OverlayButton") return false;
+                    var commandProperty=(DependencyProperty)b.GetType().GetField("CommandProperty").GetValue(null);
+                    var binding=BindingOperations.GetBindingExpression(b,commandProperty);
+                    return binding!=null && binding.ParentBinding.Path.Path=="ShowMinionsCommand";
+                });
+                if(minionsButton==null) throw new InvalidOperationException("Battlegrounds card-back button missing");
+                // Exercise WPF's routed observation separately from the command.
+                // This is synthetic WPF input, not a native desktop-input test.
+                minionsButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) {RoutedEvent=Mouse.PreviewMouseDownEvent});
+                ((ICommand)Get(minionsButton,"Command")).Execute(null);
+                break;
+            case "diagnostic-ui-stall":
+                // Only the account-free replay host exposes this deliberate stall.
+                System.Threading.Thread.Sleep(3500);
+                break;
+            case "bgs-end":
+                Set(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel",null);
+                ((FrameworkElement)overlay.FindName("BgsTopBar")).Visibility=Visibility.Collapsed;
+                scene="menu";
+                break;
             case "popup-show":
                 popup=new Popup {PlacementTarget=main,Placement=PlacementMode.Center,AllowsTransparency=true,
                     Child=new Border {Background=Brushes.DarkBlue,Padding=new Thickness(20),Child=new TextBlock {Text="Replay popup fixture",Foreground=Brushes.White}}};
@@ -225,7 +264,12 @@ class ReplayHost {
             ids.Add((string)Get(Get(card,"Card"),"Id"));
             plaqueLevels.Add((int)Get(Get(card,"PlaqueViewModel"),"Level"));
         }
+        var bgsContent=(FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent");
         var data=new {observedUTC=DateTime.UtcNow.ToString("o"),commandId,scene,mouseDowns,pluginUpdates,
+            battlegroundsContent=new {visible=bgsContent.IsVisible,width=bgsContent.ActualWidth,height=bgsContent.ActualHeight,
+                minionViews=Children<FrameworkElement>(bgsContent).Count(e=>e.IsVisible && e.GetType().Name=="BattlegroundsMinions"),
+                groupViews=Children<FrameworkElement>(bgsContent).Count(e=>e.IsVisible && e.GetType().Name=="BattlegroundsCardsGroup")},
+            battlegroundsActiveTab=Get(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel")==null?null:Get(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel").GetType().Name,
             mainWin32Handle=new WindowInteropHelper(main).Handle.ToInt64(),mainWidth=main.ActualWidth,mainHeight=main.ActualHeight,
             settingsButton=bounds,settingsOpen=(bool)Get(main.FindName("FlyoutOptions"),"IsOpen"),
             arenaVisibility=view.Visibility.ToString(),arenaOpacity=view.Opacity,cards=ids,plaqueLevels,
@@ -237,7 +281,7 @@ class ReplayHost {
                 .Select(t=>(string)Get(t,"Text")).Where(t=>new[]{"60","61","62","80","81","82"}.Contains(t)).Distinct().OrderBy(t=>t).ToArray()};
         var path=Path.Combine(directory,"state.json");
         File.WriteAllText(path+".next",serializer.Serialize(data));
-        if(File.Exists(path)) File.Replace(path+".next",path,null);else File.Move(path+".next",path);
+        if(!MoveFileEx(path+".next",path,1)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
     }
 }
 

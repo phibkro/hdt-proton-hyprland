@@ -1,5 +1,5 @@
 // Local HDT plugin, using HDT's existing plugin lifecycle and layout APIs.
-// No game writes, injected game code, window activation, or additional hooks.
+// No game writes, injected game code, or window activation.
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,6 +9,8 @@ using System.Windows.Interop;
 using System.Collections.Generic;
 using System.IO;
 using System.Web.Script.Serialization;
+using System.ComponentModel;
+using System.Windows.Data;
 using Hearthstone_Deck_Tracker.Utility.Extensions;
 using Hearthstone_Deck_Tracker.Plugins;
 using Hearthstone_Deck_Tracker.Utility.Logging;
@@ -19,8 +21,13 @@ public sealed class ProtonCompatibility : IPlugin {
     public string Description { get { return "Refresh overlay geometry, suppress incompatible Arena particles, and export input diagnostics."; } }
     public string ButtonText { get { return "No settings"; } }
     public string Author { get { return "Local investigation"; } }
-    public Version Version { get { return new Version(0,5,0); } }
+    public Version Version { get { return new Version(0,5,1); } }
     public MenuItem MenuItem { get { return null; } }
+    FlightRecorder recorder;
+    INotifyPropertyChanged battlegroundsTabs;
+    object lastBattlegroundsView;
+    DateTime lastFlightSample=DateTime.MinValue;
+    string lastFlightState;
     bool pending;
     int moves;
     DateTime lastRegionWrite = DateTime.MinValue;
@@ -42,6 +49,14 @@ public sealed class ProtonCompatibility : IPlugin {
     static bool suppressArenaParticles;
     static int arenaParticleEmittersSuppressed;
     public void OnLoad() {
+        var inputFile=Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
+        if(!String.IsNullOrEmpty(inputFile) && Environment.GetEnvironmentVariable("HDT_FLIGHT_RECORDER")!="0") {
+            var dispatcher=Application.Current.Dispatcher;
+            recorder=new FlightRecorder(Path.GetDirectoryName(inputFile),Version.ToString(),
+                action=>dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,action),
+                message=>Log.Warn(message));
+            CompositionTarget.Rendering+=ObserveRendering;
+        }
         RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
         suppressArenaParticles=true;
         if(!particleHandlerRegistered) {
@@ -62,6 +77,11 @@ public sealed class ProtonCompatibility : IPlugin {
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged += ObserveTooltip;
     }
     public void OnUnload() {
+        CompositionTarget.Rendering-=ObserveRendering;
+        if(battlegroundsTabs!=null) battlegroundsTabs.PropertyChanged-=ObserveBattlegroundsTab;
+        battlegroundsTabs=null;
+        if(recorder!=null) {recorder.Stop();recorder=null;}
+        lastBattlegroundsView=null;
         suppressArenaParticles=false;
         Application.Current.Dispatcher.UnhandledExceptionFilter -= ObserveDispatcherFailure;
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged -= ObserveTooltip;
@@ -77,6 +97,7 @@ public sealed class ProtonCompatibility : IPlugin {
             overlay.RemoveHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMouseUp));
             mouseDiagnosticsAttached=false;
         }
+        if(overlay!=null) overlay.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveBattlegroundsPointer));
         Log.Info("Local Proton compatibility stopped; layout refreshes="+moves);
     }
     static void SuppressArenaParticleEmitter(object sender,RoutedEventArgs e) {
@@ -97,6 +118,7 @@ public sealed class ProtonCompatibility : IPlugin {
     }
     public void OnButtonPress() { }
     void ObserveDispatcherFailure(object sender, System.Windows.Threading.DispatcherUnhandledExceptionFilterEventArgs e) {
+        if(recorder!=null) recorder.Event("ui.exception",new {type=e.Exception.GetType().FullName,hresult=e.Exception.HResult.ToString("X8")});
         var regionFile=Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
         if(String.IsNullOrEmpty(regionFile) || failureSequence>=32) return;
         var sequence=++failureSequence;
@@ -164,6 +186,27 @@ public sealed class ProtonCompatibility : IPlugin {
     }
     void UpdateUi() {
         var overlay = Api.OverlayWindow;
+        if(overlay!=null && recorder!=null) {
+            var tabs=overlay.BattlegroundsGuidesTabsViewModel as INotifyPropertyChanged;
+            if(!Object.ReferenceEquals(tabs,battlegroundsTabs)) {
+                if(battlegroundsTabs!=null) battlegroundsTabs.PropertyChanged-=ObserveBattlegroundsTab;
+                battlegroundsTabs=tabs;
+                lastBattlegroundsView=tabs==null?null:overlay.BattlegroundsGuidesTabsViewModel.ActiveViewModel;
+                if(tabs!=null) tabs.PropertyChanged+=ObserveBattlegroundsTab;
+                overlay.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveBattlegroundsPointer));
+                overlay.AddHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveBattlegroundsPointer),true);
+            }
+            if((DateTime.UtcNow-lastFlightSample).TotalSeconds>=1) {
+                var arena=overlay.ArenaPickHelperViewModel;
+                string state=Api.Game.CurrentMode+"/"+Api.Game.IsInMenu+"/"+arena.ClientState+"/"+arena.SessionState+"/"+arena.IsOverlayVisible;
+                if(state!=lastFlightState) {
+                    recorder.Event("view.state",new {mode=Api.Game.CurrentMode.ToString(),inMenu=Api.Game.IsInMenu,
+                        arenaClientState=arena.ClientState.ToString(),arenaSessionState=arena.SessionState.ToString(),arenaVisible=arena.IsOverlayVisible});
+                    lastFlightState=state;
+                }
+                lastFlightSample=DateTime.UtcNow;
+            }
+        }
         if(overlay!=null && !mouseDiagnosticsAttached && !String.IsNullOrEmpty(hoverOutput)) {
             overlay.AddHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMouseDown),true);
             overlay.AddHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMouseUp),true);
@@ -245,7 +288,8 @@ public sealed class ProtonCompatibility : IPlugin {
                         arenaVisualOpacity=arenaVisual==null?(double?)null:arenaVisual.Opacity,
                         mainActive=main!=null && main.IsActive, mainEnabled=main!=null && main.IsEnabled,
                         mainMouseDowns=mainMouseDowns, mainMouseUps=mainMouseUps,
-                        arenaParticleEmittersSuppressed=arenaParticleEmittersSuppressed
+                        arenaParticleEmittersSuppressed=arenaParticleEmittersSuppressed,
+                        flightRecorderFailure=recorder==null?null:recorder.FailureType
                     }
                 });
                 File.WriteAllText(output+".next",json);
@@ -259,7 +303,34 @@ public sealed class ProtonCompatibility : IPlugin {
     void ObserveMouseDown(object sender,MouseButtonEventArgs e) {
         overlayMouseDowns++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;
     }
-    void ObserveMainMouseDown(object sender,MouseButtonEventArgs e) { mainMouseDowns++; }
+    void ObserveMainMouseDown(object sender,MouseButtonEventArgs e) {
+        mainMouseDowns++;
+        if(recorder!=null) recorder.Event("main.pointer.down",new {targetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name});
+    }
+    void ObserveRendering(object sender,EventArgs e) {if(recorder!=null) recorder.Rendered();}
+    void ObserveBattlegroundsTab(object sender,PropertyChangedEventArgs e) {
+        if(recorder==null || e.PropertyName!="ActiveViewModel") return;
+        var tabs=sender as Hearthstone_Deck_Tracker.Controls.Overlay.Battlegrounds.Guides.BattlegroundsGuidesTabsViewModel;
+        if(tabs==null) return;
+        var active=tabs.ActiveViewModel;
+        if(Object.ReferenceEquals(active,lastBattlegroundsView)) return;
+        lastBattlegroundsView=active;
+        recorder.Event("battlegrounds.tab.changed",new {viewType=active==null?null:active.GetType().Name});
+    }
+    void ObserveBattlegroundsPointer(object sender,MouseButtonEventArgs e) {
+        if(recorder==null || e.ChangedButton!=MouseButton.Left) return;
+        var node=e.OriginalSource as DependencyObject;
+        for(int depth=0;node!=null && depth<32;depth++) {
+            var button=node as Hearthstone_Deck_Tracker.Controls.Overlay.Battlegrounds.OverlayButton;
+            if(button!=null) {
+                var binding=BindingOperations.GetBindingExpression(button,Hearthstone_Deck_Tracker.Controls.Overlay.Battlegrounds.OverlayButton.CommandProperty);
+                if(binding!=null && binding.ParentBinding.Path!=null && binding.ParentBinding.Path.Path=="ShowMinionsCommand" && Object.ReferenceEquals(button.DataContext,battlegroundsTabs))
+                    recorder.Event("battlegrounds.minions.pointer.down",new {});
+                return;
+            }
+            node=node is Visual ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
+        }
+    }
     void ObserveMainMouseUp(object sender,MouseButtonEventArgs e) { mainMouseUps++; }
     void ObserveMouseUp(object sender,MouseButtonEventArgs e) {
         overlayMouseUps++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;
