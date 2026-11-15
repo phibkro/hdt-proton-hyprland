@@ -67,6 +67,8 @@
 !/scripts/hdt.sh
 !/scripts/desktop.sh
 !/docs/specs/nix-desktop.md
+!/docs/specs/render-failure-diagnostics.md
+!/docs/COMPONENTS.md
 !/tests/desktop.test.ts
 !/nix/desktop-entry.desktop.in
 !/docs/NIX.md

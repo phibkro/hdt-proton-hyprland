@@ -45,6 +45,8 @@ The later saved Arena wins establish successful recording after the earlier fail
 | Residual Arena analysis | Not reproduced after recovery | After restart and departure from Arena, the user reported normal behavior. WPF reported the Arena panel as `Collapsed`. No cause was isolated |
 | Apparent main-window freeze | Not reproduced after recovery | The user reported recovery after restart. In a later inspection, the common UI thread and mouse counters still advanced, so that inspection did not establish a full deadlock |
 | Stale deck list | Resolved by deck selection | The user confirmed that the wrong deck had been selected in HDT |
+| White main and crash windows during drafting | Failed in later tests | New, repeated Settings clicks, and a floating-state change were associated with failures. A live dispatcher capture recorded COMException `88980406`. The overlay remained drawn, but repainting was not established |
+| Fresh offer after a draft pick | Failed in a later user observation | The previous offer's ratings remained visible. UI exports continued. The failing stage remains unknown |
 
 The rendering and input mechanisms are described in [HDT compatibility design](EXPLANATION.md).
 
