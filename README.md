@@ -11,6 +11,7 @@ The [tested configuration](docs/COMPATIBILITY.md#tested-environment) uses Proton
 | Install through Nix and register the desktop app | [Install the compatibility tools with Nix](docs/NIX.md) |
 | Apply the plugin and start HDT with Steam | [Apply HDT compatibility fixes](docs/INSTALL.md) |
 | Build the plugin or diagnose an overlay problem | [Check and diagnose HDT](docs/DEVELOPMENT.md) |
+| Repeat synthetic Arena UI transitions without the live game | [Replay HDT UI transitions in isolation](docs/UI-REPLAY.md) |
 | Test tracking, draft updates, or another Proton version | [Test HDT with Hearthstone](docs/TESTING.md) |
 | Look up commands, settings, or source files | [Command and configuration reference](docs/REFERENCE.md) |
 | Check what passed and what remains untested | [Observed compatibility](docs/COMPATIBILITY.md) |

@@ -69,6 +69,13 @@
 !/docs/specs/nix-desktop.md
 !/docs/specs/render-failure-diagnostics.md
 !/docs/COMPONENTS.md
+!/docs/UI-REPLAY.md
+!/docs/specs/ui-replay.md
+!/src/replay/
+/src/replay/*
+!/src/replay/ReplayHost.cs
+!/scripts/replay.sh
+!/scripts/replay-inside.sh
 !/tests/desktop.test.ts
 !/nix/desktop-entry.desktop.in
 !/docs/NIX.md

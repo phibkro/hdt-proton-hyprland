@@ -36,7 +36,7 @@ The diagram combines live observations, project source, and inspected upstream s
 | HDT main window | Deck selection, commands, and flyouts | WPF runtime identified `MainWindow` with `AllowsTransparency=false` |
 | Overlay | Arena visuals, deck visuals, and marked interactive controls | WPF runtime identified `OverlayWindow` with `AllowsTransparency=true`. It is a separate native window in the HDT process |
 | Popup and tooltip hosts | Temporary visual roots | Some WPF popups have a separate presentation source. A complete inventory of HDT popup types and creation paths is not established |
-| Crash dialog | Error display and modal lifetime | Runtime identified `CrashDialog`. Inspected upstream handler calls `ShowDialog` before it writes the report. Exact control-flow correspondence to the installed build is not yet established |
+| Crash dialog | Error display and modal lifetime | Runtime identified `CrashDialog`. REA inspection of the installed handler confirms that `ShowDialog` precedes report-file creation and writing. A stuck dialog can therefore prevent a fresh report file |
 | Arena watchers | Cached draft state and emitted changes | Installed `HearthWatcher.dll` contains `PollingWatcher.RunLoopAsync` and `Dispatch`. Method inventory alone does not prove a running watcher remains healthy |
 | Arena view model | Detected choices, availability, ratings, and visibility | Exported state can show the view model and visual as active. That does not establish that choices or ratings match the current offer |
 | Compatibility plugin | Geometry refresh, input rectangles, and diagnostic observations | [Plugin source](../src/plugin/ProtonCompatibility.cs). The plugin does not make additional HearthMirror queries |
@@ -44,6 +44,20 @@ The diagram combines live observations, project source, and inspected upstream s
 | Proton presentation | Windows graphics and window calls | The tested HDT process loaded native CLR and Direct3D components. Component loading does not identify the defective call |
 
 ## Independent state dimensions
+
+### Overlay views and update paths
+
+The overlay is one window with several views. Classify a test by its update path as well as its visible screen.
+
+| View | Updates to distinguish | Observed status |
+|---|---|---|
+| Menus and configuration | Scene changes, selected deck, Settings, and other main-window commands | Settings works at the main menu and Battlegrounds menu, according to the operator |
+| Standard match | Live match events and the displayed deck | Saved Standard results verified. This does not cover every overlay control |
+| Battlegrounds match | Live match state and mode-specific visuals | Operator reports working overlay and main-window interaction during play |
+| Arena match | Live match events and the drafted deck | Two later match results verified. Match tracking does not establish draft tracking |
+| Arena draft | Successive offers, picks, ratings, and departure from drafting | Operator reports the first offer appears, then previous ratings persist and main-window controls become unresponsive |
+
+This comparison concentrates the investigation on Arena draft transitions. It does not yet establish whether the failure begins in a watcher, ratings work, a UI callback, or presentation. White main and crash windows remain separately observed symptoms.
 
 The relevant test state is a combination of dimensions, rather than a single Arena-mode flag.
 

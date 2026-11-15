@@ -45,3 +45,7 @@ Subprocess tests cover argument handling and exit behavior. The [compatibility r
 The lookup still has no installed Effect package or guidance. Packaging separates immutable source paths from the mutable data directory. The existing namespace launcher and input bridge keep their process model. Bash provides the desktop action and command dispatcher. No TypeScript dependency is added.
 
 Nix builds the native helpers before installation. The package supplies their paths explicitly. Configuration tests verify that installed source reads a separate mutable directory and rejects a Nix-store data path. A future supervisor rewrite still reopens this exception.
+
+## Isolated WPF replay
+
+The replay host uses C# to instantiate HDT's actual .NET Framework WPF classes. Bash composes Bubblewrap, the selected Steam runtime, Xvfb, and native X11 input tools. These are the existing project shell and HDT interfaces. The harness adds no TypeScript supervisor or Python source. Its lifecycle is bounded by a timeout and a PID namespace; it does not replace the live launcher.

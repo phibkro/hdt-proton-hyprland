@@ -42,6 +42,8 @@ Inspect `trackerRuntime`, `controlInput`, the window positions, the log timestam
 
 Keep raw HDT logs and account data out of commits. `hdt-status` filters its output to selected diagnostic fields. It does not print the inherited process environment, account names, or card choices.
 
+For repeatable tests without account activity, use [Replay HDT UI transitions in isolation](UI-REPLAY.md). That procedure tests real WPF controls with synthetic state. It does not exercise live HearthMirror or ArenaSmith requests.
+
 ## Inspect window geometry
 
 With Battle.net and HDT running in the existing Steam session, run the Win32 probe:
