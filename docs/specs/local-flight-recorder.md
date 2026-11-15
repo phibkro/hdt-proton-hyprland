@@ -1,6 +1,6 @@
 # Local freeze diagnostics
 
-Status: implemented and tested locally. Not installed or published.
+Status: verified release candidate. Scope frozen for PR review on 2026-11-15. Live activation remains separate.
 
 ## Goal and scope
 
@@ -24,9 +24,9 @@ Native BG input delivery, live combat reproduction, actual GPU presentation, Hea
 
 ## Evidence
 
-Before separation on 2026-11-15, the prototype positive and deliberately failing replay used the same source manifest SHA-256, `24d5fdb5bcc24319365f8f9adc3ea30d3a42d6c92b0e46ac17fd685dcbbc1885`. The positive run passed. The negative run returned 1 at its intentional impossible-card assertion. The private result records retain the original dirty-checkout flag.
+Clean commit `259598ad25e2cf7bfce7d32e4d8b618dbdd7bab1` passed the positive replay. The same committed source returned 1 at the negative replay's intentional impossible-card assertion. Both results record `sourceDirtyAtStart=false` and source manifest SHA-256 `ef7f1416f942f887290b1473dcba1c8542cf89bcee536bb18e7d752553d1c80f`. Private captures retain the trace and binary identity.
 
-The separated candidate passed 21 tests and 68 assertions, shellcheck, TypeScript bundles, and native builds. The CLI rejected existing output and duplicate inputs while preserving the original trace. These checks do not establish live BG reliability or full portable-desktop compatibility. Clean-commit replay and Nix package verification are required before publication. Their results will be recorded with the review.
+The Nix package and its checks passed. The project checks passed 21 tests and 68 assertions, shellcheck, TypeScript bundles, and native builds. The built Nix executable exported the recorded 126-event trace. CLI tests verify private output permissions, existing-file preservation, input preservation, and duplicate rejection. These checks do not establish live BG reliability.
 
 ## Revisions
 
@@ -35,6 +35,6 @@ The separated candidate passed 21 tests and 68 assertions, shellcheck, TypeScrip
 - 2026-11-15: Captured source and scripts per replay after a test read a script while the checkout was being edited. Added a source manifest and read-only namespace mount.
 - 2026-11-15: Gave each plugin load its own directory to prevent overlapping writers during reload. Added a long-timestamp conversion check.
 
-Usage, event meanings, retention limits, and remaining gaps are maintained in [freeze diagnostics](../DIAGNOSTICS.md).
-
 - 2026-11-15: Separated diagnostics into plugin 0.5.1 on the released Hyprland baseline. Removed experimental portable input code. Added writer-failure status and a real CLI file-preservation test.
+
+Usage, event meanings, retention limits, and remaining gaps are maintained in [freeze diagnostics](../DIAGNOSTICS.md).

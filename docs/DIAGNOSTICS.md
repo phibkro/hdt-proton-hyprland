@@ -2,7 +2,11 @@
 
 The local flight recorder records UI delays, view changes, rendering callbacks, and input observations. A background thread writes the files. The recorder sends no data over the network.
 
-This is a development change. Plugin 0.5.1 contains the recorder. An existing 0.5.0 tracker must be upgraded separately. Building or testing this checkout does not install a plugin.
+Plugin 0.5.1 contains the recorder. An existing 0.5.0 tracker must be upgraded separately. Building or testing this checkout does not install a plugin.
+
+## Activate the recorder
+
+Upgrade the package or checkout, then follow the existing [setup procedure](INSTALL.md). Setup rebuilds and installs the plugin. Run setup when HDT can close. A normal tracker restart preserves its installed plugin and does not rebuild it. The development and release checks leave the running tracker unchanged.
 
 ## Read a recording
 
@@ -14,7 +18,7 @@ Export a recording:
 
 ```sh
 devenv shell -- hdt-proton trace-export evidence/hdt-trace.json \
-  evidence/flight-recorder-<Windows-PID>-<session>/events.jsonl
+  "evidence/flight-recorder-<Windows-PID>-<session>/events.jsonl"
 ```
 
 Replace the directory placeholder with the actual recorder directory. Add `previous.jsonl` as another input when that file exists. To inspect the first stall, export the `first-stall-*.jsonl` files to a different output instead. Do not combine overlapping rolling files and stall captures. The exporter rejects duplicate events and existing output files.
