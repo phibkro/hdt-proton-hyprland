@@ -53,3 +53,17 @@ The replay host uses C# to instantiate HDT's actual .NET Framework WPF classes. 
 ## Local diagnostics
 
 The recorder uses .NET Framework APIs inside HDT. The exporter is a bounded Bun CLI using the existing runtime exception. No installed Effect guidance or house overlay was found. Perfetto supplies the trace format and viewer. OpenTelemetry remains deferred until its Framework and Proton behavior is tested. Both plugin builds derive their C# source list from the plugin directory.
+
+## Independent input journal
+
+The 2026-11-15 lookup still found no installed Effect guidance, package, or house
+overlay. This reopens the diagnostics scope to include a native file collector
+with separate process ownership. The collector uses the existing Bun runtime and
+Node-compatible read-only file APIs. It preserves original bytes without a second
+game-event parser. Its explicit capacity bounds storage; failure stops collection
+and retains the evidence. Source files have one read-only owner per cursor.
+
+Tests cover byte preservation, rotation, rewrites, capacity, and producer failure
+using real processes. The isolated C# runner reuses the installed HDT parser and
+event publishers through reflection. Full semantic equivalence is not established.
+An Effect migration must preserve these tested ownership and failure boundaries.

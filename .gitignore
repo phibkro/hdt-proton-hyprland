@@ -94,3 +94,8 @@
 !/tests/trace-export.test.ts
 !/docs/DIAGNOSTICS.md
 !/docs/specs/local-flight-recorder.md
+!/docs/specs/independent-observer.md
+!/src/diagnostics/input-journal.ts
+!/src/replay/CanonicalReplay.cs
+!/tests/input-journal.test.ts
+!/docs/CAPTURE-FREEZE.md

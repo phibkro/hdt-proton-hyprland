@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+trap 'echo "Replay failed at line $LINENO" >&2' ERR
 root=$1 run=$2 proton=$3 negative=$4 plugin=$5 level=$6 particles=$7
 snapshot=$run/source
 battlegrounds_tabs=${8:-false}
 diagnostics=${9:-false}
+canonical_events=${10:-false}
 export PATH=$HDT_REPLAY_TOOLS_PATH
 [[ "$run" == "$root/local/replay/runs/"* ]]
 jq -e --arg run "$run" '.kind=="hdt-ui-replay-run" and .run==$run' "$run/ownership.json" >/dev/null
@@ -17,7 +19,15 @@ export WINEDLLOVERRIDES='mscoree=n,b;d3d9=n' WINEDEBUG=-all
 export DXVK_CONFIG='d3d9.shaderModel = 1' DXVK_LOG_PATH=$run
 Xvfb -displayfd 3 -screen 0 2560x1440x24 -nolisten tcp -ac 3>"$run/display" >"$run/xvfb.log" 2>&1 &
 xvfb_pid=$!
-trap 'status=$?; if (( status )); then magick import -window root "$run/failure.png" 2>/dev/null || true; fi; kill "$xvfb_pid" 2>/dev/null || true' EXIT
+cleanup() {
+    local status=$?
+    trap - EXIT
+    if (( status )); then timeout 3 magick import -window root "$run/failure.png" 2>/dev/null || true; fi
+    if [[ -n ${journal_pid:-} ]]; then kill -TERM "$journal_pid" 2>/dev/null || true; wait "$journal_pid" 2>/dev/null || true; fi
+    kill "$xvfb_pid" 2>/dev/null || true
+    exit "$status"
+}
+trap cleanup EXIT
 for ((i=0;i<50;i++)); do [[ -s "$run/display" ]] && break; sleep 0.1; done
 [[ -s "$run/display" ]]
 kill -0 "$xvfb_pid"
@@ -48,9 +58,9 @@ if [[ "$diagnostics" == true ]]; then
     timeout --kill-after=3s 10 "$proton/files/bin/wine" "$run/app/FlightRecorderChecks.exe" "$(winpath "$run/recorder-checks")" >"$run/recorder-checks.log" 2>&1
 fi
 timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
-    /nologo /target:winexe /platform:x64 /out:ReplayHost.exe /r:System.Xaml.dll /r:System.Web.Extensions.dll \
+    /nologo /target:winexe /platform:x64 /out:ReplayHost.exe /r:System.Xaml.dll /r:System.Web.Extensions.dll /r:Newtonsoft.Json.dll \
     /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
-    "$(winpath "$snapshot/src/replay/ReplayHost.cs")" >"$run/compile.log" 2>&1
+    "$(winpath "$snapshot/src/replay/ReplayHost.cs")" "$(winpath "$snapshot/src/replay/CanonicalReplay.cs")" >"$run/compile.log" 2>&1
 timeout 70 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" "$plugin" "$level" "$particles" >"$run/wine.log" 2>&1 &
 host_pid=$!
 for ((i=0;i<200;i++)); do
@@ -82,6 +92,72 @@ settings() {
     cp "$run/state.json" "$run/settings-$id.json"
     send settings-close
 }
+if [[ "$canonical_events" == true ]]; then
+    # The native journal is independently owned by this supervisor. Its sources
+    # are the synthetic fixture and actual HDT publishers, not interpreted markers.
+    touch "$run/canonical-input.json"
+    bun "$snapshot/src/diagnostics/input-journal.ts" --output "$run/journal" --from start --max-bytes 8388608 \
+        --source "input=$run/canonical-input.json" --source "hdt=$run/canonical.jsonl" >"$run/journal.log" 2>&1 &
+    journal_pid=$!
+    send canonical-start
+    jq -n '["DRAFT","HUB","BACON","HUB"] | to_entries | map({ns:"LoadingScreen",line:("D 00:00:00.0000000 LoadingScreen.OnSceneLoaded() - prevMode=" + (if .key==0 then "HUB" else ["DRAFT","HUB","BACON"][.key-1] end) + " currMode=" + .value)})' >"$run/canonical-input.json"
+    send canonical-input
+    jq -se '[.[]|select(.kind=="hdt.event" and .data.name=="OnModeChanged")|.data.value]==["DRAFT","HUB","BACON","HUB"]' "$run/canonical.jsonl" >/dev/null
+    cp "$run/canonical.jsonl" "$run/canonical-first.jsonl"
+    send canonical-input
+    jq -se '([.[]|select(.kind=="hdt.event" and .data.name=="OnModeChanged")|.data.value]) as $events | ($events|length)==8 and $events[0:4]==$events[4:8] and ([.[]|select(.kind=="parser.return")]|length)==8 and all(.[];.kind!="parser.error" and .kind!="hdt.event.capture-failed")' "$run/canonical.jsonl" >/dev/null
+    # Freeze the actual application process in this isolated PID namespace.
+    replay_pid=$(pgrep -P "$host_pid")
+    [[ "$replay_pid" =~ ^[0-9]+$ ]]
+    tr '\0' '\n' <"/proc/$replay_pid/cmdline" | rg -q 'ReplayHost[.]exe'
+    kill -STOP "$replay_pid"
+    for ((i=0;i<30;i++)); do
+        [[ $(sed -n 's/^.*) \([A-Za-z]\) .*$/\1/p' "/proc/$replay_pid/stat") == T ]] && break
+        sleep 0.01
+    done
+    [[ $(sed -n 's/^.*) \([A-Za-z]\) .*$/\1/p' "/proc/$replay_pid/stat") == T ]]
+    before=$(wc -l <"$run/journal/journal.jsonl")
+    printf '\n' >>"$run/canonical-input.json"
+    sleep 1
+    after=$(wc -l <"$run/journal/journal.jsonl")
+    bun -e 'const fs=require("node:fs"),p=process.argv[1]; const rows=fs.readFileSync(p+"/journal/journal.jsonl","utf8").trim().split("\n").map(JSON.parse); const bytes=Buffer.concat(rows.filter(r=>r.kind==="source.bytes" && r.data.source==="input").map(r=>Buffer.from(r.data.base64,"base64"))); if(!bytes.equals(fs.readFileSync(p+"/canonical-input.json"))) throw Error("Input capture stalled with the HDT host");' "$run"
+    kill -CONT "$replay_pid"
+    (( after>before ))
+    kill -KILL "$replay_pid"
+    if wait "$host_pid"; then
+        echo 'The deliberately killed replay host unexpectedly succeeded.' >&2
+        exit 1
+    else
+        first_status=$?
+        [[ "$first_status" != 124 && "$first_status" != 0 ]]
+        printf '%s\n' "$first_status" >"$run/canonical-killed-status.txt"
+    fi
+    [[ ! -d /proc/$replay_pid ]]
+    # A new application process must not own or restart the native journal.
+    mv "$run/canonical.jsonl" "$run/canonical-session1.jsonl"
+    rm "$run/command.json" "$run/state.json"
+    id=0
+    timeout 30 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host-second.log")" "$plugin" "$level" "$particles" >"$run/wine-second.log" 2>&1 &
+    host_pid=$!
+    for ((i=0;i<100;i++)); do
+        [[ -s "$run/state.json" ]] && break
+        sleep 0.1
+    done
+    [[ -s "$run/state.json" ]]
+    send canonical-start
+    send canonical-input
+    jq -se '[.[]|select(.kind=="hdt.event" and .data.name=="OnModeChanged")|.data.value]==["DRAFT","HUB","BACON","HUB"] and all(.[];.kind!="parser.error" and .kind!="hdt.event.capture-failed")' "$run/canonical.jsonl" >/dev/null
+    send finish
+    wait "$host_pid"
+    sleep 0.5
+    kill -TERM "$journal_pid"
+    wait "$journal_pid"
+    journal_pid=''
+    jq -se 'any(.[];.kind=="source.bytes" and .data.source=="input") and any(.[];.kind=="source.bytes" and .data.source=="hdt" and .data.generation==1) and any(.[];.kind=="source.replaced") and .[-1].kind=="journal.stop" and .[-1].data.reason=="signal"' "$run/journal/journal.jsonl" >/dev/null
+    bun -e 'const fs=require("node:fs"),p=process.argv[1]; const rows=fs.readFileSync(p+"/journal/journal.jsonl","utf8").trim().split("\n").map(JSON.parse); for(const [generation,file] of [[0,"canonical-session1.jsonl"],[1,"canonical.jsonl"]]) {const captured=Buffer.concat(rows.filter(r=>r.kind==="source.bytes" && r.data.source==="hdt" && r.data.generation===generation).map(r=>Buffer.from(r.data.base64,"base64"))); if(!captured.equals(fs.readFileSync(p+"/"+file))) throw Error("Canonical publisher bytes differ from independent journal");}' "$run"
+    echo 'Canonical installed-parser mode transitions and independent journal survival verified in isolation.'
+    exit 0
+fi
 settings
 if [[ "$diagnostics" == true ]]; then
     # Give the independent writer time to post a ping before blocking WPF.

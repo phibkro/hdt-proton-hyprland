@@ -27,6 +27,7 @@ class ReplayHost {
     static string scene="menu";
     static Popup popup;
     static object compatibilityPlugin;
+    static CanonicalReplay canonical;
     static int pluginUpdates;
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool MoveFileEx(string source,string destination,int flags);
     static int? plaqueLevel;
@@ -192,6 +193,15 @@ class ReplayHost {
         if(id<=commandId) return;
         string op=(string)command["op"];
         switch(op) {
+            case "canonical-start":
+                if(canonical!=null) throw new InvalidOperationException("Canonical replay already initialized");
+                canonical=new CanonicalReplay(hdt,directory);break;
+            case "canonical-input":
+                if(canonical==null) throw new InvalidOperationException("Canonical replay not initialized");
+                var lines=serializer.DeserializeObject(File.ReadAllText(Path.Combine(directory,"canonical-input.json"))) as object[];
+                foreach(System.Collections.Generic.Dictionary<string,object> line in lines)
+                    canonical.Feed((string)line["ns"],(string)line["line"]);
+                break;
             case "menu":case "arena-lobby":case "draft-1":case "draft-2":SetScene(op);break;
             case "settings-close":Set(main.FindName("FlyoutOptions"),"IsOpen",false);break;
             case "bgs-start":
