@@ -1,6 +1,6 @@
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
-export const projectRoot = dirname(import.meta.path);
+export const projectRoot = resolve(import.meta.dir, "../..");
 export function parseAppId(value: unknown): string {
   if(typeof value!=="string" || !/^[1-9][0-9]{0,9}$/.test(value) || BigInt(value)>4294967295n)
     throw Error("Set HS_APP_ID to the numeric Steam shortcut app ID (uint32).");

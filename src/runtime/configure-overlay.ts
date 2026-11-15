@@ -1,13 +1,13 @@
 import { readFile, readdir, copyFile, writeFile, mkdir } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { hdtData } from "./config";
+import { join } from "node:path";
+import { projectRoot, hdtData } from "./config";
 for(const pid of (await readdir("/proc")).filter(x=>/^\d+$/.test(x))) {
   try { if((await readFile(`/proc/${pid}/comm`,"utf8")).trim() === "HearthstoneDeck") throw Error("Close HDT normally before changing its configuration"); }
   catch(error) { if(!["ENOENT","EACCES"].includes((error as any).code)) throw error; }
 }
 const path=join(hdtData,"config.xml");
-await mkdir(join(dirname(import.meta.path),"backups/hdt-before-render"),{recursive:true,mode:0o700});
-try { await copyFile(path,join(dirname(import.meta.path),"backups/hdt-before-render/config-before-background-test.xml"),1); }
+await mkdir(join(projectRoot,"backups/hdt-before-render"),{recursive:true,mode:0o700});
+try { await copyFile(path,join(projectRoot,"backups/hdt-before-render/config-before-background-test.xml"),1); }
 catch(error) { if((error as any).code!=="EEXIST") throw error; }
 let xml=await readFile(path,"utf8");
 for(const key of ["HideInMenu","HideInBackground","HideMenuOverlayInBackground"]) {

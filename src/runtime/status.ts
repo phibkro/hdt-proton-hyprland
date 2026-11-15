@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { prefix, hdtData as data, windowClass } from "./config";
+import { projectRoot, prefix, hdtData as data, windowClass } from "./config";
 const drive = join(prefix,"drive_c");
 async function optional(path: string) {
   try { return await readFile(path, "utf8"); }
@@ -49,7 +49,7 @@ async function renderSettings(pid?: number) {
   };
 }
 const deckStats=await optional(join(data,"DeckStats.xml"));
-const controlRaw=await optional(join(import.meta.dir,"evidence/control-input.json"));
+const controlRaw=await optional(join(projectRoot,"evidence/control-input.json"));
 const control=controlRaw===null?null:JSON.parse(controlRaw);
 const matches=(deckStats?.match(/<Game\b[^>]*>[\s\S]*?<\/Game>/g) ?? []).map(block=>
   Object.fromEntries(["GameMode","Result","Turns","Format"].map(key=>[key,block.match(new RegExp(`<${key}>([^<]*)</${key}>`))?.[1]??null])));

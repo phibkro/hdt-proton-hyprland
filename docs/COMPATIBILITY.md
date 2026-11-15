@@ -9,7 +9,7 @@ Desktop session tested on 2026-11-15: NixOS, Hyprland 0.56.2 (`efb50993780079460
 | HDT startup | Verified | Native Microsoft CLR mapped in the real tracker process; tracker stayed open after earlier Wine Mono crashes |
 | Game detection | Verified | Correct log directory, fresh Power.log consumption and automatic import of an existing complete Arena deck |
 | Standard match recording | Verified | Three saved Ranked/Standard results at cleanup; one earlier match was observed through an HDT-only restart |
-| Arena match recording | Failed | Two observed Arena completions were not saved while HDT stopped progressing. The later history still contained only the two Standard results; recovery restart does not prove Arena recording fixed |
+| Arena match recording | Verified for two later saved results; historical failures retained | During the structure/setup work, read-only DeckStats inspection found two Arena wins, each 10 turns, with distinct start/end times. Earlier two completions were not saved during a UI/export stall; no isolated cause or general stability fix is claimed |
 | Live Arena redraft recording | Verified for saved events | After the operator's redraft, HDT saved five picks with three choices each. Individual displayed card identities were not compared; a fresh full draft remains untested |
 | ArenaSmith ratings | Verified for recorded redraft | Operator upgraded to Premium. All five recorded picks report ArenaSmith available and overlay visible, with 15 nonzero rating entries. Earlier unregistered-trial observations predate the upgrade |
 | Transparent overlay | Verified with workaround | Software-rendering profile plus 1/255 black background; faint tint is intentional |
@@ -23,6 +23,14 @@ Desktop session tested on 2026-11-15: NixOS, Hyprland 0.56.2 (`efb50993780079460
 | Long-session UI liveness | Failed later observation | After successful visual/control tests, both UI heartbeat and control export timestamps stopped progressing while the process stayed alive. Current log also stopped; no matching HearthMirror RPC exception was found. Cause unisolated; stale regions expired as designed |
 
 “Verified” combines named observations: operator visual/click acceptance, process maps, selected logs, saved results, or geometry. It does not mean automated end-to-end coverage of every combination. Raw local evidence includes private session/game material and is deliberately not published.
+
+## Setup integration checks
+
+| Path | Result | Evidence and limits |
+|---|---|---|
+| Steam Launch Options wrapper | Verified subprocess behavior; Steam client untested | Controlled service success/failure tests preserve arguments and game exit status. A real request to the existing active desktop service succeeded. The operator has not yet launched Battle.net through the new option |
+| Structured setup command | Verified composition and real plugin build; application untested | Tests cover ordered build/install/configuration and fail-fast behavior. The moved plugin compiles against the real running prefix. The new aggregate command has not closed/reconfigured the accepted live tracker |
+| Stable Proton | Untested | Only Experimental installed locally; no compatibility selection or prefix was changed |
 
 ## Why these mechanisms were chosen
 
@@ -40,7 +48,7 @@ Blanket no_focus prevented compositor selection of HDT controls. Enabling focus 
 
 ## Remaining real tests
 
-1. Play and finish an existing Arena match; confirm a saved Arena result independently of Power.log completion.
+1. Repeat Arena match recording across a longer session; two later saved Arena results now establish successful recording after the earlier failures.
 2. When an Arena offer is available, pause before selecting. Compare the displayed options with HDT's automatic detection, then let the operator pick and verify the next offer/pick state.
 3. Extend the successful redraft/rating test to a fresh initial draft and compare displayed individual offers with detected cards.
 4. Exercise more overlay controls, drag/resize/Alt-Tab under the final input gate, and additional monitor/scale configurations.
@@ -48,4 +56,4 @@ Blanket no_focus prevented compositor selection of HDT controls. Enabling focus 
 
 Arena entry, picks and gameplay remain operator actions. No game patch, injected rendering, automatic picks or account bypass is implemented.
 
-At cleanup the operator reported that everything seemed to work. Live read-only checks still found native CLR, advancing UI/input snapshots, enabled automatic startup and the Arena panel Collapsed during gameplay. This is acceptance of the current profile, not evidence that an unretaken Arena match or a future long-session test has passed.
+At cleanup the operator reported that everything seemed to work. Live read-only checks still found native CLR, advancing UI/input snapshots, enabled automatic startup and the Arena panel Collapsed during gameplay. A later read-only check during repository organization found two distinct saved Arena wins as well as the three Standard results, fresh Power.log output, native CLR and fresh control heartbeats. This establishes those Arena saves, not a general cure for the earlier long-session stall.

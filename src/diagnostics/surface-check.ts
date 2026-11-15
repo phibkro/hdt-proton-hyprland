@@ -1,7 +1,6 @@
-import { join,dirname } from "node:path";
+import { join } from "node:path";
 import { appendFile } from "node:fs/promises";
-import { windowClass } from "./config";
-const root=dirname(import.meta.path);
+import { projectRoot as root, windowClass } from "../runtime/config";
 async function command(args:string[]) {
   const p=Bun.spawn(args,{stdout:"pipe",stderr:"pipe"});
   const [out,err]=await Promise.all([new Response(p.stdout).text(),new Response(p.stderr).text()]);
