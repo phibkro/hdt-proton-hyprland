@@ -1,0 +1,47 @@
+{
+  description = "HDT compatibility tools for Steam Proton and Hyprland";
+
+  outputs = { self }:
+    let
+      # devenv.lock is the single dependency pin for the shell and package.
+      lock = builtins.fromJSON (builtins.readFile ./devenv.lock);
+      nixpkgs = builtins.fetchTree lock.nodes.nixpkgs.locked;
+      system = "x86_64-linux";
+      packageSets = (import "${nixpkgs.outPath}/flake.nix").outputs {
+        self = { };
+        nixpkgs-src = builtins.fetchTree lock.nodes.nixpkgs-src.locked;
+      };
+      pkgs = packageSets.legacyPackages.${system};
+      package = pkgs.callPackage ./nix/package.nix { };
+    in
+    {
+      packages.${system} = {
+        default = package;
+        hdt-proton = package;
+      };
+      apps.${system}.default = {
+        type = "app";
+        meta.description = "Open HDT or manage its desktop integration";
+        program = "${package}/bin/hdt-proton";
+      };
+      homeManagerModules.default = import ./nix/home-manager.nix self;
+      checks.${system} = {
+        inherit package;
+        tests = pkgs.runCommand "hdt-proton-tests" {
+          nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.shellcheck pkgs.jq pkgs.coreutils ];
+        } ''
+          mkdir source
+          cp -R ${./src} source/src
+          cp -R ${./scripts} source/scripts
+          cp -R ${./tests} source/tests
+          chmod -R u+w source
+          cd source
+          export HOME="$TMPDIR/home" HS_APP_ID=1234567890
+          mkdir -p "$HOME"
+          bun test ./tests/config.test.ts ./tests/steam-launch.test.ts ./tests/desktop.test.ts
+          shellcheck scripts/*.sh
+          touch "$out"
+        '';
+      };
+    };
+}

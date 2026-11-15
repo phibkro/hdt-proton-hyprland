@@ -18,3 +18,34 @@ test("configuration uses the checkout when invoked from another directory",async
   expect(await p.exited).toBe(0);
   expect((await new Response(p.stdout).text()).trim()).toBe(decodeURIComponent(expected.pathname).replace(/\/$/, ""));
 });
+
+test("installed source reads configuration and app data from the explicit mutable directory",async()=>{
+  const {mkdtemp,rm} = await import("node:fs/promises");
+  const dir = await mkdtemp("/tmp/hdt-config-");
+  try {
+    await Bun.write(`${dir}/hdt.local.json`,JSON.stringify({steamAppId:"6789",steamRoot:`${dir}/steam`}));
+    const env={...process.env,HDT_PROJECT_DIR:dir};
+    delete env.HS_APP_ID;
+    delete env.STEAM_ROOT;
+    delete env.HDT_APP_DIR;
+    delete env.HDT_NATIVE_DIR;
+    const p=Bun.spawn([process.execPath,"-e",
+      `import {projectRoot,sourceRoot,appId,appDirectory,nativeDirectory,prefix} from ${JSON.stringify(new URL("../src/runtime/config.ts",import.meta.url).href)};console.log(JSON.stringify({projectRoot,sourceRoot,appId,appDirectory,nativeDirectory,prefix}))`],
+      {cwd:"/tmp",env,stdout:"pipe",stderr:"pipe"});
+    expect(await p.exited).toBe(0);
+    const value=JSON.parse(await new Response(p.stdout).text());
+    expect(value.projectRoot).toBe(dir);
+    expect(value.sourceRoot).not.toBe(dir);
+    expect(value.appId).toBe("6789");
+    expect(value.appDirectory).toBe(`${dir}/app`);
+    expect(value.nativeDirectory).toBe(`${dir}/evidence`);
+    expect(value.prefix).toBe(`${dir}/steam/steamapps/compatdata/6789/pfx`);
+  } finally {await rm(dir,{recursive:true,force:true});}
+});
+
+for(const dir of ["relative/path","/nix/store/not-mutable"])
+  test(`rejects a non-mutable data location: ${dir}`,async()=>{
+    const p=Bun.spawn([process.execPath,"-e",`await import(${JSON.stringify(new URL("../src/runtime/config.ts",import.meta.url).href)})`],
+      {env:{...process.env,HDT_PROJECT_DIR:dir},stdout:"pipe",stderr:"pipe"});
+    expect(await p.exited).not.toBe(0);
+  });

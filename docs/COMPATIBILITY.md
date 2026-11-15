@@ -63,6 +63,19 @@ The rendering and input mechanisms are described in [HDT compatibility design](E
 
 The source checks at commit `6bddf1e` passed from a clean worktree. They covered 10 tests with 33 assertions, shellcheck, seven TypeScript entry bundles, and both native helper builds. The checks are defined by `scripts/check.sh` and exposed as `hdt-check`.
 
+## Nix package and desktop results
+
+| Path | Result | Evidence and limits |
+|---|---|---|
+| Nix package | Verified | `nix build` produced the tools and prebuilt native helpers. The package's desktop entry passed validation |
+| Nix checks | Verified | `nix flake check` passed the package build, 17 tests with 50 assertions, and shellcheck |
+| Home Manager module | Verified for focused evaluation | A real Home Manager evaluation produced the service and desktop entry with no failed assertions. The generated artifacts were built. A full machine activation was not run |
+| Vicinae registration and Open | Verified | Vicinae listed Hearthstone Deck Tracker. Launching the registered app focused the existing HDT window without a duplicate. The game process stayed unchanged |
+| Packaged tracker startup | Verified | The generated service started the Nix-packaged watcher and launcher. HDT loaded native CLR and exported fresh controls with matching game and overlay origins |
+| Restart action command | Verified | `hdt-proton restart`, the desktop action's target, restarted the isolated tracker service. HDT's UI updates advanced afterward. Hearthstone's process stayed unchanged. The action was not clicked through Vicinae's menu |
+
+The [Nix installation guide](NIX.md) covers the package, module, and desktop actions. These results do not extend the earlier visual tests to every control or monitor configuration.
+
 ## Evidence limits
 
 Raw logs and saved game records remain private because they contain account or game data. The public record contains selected facts rather than the raw files.

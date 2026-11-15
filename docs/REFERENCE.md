@@ -19,9 +19,28 @@
 
 `hdt-setup` takes no arguments. A build failure prevents installation. An HDT close timeout prevents installation and configuration changes. Configuration failure stops setup after the preceding plugin installation step. Setup reports the failure and retains its backups.
 
+## Installed package commands
+
+The Nix package provides `hdt-proton`. Its subcommands reuse the same scripts as devenv.
+
+| Subcommand | Behavior |
+|---|---|
+| `open` | Focuses the existing HDT window or starts its service |
+| `restart` | Restarts the tracker service after checks that protect the game process |
+| `watch` | Runs the existing automatic-start watcher |
+| `setup` | Applies the compatibility plugin and settings |
+| `status` | Reports the filtered runtime status |
+| `overlay-launch` | Starts HDT with the compatibility defaults |
+| `raw-launch` | Starts the namespace launcher with its supplied arguments |
+| `steam-options` | Prints the installed Steam Launch Options line |
+| `steam-run` | Starts the service and executes Steam's original arguments |
+| `build-surface-probe` | Checks the prebuilt probe in a package, or compiles it in a checkout |
+
+The desktop entry and Home Manager module use `nix/desktop-entry.desktop.in` as their shared definition. The desktop entry has the ID `io.github.phibkro.hdt-proton` and a `Restart tracker` action.
+
 ## Configuration
 
-`src/runtime/config.ts` reads `hdt.local.json` from the checkout root. Git ignores that file.
+`src/runtime/config.ts` reads `hdt.local.json` from the mutable data directory. In a checkout, the default is the checkout root. The installed wrapper defaults to `${XDG_DATA_HOME:-$HOME/.local/share}/hdt-proton`. Git ignores the local file.
 
 | Key or environment variable | Meaning and precedence |
 |---|---|
@@ -29,6 +48,8 @@
 | `HS_APP_ID` | Overrides `steamAppId` |
 | `steamRoot` | Optional absolute Steam directory |
 | `STEAM_ROOT` | Overrides `steamRoot`. The default is `$HOME/.local/share/Steam` |
+| `HDT_PROJECT_DIR` | Overrides the mutable directory for configuration, app files, backups, and evidence. It must be absolute and outside the Nix store |
+| `HDT_NATIVE_DIR` | Selects the prebuilt native helper directory. The Nix wrapper sets this value |
 | `HDT_APP_DIR` | Selects the complete HDT application directory. The default is `app/` under the checkout |
 
 The configuration rejects unknown JSON keys and IDs outside the unsigned 32-bit range. The prefix path is `steamapps/compatdata/<steamAppId>/pfx` under the selected Steam directory.
@@ -86,7 +107,7 @@ The installer refuses settings writes while an accessible `HearthstoneDeck` proc
 
 `scripts/autostart.sh` checks the exact Hearthstone window every two seconds. A runtime lock prevents duplicate monitors. The watcher starts HDT once per game process or reuses an existing HDT window. A manual HDT exit does not trigger a relaunch during that same game session.
 
-Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service declarations. The tested machine's service is declared separately in [homelab PR #92](https://github.com/phibkro/homelab/pull/92).
+Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service declarations. The tested machine's service is declared separately in [homelab PR #93](https://github.com/phibkro/homelab/pull/93).
 
 ## Source and private files
 
@@ -100,6 +121,7 @@ Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service decl
 | `src/diagnostics/` | Read-only Win32 and XComposite probes |
 | `scripts/` | Setup, Steam integration, the watcher, and checks |
 | `tests/` | Tests selected by `scripts/check.sh` |
+| `nix/` | The package, Home Manager module, and shared desktop entry |
 | `docs/specs/` | Feature contracts and their recorded verification |
 | `devenv.nix`, `devenv.yaml`, and `devenv.lock` | Commands and toolchain dependencies |
 

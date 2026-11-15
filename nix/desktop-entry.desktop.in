@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Hearthstone Deck Tracker
+GenericName=HDT
+Comment=Open the tracker for Hearthstone running through Steam Proton
+Exec=@launcher@ open
+Icon=applications-games
+Terminal=false
+StartupNotify=false
+Categories=Game;
+Keywords=HDT;HSReplay;Hearthstone;Arena;
+Actions=Restart;
+
+[Desktop Action Restart]
+Name=Restart tracker
+Exec=@launcher@ restart

@@ -85,3 +85,11 @@ The investigation evaluated these sources:
 - [Steam's wrapper convention](https://help.steampowered.com/en/faqs/view/145A-FE54-F37B-278A) supports a host wrapper before `%command%`.
 
 No third-party implementation was copied into this repository. The inspected upstream HDT commit was `2698623dc0e91491671a614ae176f9db68831aa7`. Its exact correspondence to the installed build remains unverified, so plugin compilation uses the installed assemblies.
+
+## Immutable package and mutable data
+
+The Nix package stores source and native helpers in the Nix store. The launcher keeps the configuration, HDT installation, backups, and evidence in a separate mutable directory. The checkout workflow keeps its original directory defaults.
+
+Nix builds the X11 helpers before installation. Plugin compilation still uses the actual HDT assemblies and native .NET in the game prefix. The package therefore contains no HDT or Microsoft binaries.
+
+The package and Home Manager module derive their application entry from one template. The service still owns the tracker lifecycle. The desktop Open action focuses the exact HDT window instead of matching the Steam class shared by Battle.net and Hearthstone.

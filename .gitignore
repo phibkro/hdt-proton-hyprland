@@ -57,3 +57,16 @@
 !/docs/specs/automatic-startup.md
 !/docs/specs/overlay-stacking.md
 !/docs/specs/structured-setup.md
+
+!/flake.nix
+!/flake.lock
+!/nix/
+/nix/*
+!/nix/package.nix
+!/nix/home-manager.nix
+!/scripts/hdt.sh
+!/scripts/desktop.sh
+!/docs/specs/nix-desktop.md
+!/tests/desktop.test.ts
+!/nix/desktop-entry.desktop.in
+!/docs/NIX.md

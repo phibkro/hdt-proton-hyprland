@@ -1,6 +1,6 @@
 # Apply HDT compatibility fixes
 
-Use this guide to apply the plugin to an existing HDT installation and start HDT alongside Hearthstone.
+Use this guide for the devenv checkout workflow. For an installed package and desktop entry, use [Install the compatibility tools with Nix](NIX.md).
 
 ## Prepare the installation
 
@@ -64,7 +64,7 @@ Setup can close HDT. Finish any tracking test before you run setup.
 
 ## Start HDT from the Steam shortcut
 
-This procedure requires `hdt-proton-autostart.service` in your desktop session. The tested machine's Home Manager declaration is in [homelab PR #92](https://github.com/phibkro/homelab/pull/92).
+This procedure requires `hdt-proton-autostart.service` in your desktop session. The tested machine's Home Manager declaration is in [homelab PR #93](https://github.com/phibkro/homelab/pull/93).
 
 1. Confirm that the desktop service exists:
 

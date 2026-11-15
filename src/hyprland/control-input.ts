@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { projectRoot as root, windowClass } from "../runtime/config";
+import { projectRoot as root, nativeDirectory, windowClass } from "../runtime/config";
 const session=process.argv[2];
 if(!session) throw Error("Expected control-region session nonce");
 let running=true,lastFailure="";
@@ -24,7 +24,7 @@ while(running) {
     if(games.length===1) {
       const pair=`${overlays[0].pid}:${overlays[0].address}:${games[0].pid}:${games[0].address}`;
       if(pair!==linkedPair) {
-        const link=JSON.parse(await command([join(root,"evidence/overlay-link"),"apply",String(overlays[0].pid),String(games[0].pid),windowClass]));
+        const link=JSON.parse(await command([join(nativeDirectory,"overlay-link"),"apply",String(overlays[0].pid),String(games[0].pid),windowClass]));
         if(![link.overlay,link.game,link.original].every(x=>Number.isInteger(x)&&x>=0&&x<=4294967295) || !link.overlay || !link.game)
           throw Error("Invalid overlay relationship readback");
         links.push({pid:overlays[0].pid,...link});
@@ -60,5 +60,5 @@ await command(["hyprctl","eval","hdtProtonControls=nil; hdtProtonControlTicks=0;
 // value still match. Closed/replaced overlay windows require no restoration.
 await command(["hyprctl","eval","if hdtProtonStackTimer then hdtProtonStackTimer:set_enabled(true) end"]);
 for(const link of links.reverse()) {
-  await command([join(root,"evidence/overlay-link"),"restore",String(link.pid),windowClass,String(link.overlay),String(link.game),String(link.original)]);
+  await command([join(nativeDirectory,"overlay-link"),"restore",String(link.pid),windowClass,String(link.overlay),String(link.game),String(link.original)]);
 }
