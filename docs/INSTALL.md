@@ -64,7 +64,7 @@ Setup can close HDT. Finish any tracking test before you run setup.
 
 ## Start HDT from the Steam shortcut
 
-This procedure requires `hdt-proton-autostart.service` in your desktop session. The tested machine's Home Manager declaration is in [homelab PR #92](https://github.com/phibkro/homelab/pull/92).
+This procedure requires `hdt-proton-autostart.service` in your desktop session. The tested machine's Home Manager declaration is in [homelab PR #93](https://github.com/phibkro/homelab/pull/93).
 
 1. Confirm that the desktop service exists:
 

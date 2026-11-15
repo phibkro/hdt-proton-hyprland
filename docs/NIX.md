@@ -1,6 +1,6 @@
 # Install the compatibility tools with Nix
 
-Use this guide to install the launcher, desktop entry, and native helpers. The package supports `x86_64-linux` with Hyprland's Lua API and the host's `hyprctl` command.
+Use Nix with `nix-command` and `flakes` enabled. This guide installs the launcher, desktop entry, and native helpers. The package supports `x86_64-linux` with Hyprland's Lua API and the host's `hyprctl` command.
 
 Hearthstone, Battle.net, HDT, and native .NET must already exist in the Steam prefix. The package contains the compatibility plugin's source, not those applications or their account data.
 

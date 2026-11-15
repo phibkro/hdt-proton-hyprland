@@ -107,7 +107,7 @@ The installer refuses settings writes while an accessible `HearthstoneDeck` proc
 
 `scripts/autostart.sh` checks the exact Hearthstone window every two seconds. A runtime lock prevents duplicate monitors. The watcher starts HDT once per game process or reuses an existing HDT window. A manual HDT exit does not trigger a relaunch during that same game session.
 
-Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service declarations. The tested machine's service is declared separately in [homelab PR #92](https://github.com/phibkro/homelab/pull/92).
+Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service declarations. The tested machine's service is declared separately in [homelab PR #93](https://github.com/phibkro/homelab/pull/93).
 
 ## Source and private files
 
