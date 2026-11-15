@@ -1,4 +1,4 @@
-import { windowClass } from "./config";
+import { projectRoot as root, windowClass } from "../runtime/config";
 const args=process.argv.slice(2);
 if(args.length>1 || (args.length===1 && args[0]!=="--disable")) throw Error("Usage: overlay-rule.ts [--disable]");
 const source = args[0]==="--disable" ? `

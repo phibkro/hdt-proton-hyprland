@@ -1,13 +1,41 @@
-# Temporary exception: preserve the tested investigation runtime
+# Bun runtime exception
 
-Scope: the existing Bun/TypeScript command-line supervisor and diagnostics, plus the minimal configuration extraction needed to publish them. Owner: repository maintainer. Recorded 2026-11-15.
+## Scope and owner
 
-The house default is native Effect. This investigation has no installed Effect package, guidance, house overlay or application scaffold. Its tested runtime uses Bun's process API to enter an existing Steam user/mount namespace and supervises the compositor helper. Publication preserves that runtime rather than introducing a framework migration into a working desktop session. This is a deliberate temporary exception, not a claim that Effect lacks process or filesystem capabilities. Native Effect/platform services would be the first option for a semantic rewrite; wrapping every existing promise without redesigning supervision would not establish that migration.
+This temporary exception covers the existing Bun command-line supervisor, diagnostics, and configuration extraction. The repository maintainer owns the exception. It was recorded on 2026-11-15.
 
-Verification: configuration rejection tests, clean-checkout TypeScript bundling, native read-only probe compilation and compilation of the plugin against the real installed HDT/.NET assemblies. Desktop behavior was operator-observed before publication; the configuration refactor is checked against the same running setup without restarting it. Bun 1.4.4 is the observed runtime; devenv.lock pins the toolchain. A later change to process supervision, configuration authority or runtime dependencies reopens this exception and requires examining the then-installed Effect guidance.
+The house default is native Effect. At the recorded lookup, the project had no installed Effect package, guidance, house overlay, or application scaffold.
 
-The existing shell session's private prefix tree makes unbounded test discovery unsuitable; the documented test command explicitly selects config.test.ts. A broad initial discovery run was stopped and the bounded run passed.
+The tested launcher uses Bun's process API to enter the running Steam server's user and mount namespaces. It also supervises the compositor bridge. Publication retained that implementation during a working desktop session.
 
-C# is required by HDT's .NET Framework plugin interface. The small C diagnostic uses Xlib/XComposite/XRender directly; it reads only the identified overlay's backing pixmap. No web application or infrastructure scaffold is applicable. No Python source is shipped.
+This decision does not claim that Effect lacks process or filesystem capabilities. A rewrite would first examine native Effect services and platform services. Wrapping the existing promises alone would not redesign process supervision.
 
-Reopened 2026-11-15 for the stacking fix: no installed Effect guidance/package or house overlay is present. The existing compositor bridge calls one bounded Xlib helper through its existing command boundary; no process-supervision or configuration ownership change is introduced. Retain the temporary Bun exception for this integration rather than migrating the working runtime during a live game. `overlay-link.c` is a separate mutating helper: it identity-checks both windows, changes only the overlay's transient relationship, verifies readback, and supports guarded restoration. The read-only pixel probe remains read-only. Verification includes warnings-as-errors compilation, real relationship readback and operator click/hover/Alt-Tab acceptance; a later framework migration still reopens this exception.
+## Verification
+
+The recorded checks cover configuration rejection, TypeScript bundles from a clean checkout, native probe compilation, and plugin compilation against the installed HDT and .NET assemblies. Desktop observations are recorded separately in [Observed compatibility](COMPATIBILITY.md).
+
+Bun 1.4.4 was the observed runtime. `devenv.lock` pins the toolchain. `scripts/check.sh` selects test files explicitly because the private prefix backups contain unrelated files. An earlier unbounded test run was stopped.
+
+C# is required by HDT's .NET Framework plugin interface. The C probes use Xlib, XComposite, and XRender. The repository ships no Python source.
+
+## Reopening and retirement
+
+A change to process supervision, configuration ownership, or runtime dependencies reopens this exception. Review then uses the installed Effect guidance for that version.
+
+A native Effect rewrite that preserves the verified namespace and process behavior retires this exception.
+
+## Stacking change recorded on 2026-11-15
+
+The lookup again found no installed Effect package, guidance, or house overlay. The existing bridge gained one bounded Xlib command without a new process-supervision model or configuration owner.
+
+`src/hyprland/overlay-link.c` changes the overlay's transient parent after identity checks. It verifies the result and supports guarded restoration. The pixel probe remains read-only.
+
+Verification covered compilation with warnings as errors, real relationship readback, and user checks for clicks, hover previews, and Alt-Tab. This change retained the Bun exception.
+
+## Source organization and setup recorded on 2026-11-15
+
+Source relocation retained the existing Bun process boundaries. The setup script composes the existing Bash and devenv commands. The Steam wrapper requests the existing systemd service and executes Steam's original arguments.
+
+No new TypeScript runtime layer or dependency was added. The plugin installer gained support for an already-stopped tracker. It refuses writes while an accessible tracker process remains.
+
+Subprocess tests cover argument handling and exit behavior. The [compatibility record](COMPATIBILITY.md#setup-and-startup-results) distinguishes those tests from actual desktop activation.

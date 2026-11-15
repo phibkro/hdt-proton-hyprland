@@ -1,6 +1,6 @@
-import { join,dirname } from "node:path";
-import { windowClass } from "./config";
-const root=dirname(import.meta.path),session=process.argv[2];
+import { join } from "node:path";
+import { projectRoot as root, windowClass } from "../runtime/config";
+const session=process.argv[2];
 if(!session) throw Error("Expected control-region session nonce");
 let running=true,lastFailure="";
 let linkedPair="";
