@@ -72,6 +72,13 @@
 !/docs/UI-REPLAY.md
 !/docs/specs/ui-replay.md
 !/docs/specs/arena-freeze-investigation.md
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/check.yml
+!/docs/specs/maintenance-ci.md
+!/docs/UPSTREAM-REPORT.md
 !/src/replay/
 /src/replay/*
 !/src/replay/ReplayHost.cs

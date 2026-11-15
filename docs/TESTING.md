@@ -59,6 +59,21 @@ This test requires an account with the applicable HSReplay entitlement.
 
 If offers appear without ratings, inspect ArenaSmith availability and HSReplay errors separately from HearthMirror detection. A detected offer alone does not establish access to ratings.
 
+## Test a fresh draft and a longer session
+
+The completed draft verified the particle workaround after an HDT restart. A fresh draft from initial hero selection and a longer session remain separate checks.
+
+1. Start a fresh draft only when you choose to spend the entry cost.
+2. Compare hero choices with HDT before you pick.
+3. Enable both **Enable Arenasmith** and **Show Arenasmith Scores**.
+4. Repeat the offer, pick, and rating checks through the draft.
+5. Open and close HDT Settings after several offers, including an offer with a level-five badge when available.
+6. Leave drafting and confirm that draft analysis disappears in the main menu.
+7. Continue normal play and repeat the saved-match and overlay checks later in the session.
+8. Record elapsed session time, offer count, screen transitions, and the first failing action if one occurs.
+
+Use private `evidence/input-region.json` to compare `arenaParticleEmittersSuppressed` before and after level-five badges appear. The counter establishes that the workaround ran. Changed offers, cleared panels, responsive controls, and saved results establish the corresponding behavior.
+
 ## Test the overlay
 
 Begin with windowed Hearthstone on one monitor at scale 1. Leave the overlay itself in place.

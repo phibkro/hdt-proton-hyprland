@@ -14,6 +14,18 @@ Confirm that the command exits with status zero. The command runs the tests list
 
 Do not run unbounded test discovery in a checkout that contains private prefix backups. Those backups can contain unrelated test files.
 
+## Run the CI checks locally
+
+Run the same check that GitHub Actions runs:
+
+```sh
+nix flake check --print-build-logs --no-write-lock-file --max-jobs 1 --cores 2
+```
+
+Confirm that the command exits with status zero. The flake builds the package and runs its declared tests, shellcheck, and workflow lint. The [workflow](../.github/workflows/check.yml) runs for pull requests and pushes to `main`.
+
+CI does not launch HDT or Hearthstone. Use the [isolated replay](UI-REPLAY.md) and [desktop tests](TESTING.md) to check rendering and live state updates.
+
 ## Compile the plugin against HDT
 
 This procedure requires a complete HDT installation and native .NET in the running Steam prefix.

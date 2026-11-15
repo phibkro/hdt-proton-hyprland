@@ -19,6 +19,7 @@ Plugin 0.5.0 prevents Arena score particles from triggering the reproduced WPF r
 | Check what passed and what remains untested | [Observed compatibility](docs/COMPATIBILITY.md) |
 | Understand the rendering, input, and window fixes | [HDT compatibility design](docs/EXPLANATION.md) |
 | Distinguish window, draft-state, and rendering failures | [HDT windows, state, and failure observations](docs/COMPONENTS.md) |
+| Review the Arena particle reproduction for upstream | [Upstream report draft](docs/UPSTREAM-REPORT.md) |
 
 ## Scope
 
