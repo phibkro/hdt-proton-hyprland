@@ -16,7 +16,7 @@ Hearthstone, Battle.net, HDT, and native .NET must already exist in the Steam pr
 3. Install the package in your user profile:
 
    ```sh
-   nix profile install .#default
+   nix profile add .#default
    ```
 
 4. Prepare a mutable data directory:
