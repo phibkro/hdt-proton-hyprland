@@ -30,7 +30,7 @@ If a project-owned seed already exists, add `--reuse` to validate its CLR and HD
    ```
 
 2. Confirm exit status zero and the printed evidence directory.
-3. Inspect that directory's `result.json`, `supervisor.log`, state snapshots, and screenshots.
+3. Inspect that directory's `result.json`, `supervisor.log`, state snapshots, and screenshots. `result.json` records the source commit and whether the checkout had changes at run start.
 
 Each run creates a fresh prefix and app directory from the seed. The sequence opens Settings with native mouse input, enters the Arena lobby, displays two synthetic offers, returns to the menu, resizes the main window, shows and hides a WPF popup, and executes HDT's New command. The New command must open HDT's actual deck-type dialog.
 
@@ -50,6 +50,6 @@ Expect a nonzero exit status and `negativeAssertionTest: true` in `result.json`.
 
 The host uses the installed HDT assembly, WPF resources, main window, overlay, Arena card models, and visibility methods. It bypasses normal HDT startup and supplies synthetic game scenes and ratings directly. Constructor work can attempt network access, but the network namespace blocks external connectivity.
 
-The run owns a separate PID namespace, network namespace, home directory, prefix, and Xvfb display. The live prefix and desktop sockets are masked. A timeout bounds execution, and namespace exit terminates the test descendants. Commands reject simultaneous access to the lab.
+The run owns a separate PID namespace, network namespace, home directory, prefix, and Xvfb display. It mounts selected system paths and this project, leaving unrelated host volumes outside the test environment. The live prefix and desktop sockets are masked. A timeout bounds execution, and namespace exit terminates the test descendants. Commands reject simultaneous access to the lab.
 
 A passing replay establishes that the exercised WPF path works under the isolated X11 configuration. It does not establish a fix for the live Arena failure. HearthMirror polling, watcher dispatch, ArenaSmith requests, real picks, the compatibility plugin, and Hyprland composition are outside this fixture's coverage. The generic popup is not HDT's card-preview implementation.

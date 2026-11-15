@@ -78,6 +78,9 @@ if (( $# )); then [[ $# == 1 && "$1" == --inject-failure ]] || { usage; exit 2; 
 jq -e --arg root "$root" '.schema==2 and .kind=="hdt-ui-replay" and .project==$root' "$manifest" >/dev/null || fail 'Invalid environment ownership.'
 proton=$(jq -er .proton "$manifest")
 source_prefix=$(jq -er .sourcePrefix "$manifest")
+revision=$(git -C "$root" rev-parse HEAD)
+source_dirty=false
+[[ -z $(git -C "$root" status --porcelain) ]] || source_dirty=true
 run=$lab/runs/$(date -u +%Y%m%dT%H%M%S)-$$
 mkdir -p "$run/home" "$run/runtime"
 chmod 700 "$run" "$run/runtime"
@@ -88,7 +91,11 @@ jq -n --arg run "$run" --arg root "$root" '{kind:"hdt-ui-replay-run",run:$run,pr
 # are masked; the only Windows prefix available to the test is its own copy.
 set +e
 timeout 120 bwrap --die-with-parent --unshare-net --unshare-pid \
-    --ro-bind / / --proc /proc --dev /dev --tmpfs /dev/shm --dev-bind /dev/dri /dev/dri \
+    --ro-bind /nix/store /nix/store --ro-bind /etc /etc \
+    --ro-bind /bin /bin --ro-bind /usr /usr --ro-bind /lib64 /lib64 \
+    --ro-bind /sys /sys --ro-bind /run/current-system /run/current-system \
+    --ro-bind /run/opengl-driver /run/opengl-driver --ro-bind "$root" "$root" \
+    --proc /proc --dev /dev --tmpfs /dev/shm --dev-bind /dev/dri /dev/dri \
     --bind "$lab" "$lab" --ro-bind "$lab/seed" "$lab/seed" \
     --tmpfs "$HOME" --ro-bind "$proton" "$proton" --tmpfs "$source_prefix" \
     --tmpfs /run/user --tmpfs /tmp --clearenv \
@@ -100,6 +107,7 @@ timeout 120 bwrap --die-with-parent --unshare-net --unshare-pid \
 status=$?
 set -e
 jq -n --argjson status "$status" --argjson negative "$expected" --arg run "$run" \
-    '{exitStatus:$status,negativeAssertionTest:$negative,evidence:$run}' >"$run/result.json"
+    --arg revision "$revision" --argjson dirty "$source_dirty" \
+    '{exitStatus:$status,negativeAssertionTest:$negative,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty}' >"$run/result.json"
 echo "Replay exit status: $status. Evidence: $run"
 exit "$status"
