@@ -14,9 +14,10 @@ list. Other preloaded tools remain. The inherited game environment is unchanged.
 
 A captured HDT freeze stopped its UI thread in `GetAsyncKeyState` while X11
 waited on a mutex owned by that same thread. Steam's `XCheckIfEvent` hook appeared
-on the native call path. Excluding that hook from HDT is a launcher workaround
-for this observed failure. It does not establish that every slowdown has the
-same cause. [Valve's related overlay investigation](https://github.com/ValveSoftware/steam-for-linux/issues/11729)
+on the native call path. Excluding the hook removes an unnecessary component
+from that path. Repeated Settings animations on Stable Proton still caused
+temporary stalls without the library. This change does not fix every UI stall.
+[Valve's related overlay investigation](https://github.com/ValveSoftware/steam-for-linux/issues/11729)
 describes another input-event problem involving the same hook.
 
 A prefix identifies Wine's files and configuration. Steam also starts Wine inside its runtime namespaces.
