@@ -45,6 +45,7 @@ if [[ ${1:-} == --inside ]]; then
     grep -q '^HDT_NATIVE_XLIB_FATAL_BEGIN$' fatal-gdb.log
     grep -q 'XGetDeviceButtonMapping' fatal-gdb.log
     grep -q '^HDT_MAPPING_QUERY .*device=[0-9]' fatal-gdb.log
+    grep -q '^HDT_DEVICE_OPEN .*requested=[0-9]' fatal-gdb.log
     grep -q '^HDT_NATIVE_XLIB_FATAL_END$' fatal-gdb.log
     HDT_XINPUT_REPRO=1 "$4" -nx -nh -batch -iex 'set auto-load off' -iex 'set debuginfod enabled off' \
         -ex start -x xlib-fatal.gdb -ex continue \
