@@ -90,6 +90,23 @@ byte zero of the next opened generation. Other sources continue. The opened
 descriptor supplies the authoritative file identity. Symlinks and nonregular
 files remain errors.
 
+The optional `--recorder-root DIRECTORY` discovers HDT's `flight-recorder-<Windows PID>-<session>`
+directories. The collector reads each session's `events.jsonl` as a separate
+source. Sessions present at startup follow `--from`. Sessions discovered later
+start at byte zero, including sessions created while HDT restarts. Discovery
+retains every observed session rather than selecting the newest directory.
+Older sessions continue to drain. Existing rotation handling applies to each
+session's `events.jsonl` path.
+
+`recorder.discovered` records the source path and initial offset policy.
+`recorder.root.unavailable` reports a missing root. Discovery resumes when the
+root appears and records `recorder.root.available`. Symlink roots, symlink
+session directories, and duplicate explicit source paths are errors. Names
+beginning with `recorder-` are reserved when this option is used. Discovery
+accepts at most 128 sessions per capture, then fails explicitly. The byte limit
+still bounds total journal storage. This option does not discover new
+Hearthstone log directories or recover events that the plugin never wrote.
+
 Storage capacity is explicit. Exhaustion stops collection with a failure record
 and nonzero exit status. The collector retains existing evidence. Disk errors
 can prevent a final record; stderr and the command's exit status remain the

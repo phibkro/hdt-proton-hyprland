@@ -67,3 +67,10 @@ Tests cover byte preservation, rotation, rewrites, capacity, and producer failur
 using real processes. The isolated C# runner reuses the installed HDT parser and
 event publishers through reflection. Full semantic equivalence is not established.
 An Effect migration must preserve these tested ownership and failure boundaries.
+
+The 2026-11-16 recorder-discovery change extends this collector with additional
+read-only cursors. The dependency lookup still found no installed Effect package
+or house overlay. The change retains the existing process boundary and adds no
+runtime dependency. Tests use real files and a separate producer process that is
+stopped, killed, and restarted with a new recorder directory. An Effect migration
+must preserve discovery across producer restarts and both capacity failures.

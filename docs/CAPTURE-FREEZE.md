@@ -14,7 +14,12 @@ for the distinction between collected bytes and processed game events.
    ```sh
    HDT_LOG='/absolute/path/to/HearthstoneDeckTracker/Logs/hdt_log.txt'
    GAME_LOGS='/absolute/path/to/Hearthstone/Logs/Hearthstone_CURRENT_SESSION'
+   RECORDER_ROOT="$PWD/evidence"
    ```
+
+   Set `RECORDER_ROOT` to the directory that contains `flight-recorder-*`
+   directories. For an installed package, use your data directory's `evidence`
+   directory. See [recorder locations](DIAGNOSTICS.md#read-a-recording).
 
 3. Start the journal:
 
@@ -23,6 +28,7 @@ for the distinction between collected bytes and processed game events.
      --output "$PWD/evidence/freeze-$(date -u +%Y%m%dT%H%M%S)" \
      --from end \
      --max-bytes 536870912 \
+     --recorder-root "$RECORDER_ROOT" \
      --source "hdt=$HDT_LOG" \
      --source "power=$GAME_LOGS/Power.log" \
      --source "loading=$GAME_LOGS/LoadingScreen.log" \
@@ -52,6 +58,9 @@ the capture private. Review and sanitize evidence before sharing it.
 If Hearthstone restarts, select its new session directory and start another
 capture. If only HDT restarts, the existing capture follows replacement of the
 selected `hdt_log.txt` path and records a new source generation.
+With `--recorder-root`, the capture also discovers each restarted HDT recorder
+and collects that session from its first byte. Leave the collector running
+across HDT restarts.
 
 If the journal reports capacity exhaustion, retain the completed directory and
 start a capture in a new directory. The command exits nonzero rather than

@@ -1,10 +1,10 @@
 import {constants} from "node:fs";
-import {open, mkdir, lstat} from "node:fs/promises";
+import {open, mkdir, lstat, readdir} from "node:fs/promises";
 import type {FileHandle} from "node:fs/promises";
 import {resolve, join} from "node:path";
 
 export type Source = {name:string; path:string};
-type Cursor = Source & {handle?:FileHandle; identity?:string; offset:number; generation:number; anchor?:Buffer; unavailable?:boolean};
+type Cursor = Source & {from:"start"|"end"; handle?:FileHandle; identity?:string; offset:number; generation:number; anchor?:Buffer; unavailable?:boolean};
 
 // Preserve source bytes. Interpretation belongs to the versioned HDT worker.
 export class InputJournal {
@@ -15,18 +15,55 @@ export class InputJournal {
   private started=performance.now();
   private closed=false;
   private lastHeartbeat=-Infinity;
-  constructor(private directory:string, sources:Source[], private from:"start"|"end", private maxBytes:number) {
+  private recorderSessions=new Set<string>();
+  private recorderRootUnavailable=false;
+  constructor(private directory:string, sources:Source[], private from:"start"|"end", private maxBytes:number, private recorderRoot?:string) {
     if(!Number.isSafeInteger(maxBytes) || maxBytes<65536) throw Error("Journal capacity must be at least 65536 bytes.");
-    if(!sources.length || new Set(sources.map(s=>s.name)).size!==sources.length || new Set(sources.map(s=>resolve(s.path))).size!==sources.length)
+    if((!sources.length && !recorderRoot) || new Set(sources.map(s=>s.name)).size!==sources.length || new Set(sources.map(s=>resolve(s.path))).size!==sources.length)
       throw Error("Supply unique source names and paths.");
     for(const source of sources) if(!/^[a-z][a-z0-9-]*$/.test(source.name)) throw Error("Invalid source name.");
-    this.cursors=sources.map(s=>({...s,path:resolve(s.path),offset:0,generation:0}));
+    if(recorderRoot) {
+      this.recorderRoot=resolve(recorderRoot);
+      if(sources.some(s=>s.name.startsWith("recorder-"))) throw Error("Source names beginning recorder- are reserved with --recorder-root.");
+    }
+    this.cursors=sources.map(s=>({...s,path:resolve(s.path),from:this.from,offset:0,generation:0}));
     if(this.cursors.some(s=>s.path===join(resolve(directory),"journal.jsonl"))) throw Error("A journal cannot collect its own output.");
   }
   async start() {
     await mkdir(this.directory,{mode:0o700}); // Exclusive ownership; never adopt existing evidence.
     this.sink=await open(join(this.directory,"journal.jsonl"),"wx",0o600);
-    await this.record("journal.start",{schema:1,from:this.from,maxBytes:this.maxBytes,sources:this.cursors.map(s=>({name:s.name,path:s.path}))});
+    await this.record("journal.start",{schema:1,from:this.from,maxBytes:this.maxBytes,sources:this.cursors.map(s=>({name:s.name,path:s.path})),recorderRoot:this.recorderRoot});
+    await this.discoverRecorders(true);
+  }
+  private async discoverRecorders(initial=false) {
+    if(!this.recorderRoot) return;
+    let entries:string[];
+    try {
+      const root=await lstat(this.recorderRoot);
+      if(!root.isDirectory()) throw Error("Recorder root must be a directory, not a symlink.");
+      entries=await readdir(this.recorderRoot);
+    } catch(error) {
+      if((error as NodeJS.ErrnoException).code!=="ENOENT") throw error;
+      if(!this.recorderRootUnavailable) await this.record("recorder.root.unavailable",{});
+      this.recorderRootUnavailable=true;return;
+    }
+    if(this.recorderRootUnavailable) await this.record("recorder.root.available",{});
+    this.recorderRootUnavailable=false;
+    // Observe every session, not the newest mtime: multiple restarts can occur
+    // between polls, and an older writer can still have bytes to drain.
+    for(const entry of entries.sort()) {
+      if(!/^flight-recorder-[1-9][0-9]*-[a-f0-9]{32}$/.test(entry) || this.recorderSessions.has(entry)) continue;
+      let directory;
+      try {directory=await lstat(join(this.recorderRoot,entry));}
+      catch(error) {if((error as NodeJS.ErrnoException).code==="ENOENT") continue;throw error;}
+      if(!directory.isDirectory()) throw Error("Recorder session must be a directory, not a symlink.");
+      if(this.recorderSessions.size>=128) throw Error("Recorder session capacity exhausted (128 sessions). Start a new capture.");
+      const source={name:entry.replace(/^flight-/,""),path:join(this.recorderRoot,entry,"events.jsonl"),from:initial?this.from:"start" as const};
+      if(this.cursors.some(c=>c.path===source.path)) throw Error("Recorder session duplicates an explicit source path.");
+      await this.record("recorder.discovered",source);
+      this.cursors.push({...source,offset:0,generation:0});
+      this.recorderSessions.add(entry);
+    }
   }
   private async record(kind:string,data:object,reserve=true) {
     if(!this.sink) throw Error("Journal is not open.");
@@ -69,6 +106,7 @@ export class InputJournal {
   async poll() {
     if(this.closed) throw Error("Journal is closed.");
     const before=this.seq;
+    await this.discoverRecorders();
     for(const cursor of this.cursors) {
       let pathStat;
       try {pathStat=await lstat(cursor.path);} catch(error) {
@@ -102,7 +140,7 @@ export class InputJournal {
           if(`${actual.dev}:${actual.ino}`!==identity) await this.reset(cursor,"source.open-raced");
         } catch(error) {await handle.close();throw error;}
         cursor.handle=handle;cursor.identity=`${actual.dev}:${actual.ino}`;
-        if(cursor.generation===0 && cursor.unavailable===undefined && this.from==="end") cursor.offset=actual.size;
+        if(cursor.generation===0 && cursor.unavailable===undefined && cursor.from==="end") cursor.offset=actual.size;
         await this.record("source.open",{source:cursor.name,identity:cursor.identity,offset:cursor.offset,generation:cursor.generation});
         cursor.unavailable=false;
         await this.drain(cursor);
@@ -128,7 +166,7 @@ if(import.meta.main) {
   let journal:InputJournal|undefined;
   try {
     const args=process.argv.slice(2), sources:Source[]=[];
-    let directory:string|undefined,from:"start"|"end"|undefined,maxBytes:number|undefined;
+    let directory:string|undefined,from:"start"|"end"|undefined,maxBytes:number|undefined,recorderRoot:string|undefined;
     for(let i=0;i<args.length;i+=2) {
       const value=args[i+1];if(!value) throw Error("Each option requires a value.");
       switch(args[i]) {
@@ -136,11 +174,12 @@ if(import.meta.main) {
         case "--from":if(from || !["start","end"].includes(value)) throw Error("Choose --from start or end once.");from=value as "start"|"end";break;
         case "--max-bytes":if(maxBytes!==undefined || !/^[1-9][0-9]*$/.test(value)) throw Error("Invalid --max-bytes.");maxBytes=Number(value);break;
         case "--source":{const split=value.indexOf("=");if(split<1) throw Error("Use --source name=/absolute/file.");sources.push({name:value.slice(0,split),path:value.slice(split+1)});break;}
+        case "--recorder-root":if(recorderRoot) throw Error("Duplicate --recorder-root.");recorderRoot=resolve(value);break;
         default:throw Error(`Unknown option ${args[i]}.`);
       }
     }
-    if(!directory || !from || maxBytes===undefined) throw Error("Usage: input-journal --output NEW_DIRECTORY --from start|end --max-bytes INTEGER --source name=FILE [...]");
-    journal=new InputJournal(directory,sources,from,maxBytes);
+    if(!directory || !from || maxBytes===undefined) throw Error("Usage: input-journal --output NEW_DIRECTORY --from start|end --max-bytes INTEGER [--source name=FILE ...] [--recorder-root DIRECTORY]");
+    journal=new InputJournal(directory,sources,from,maxBytes,recorderRoot);
     await journal.start();
     let stopping=false;
     process.on("SIGTERM",()=>{stopping=true;});process.on("SIGINT",()=>{stopping=true;});

@@ -78,6 +78,13 @@ evidence. Detected replacement or rewrite marks continuity unknown. A rewrite
 between polls that preserves the checked byte range can escape detection; this
 is not a kernel-level audit of every file write.
 
+The optional recorder root adds session discovery to the existing collector.
+Every matching HDT session owns a separate cursor, so a restart does not replace
+an older session that still has unread bytes. New sessions start at byte zero.
+Startup sessions follow the requested offset policy. Discovery has a limit of
+128 sessions and shares the journal's byte limit. Both limits fail explicitly.
+Hearthstone log-session discovery remains outside this implementation.
+
 `hdt-replay run --canonical-events --with-plugin` loads the installed HDT and
 HearthWatcher assemblies in the existing isolated WPF host. It invokes
 `LogWatcherManager.OnNewLines`, subscribes to the actual `GameEvents` fields, and
