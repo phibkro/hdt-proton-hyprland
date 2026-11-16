@@ -39,7 +39,7 @@
           cd source
           export HOME="$TMPDIR/home" HS_APP_ID=1234567890
           mkdir -p "$HOME"
-          bun test ./tests/config.test.ts ./tests/steam-launch.test.ts ./tests/desktop.test.ts ./tests/trace-export.test.ts
+          bash scripts/test-unit.sh
           shellcheck scripts/*.sh
           actionlint .github/workflows/check.yml
           touch "$out"

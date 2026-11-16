@@ -6,6 +6,19 @@ HDT reads game logs, inspects live state through HearthMirror, and draws a separ
 
 ## The Steam process namespace
 
+### Steam's overlay stays with the game
+
+The tracker inherits the game's Wine session so it can discover Hearthstone.
+The launcher removes `gameoverlayrenderer.so` from the tracker's `LD_PRELOAD`
+list. Other preloaded tools remain. The inherited game environment is unchanged.
+
+A captured HDT freeze stopped its UI thread in `GetAsyncKeyState` while X11
+waited on a mutex owned by that same thread. Steam's `XCheckIfEvent` hook appeared
+on the native call path. Excluding that hook from HDT is a launcher workaround
+for this observed failure. It does not establish that every slowdown has the
+same cause. [Valve's related overlay investigation](https://github.com/ValveSoftware/steam-for-linux/issues/11729)
+describes another input-event problem involving the same hook.
+
 A prefix identifies Wine's files and configuration. Steam also starts Wine inside its runtime namespaces.
 
 In this investigation, protontricks selected the correct prefix but used a different temporary-files namespace. HDT started another wineserver and encountered a stale fsync mapping. The launcher now joins the running server's user and mount namespaces, then derives that server's Proton path.

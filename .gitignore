@@ -99,3 +99,6 @@
 !/src/replay/CanonicalReplay.cs
 !/tests/input-journal.test.ts
 !/docs/CAPTURE-FREEZE.md
+!/src/runtime/tracker-environment.ts
+!/tests/tracker-environment.test.ts
+!/scripts/test-unit.sh

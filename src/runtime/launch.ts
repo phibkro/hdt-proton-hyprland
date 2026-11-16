@@ -1,6 +1,7 @@
 import { readdir, readFile, readlink, realpath, stat, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { projectRoot as root, sourceRoot, prefix, appDirectory } from "./config";
+import { trackerEnvironment } from "./tracker-environment";
 
 const canonicalPrefix=await realpath(prefix);
 // Velopack locates Update.exe relative to the installed executable's directory.
@@ -34,7 +35,8 @@ const inside = process.argv[2] === "--inside";
 const probe = process.argv.includes("--window-probe");
 const buildPlugin = process.argv.includes("--build-plugin");
 if (inside) {
-  const { e, proton } = await session(process.argv[3]);
+  const { e: inherited, proton } = await session(process.argv[3]);
+  const e = trackerEnvironment(inherited);
   const outer = await stat(`/proc/${process.argv[3]}/root/tmp`);
   const current = await stat("/tmp");
   if (outer.dev !== current.dev || outer.ino !== current.ino) throw Error("Steam temporary-files namespace was not joined");
