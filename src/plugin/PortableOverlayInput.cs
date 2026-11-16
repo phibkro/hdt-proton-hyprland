@@ -20,19 +20,6 @@ sealed class PortableOverlayInput
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
     static extern int ExtendedStyle(IntPtr window, int index);
 
-    [StructLayout(LayoutKind.Sequential)]
-    struct NativePoint { public int X; public int Y; }
-    [DllImport("user32.dll")]
-    static extern bool GetCursorPos(out NativePoint point);
-    [DllImport("user32.dll")]
-    static extern bool ScreenToClient(IntPtr hwnd, ref NativePoint point);
-    [DllImport("user32.dll")]
-    static extern IntPtr WindowFromPoint(NativePoint point);
-    [DllImport("user32.dll")]
-    static extern short GetKeyState(int key);
-    [DllImport("user32.dll", EntryPoint = "PostMessageW")]
-    static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
-
     public sealed class Acknowledgement
     {
         public string session { get; set; }
@@ -42,7 +29,6 @@ sealed class PortableOverlayInput
         public bool active { get; set; }
         public bool focused { get; set; }
         public bool pointerOverControl { get; set; }
-        public int inputControls { get; set; }
         public long overlayHwnd { get; set; }
         public long observedMS { get; set; }
     }
@@ -54,7 +40,6 @@ sealed class PortableOverlayInput
     bool originalClickthrough;
     bool focusOwned;
     bool disabled;
-    bool pointerAdmitted;
     IList clickableElements;
     FrameworkElement inputSurface;
     bool surfaceOwned;
@@ -154,28 +139,6 @@ sealed class PortableOverlayInput
                 focusOwned = false;
             }
             else if (!ack.active) focusOwned = false;
-
-            var admitted = ack.fresh && ack.active && ack.focused && ack.pointerOverControl &&
-                ack.inputControls > 0 && overlay.IsActive &&
-                Hearthstone_Deck_Tracker.User32.GetForegroundWindow() == hwnd;
-            if (!admitted) pointerAdmitted = false;
-            else if (!pointerAdmitted)
-            {
-                NativePoint point;
-                // X11 can deliver EnterNotify after input shaping without Wine
-                // producing WM_MOUSEMOVE. Refresh only our admitted window from
-                // the real cursor; never move it, forward buttons or target game.
-                if (GetCursorPos(out point) && WindowFromPoint(point) == hwnd &&
-                    GetKeyState(1) >= 0 && GetKeyState(2) >= 0 && GetKeyState(4) >= 0 &&
-                    GetKeyState(5) >= 0 && GetKeyState(6) >= 0 && ScreenToClient(hwnd, ref point) &&
-                    point.X >= 0 && point.X <= short.MaxValue && point.Y >= 0 && point.Y <= short.MaxValue)
-                {
-                    var keys = (GetKeyState(16) < 0 ? 4 : 0) | (GetKeyState(17) < 0 ? 8 : 0);
-                    if (!PostMessage(hwnd, 0x0200, new IntPtr(keys), new IntPtr(point.X | (point.Y << 16))))
-                        throw new InvalidOperationException("Portable pointer refresh failed");
-                    pointerAdmitted = true;
-                }
-            }
         }
         catch (Exception error)
         {
@@ -212,7 +175,6 @@ sealed class PortableOverlayInput
             Hearthstone_Deck_Tracker.User32.SetWindowExStyle(window, originalBits & ~appliedBits & unchanged);
         }
         stylesOwned = false;
-        pointerAdmitted = false;
         focusOwned = false;
         window = IntPtr.Zero;
     }
