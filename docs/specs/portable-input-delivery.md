@@ -51,3 +51,17 @@ Private acceptance does not establish compositor-specific KDE/GNOME behavior,
 Hearthstone state acquisition or long-session crash prevention. The libXi
 request-buffer defect remains a separate fix, not the explanation for this
 Win32/native ownership conflict.
+
+Review follow-up: preparation is also bound to a fresh controller-generation UUID
+published by each native ownership acquisition and echoed only after the plugin
+prepares for that owner. A real controller restart test rejects the old prepared
+snapshot while its timestamp is still fresh, then accepts the new generation.
+The native fixture publishes atomically and explicitly reacquires ownership after
+an intentional malformed snapshot.
+
+The Win32 lease is scoped to visible CanvasInfo using HDT's existing
+ElementContains predicate. Pointer coordinates and inside-overlay status come
+from the native controller's same X11 query as input-region selection. Wine's
+cached cursor coordinates are not authoritative outside its windows. The replay
+must observe native pointer departure before checking style stability outside the
+overlay; it does not require a particular Win32 cached click-through value there.
