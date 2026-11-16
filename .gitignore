@@ -120,6 +120,7 @@
 !/scripts/check-fuzz.sh
 !/scripts/check-rust-x11.sh
 !/scripts/check-xinput.sh
+!/scripts/check-xinput-watch.sh
 !/scripts/check.sh
 !/scripts/ci-scope.sh
 !/scripts/desktop.sh
@@ -155,6 +156,7 @@
 !/src/host/status.rs
 !/src/host/trace.rs
 !/src/host/x11.rs
+!/src/host/xinput_watch.rs
 !/src/hyprland/
 /src/hyprland/*
 !/src/hyprland/overlay-rules.lua

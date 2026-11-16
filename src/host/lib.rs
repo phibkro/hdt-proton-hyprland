@@ -7,3 +7,4 @@ pub mod setup;
 pub mod status;
 pub mod trace;
 pub mod x11;
+pub mod xinput_watch;

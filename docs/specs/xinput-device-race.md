@@ -1,6 +1,6 @@
 # Fatal XInput mapping errors
 
-Two observed HDT exits on Proton Experimental ended with `XI_BadDevice`,
+Repeated observed HDT exits on Proton Experimental ended with `XI_BadDevice`,
 request `X_GetDeviceButtonMapping`, and process status 1. The in-process recorder
 stopped without a managed exception. These exits are distinct from UI freezes.
 
@@ -71,3 +71,18 @@ license. Any future Wine source patch must retain Wine's LGPL provenance.
 REA's ELF provider was unavailable during this investigation. Installed LLVM
 tools supplied the symbol and disassembly evidence. No REA result is claimed
 for the native call sequence.
+
+## Further desktop incidents and independent capture
+
+Two additional native error records on 16 November 2026, at 18:24:16 and
+18:26:40 Europe/Oslo, report the same error and mapping request. Neither adds a
+native stack or establishes a click-triggered device race. Original records
+and recorder sessions are retained privately, outside the source tree.
+
+The independent Rust `xinput-watch` command uses the existing x11rb dependency
+to subscribe only to hierarchy/device-change events. It cannot catch another
+process's Xlib error or change Wine's mapping behavior. The private acceptance
+journey adds/removes devices through the existing project-owned C fixture,
+then lets that separate client exit through Xlib's default fatal handler. The
+observer must remain alive, retain the device events and end normally.
+See [capture instructions](../guides/freeze-capture.md#native-xinput-exits).

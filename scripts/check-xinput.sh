@@ -22,3 +22,6 @@ bwrap --unshare-all --die-with-parent --new-session --clearenv \
     --bind "$run" /capture --chdir /capture --setenv HOME /tmp \
     "$bun" /capture/xinput-race.ts /capture "$xvfb"
 echo "Private XInput reproduction passed. Evidence: $run/results"
+
+# Independent lifecycle capture uses the same isolated device-race fixture.
+bash scripts/check-xinput-watch.sh

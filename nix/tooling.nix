@@ -23,6 +23,8 @@ with pkgs;
   pkg-config
   libx11
   libxi
+  bubblewrap
+  xorg.xorgserver
   libxcomposite
   libxrender
   stylua
