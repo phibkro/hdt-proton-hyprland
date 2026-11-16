@@ -14,6 +14,7 @@ The Linux host is now a native Rust executable. The C# plugin still runs inside 
 
 | Task or question | Document |
 |---|---|
+| Try the independent native Arena migration preview | [Avalonia slice, parity and limits](avalonia/README.md) |
 | Review and merge changes with reproducible verification | [PR review workflow](docs/PR-REVIEW.md) |
 | Install through Nix and register the desktop app | [Install the compatibility tools with Nix](docs/NIX.md) |
 | Apply the plugin and start HDT with Steam | [Apply HDT compatibility fixes](docs/INSTALL.md) |

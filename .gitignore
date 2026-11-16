@@ -224,3 +224,11 @@
 !/docs/TEST-STRATEGY.md
 !/scripts/bench-host.sh
 !/scripts/evaluate.sh
+
+# Independently authored Avalonia migration; no upstream assets or runtime state.
+!/avalonia/
+/avalonia/**/bin/
+/avalonia/**/obj/
+/avalonia/**/.avalonia-build-tasks/
+/avalonia/local/
+!/.github/workflows/avalonia.yml
