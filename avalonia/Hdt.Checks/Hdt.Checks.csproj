@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/plugin/NativeSnapshotWriter.cs" Link="NativeSnapshotWriter.cs" />
+    <ProjectReference Include="../Hdt.Avalonia/Hdt.Avalonia.csproj" />
+    <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+</Project>

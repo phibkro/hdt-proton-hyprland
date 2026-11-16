@@ -1,0 +1,73 @@
+name: Avalonia migration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avalonia-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      docs-only: ${{ steps.scope.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Classify the complete change
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          docs_only=$(bash scripts/ci-scope.sh "$BASE_SHA" "$HEAD_SHA")
+          echo "docs-only=$docs_only" >> "$GITHUB_OUTPUT"
+
+  native-ui:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs-only == 'false' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Build and check native IO and client transactions
+        run: nix-shell avalonia/shell.nix --run 'cargo build --locked -j2 && cargo test --locked -j2 --lib --test rust-snapshot --test rust-client --test rust-launcher'
+      - name: Restore exact dependency graph
+        run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet restore Hdt.Checks/Hdt.Checks.csproj --locked-mode'
+      - name: Build native application and acceptance driver
+        run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilation=false'
+      - name: Check native C# formatting
+        run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet format whitespace Hdt.Avalonia/Hdt.Avalonia.csproj --no-restore --verify-no-changes && dotnet format whitespace Hdt.Checks/Hdt.Checks.csproj --no-restore --verify-no-changes'
+      - name: Verify managed assertion failure and owned cleanup
+        run: nix-shell avalonia/shell.nix --run 'bash scripts/check-native-failure.sh'
+      - name: Exercise rendered native controls
+        run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalonia-evidence'
+      - name: Allow the pinned Bubblewrap binary to create private namespaces
+        # Ubuntu requires an explicit userns profile for Nix-store executables.
+        # Keep tests rootless and leave global namespace restrictions unchanged.
+        run: |
+          bwrap_path=$(nix-shell avalonia/shell.nix --run 'command -v bwrap')
+          bwrap_path=$(readlink -f "$bwrap_path")
+          case "$bwrap_path" in /nix/store/*/bin/bwrap) ;; *) exit 1 ;; esac
+          printf 'abi <abi/4.0>,\ninclude <tunables/global>\nprofile hdt-avalonia-ci %s flags=(unconfined) {\n  userns,\n}\n' "$bwrap_path" > "$RUNNER_TEMP/hdt-avalonia-ci.profile"
+          sudo apparmor_parser --replace "$RUNNER_TEMP/hdt-avalonia-ci.profile"
+      - name: Verify rendered pixels and input-empty overlay in isolated X11
+        run: nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json --native-ui'

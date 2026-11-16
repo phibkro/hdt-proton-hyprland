@@ -92,3 +92,40 @@ fn exact_preload_filter_preserves_similar_names_and_absent_loader_variable() {
         Some(&OsString::from(similar))
     );
 }
+
+#[test]
+fn native_observation_export_requires_explicit_private_owned_output() {
+    use hdt_host::launch::native_observation_environment;
+    use std::{
+        fs,
+        os::unix::fs::{PermissionsExt, symlink},
+    };
+    let mut input = environment(&[
+        ("HDT_NATIVE_CLIENT_FILE", "inherited-target"),
+        ("KEEP", "value"),
+    ]);
+    native_observation_environment(&mut input, None).unwrap();
+    assert!(!input.contains_key(std::ffi::OsStr::new("HDT_NATIVE_CLIENT_FILE")));
+    assert_eq!(input[std::ffi::OsStr::new("KEEP")], "value");
+    assert!(
+        native_observation_environment(&mut input, Some(std::ffi::OsStr::new("relative.json")))
+            .is_err()
+    );
+    let directory = tempfile::tempdir().unwrap();
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let output = directory.path().join("native.json");
+    native_observation_environment(&mut input, Some(output.as_os_str())).unwrap();
+    assert_eq!(
+        input[std::ffi::OsStr::new("HDT_NATIVE_CLIENT_FILE")],
+        OsString::from(format!("Z:{}", output.to_str().unwrap().replace('/', "\\")))
+    );
+    assert!(
+        !output.exists(),
+        "configuration must not write the observation file"
+    );
+    let link = directory.path().join("link.json");
+    symlink(&output, &link).unwrap();
+    assert!(native_observation_environment(&mut input, Some(link.as_os_str())).is_err());
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o750)).unwrap();
+    assert!(native_observation_environment(&mut input, Some(output.as_os_str())).is_err());
+}

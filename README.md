@@ -14,6 +14,7 @@ The Linux host is now a native Rust executable. The C# plugin still runs inside 
 
 | Path | Responsibility |
 |---|---|
+| `avalonia/` | Native client preview, locked .NET tooling and rendered acceptance |
 | `src/host/` | Native Rust launcher, desktop control, independent journal and trace export |
 | `src/plugin/` | C# compatibility plugin loaded inside HDT through Proton |
 | `src/hyprland/` | Compositor-specific rules |
@@ -26,8 +27,8 @@ The Linux host is now a native Rust executable. The C# plugin still runs inside 
 Tool-discovered configuration files live directly at the root. They are ordinary
 files, without symlinks or forwarding configuration. Private installations,
 account state, captures and local worktrees remain ignored.
-The separate `feat/avalonia-ui` branch contains the native client migration; it is
-not part of the installed compatibility package.
+The native client migration in `avalonia/` is a preview and is not part of the
+installed compatibility package.
 
 ## Documentation
 
@@ -35,6 +36,7 @@ See the [documentation index](docs/README.md) for the full structure.
 
 | Task or question | Document |
 |---|---|
+| Try the independent native client migration | [Avalonia client, parity and limits](avalonia/README.md) |
 | Review and merge changes with reproducible verification | [PR review workflow](docs/development/pr-review.md) |
 | Install through Nix and register the desktop app | [Install the compatibility tools with Nix](docs/guides/nix.md) |
 | Apply the plugin and start HDT with Steam | [Apply HDT compatibility fixes](docs/guides/installation.md) |
