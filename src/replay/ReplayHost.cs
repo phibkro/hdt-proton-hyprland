@@ -34,6 +34,7 @@ sealed class ReplayHost
     static Button desktopControl;
     static int desktopClicks;
     static int pointerMessages;
+    static int overlayTransparencyChanges;
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
@@ -42,6 +43,10 @@ sealed class ReplayHost
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool MoveFileEx(string source, string destination, int flags);
     static IntPtr ObservePointerMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (desktopControl != null && overlay != null && hwnd == new WindowInteropHelper(overlay).Handle &&
+            message == 0x7d && wParam.ToInt64() == -20 &&
+            ((Marshal.ReadInt32(lParam, 0) ^ Marshal.ReadInt32(lParam, 4)) & 0x20) != 0)
+            overlayTransparencyChanges++;
         if (desktopControl != null && pointerMessages < 512 &&
             (message == 0x200 || message == 0x201 || message == 0x202 || message == 0x2a3 ||
              message == 0x20 || message == 0x21 || message == 0x84 || message == 7 || message == 8 ||
@@ -406,6 +411,7 @@ sealed class ReplayHost
             overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
             overlayActive = overlay.IsActive,
             foregroundHwnd = GetForegroundWindow().ToInt64(),
+            overlayTransparencyChanges,
             overlayExtendedStyle = WindowStyle(new WindowInteropHelper(overlay).Handle, -20),
             clickthrough = Get(overlay, "_clickthrough"),
             battlegroundsContent = new

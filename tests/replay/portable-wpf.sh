@@ -81,7 +81,15 @@ read -r cx cy < <(jq -r '[.desktopControl.x,.desktopControl.y]|@tsv' "$state")
 for ((expected = 1; expected <= 6; expected++)); do
     before=$(jq .gameClicks "$run/game-fixture.json")
     move "$((ox + 5))" "$((oy + 5))"
+    wait_for 'empty-space native ownership' '.fresh and .active and (.pointerOverControl|not)' "$ack"
+    updates=$(jq .pluginUpdates "$state")
+    wait_for 'empty-space UI settled' ".pluginUpdates>=$((updates + 2))" "$state"
+    changes=$(jq .overlayTransparencyChanges "$state")
     sleep 0.25
+    jq -e ".overlayTransparencyChanges==$changes" "$state" >/dev/null || {
+        echo 'Win32 click-through has competing owners in empty space.' >&2
+        exit 1
+    }
     xdotool click 1
     wait_for 'empty area reaches game fixture' ".gameClicks==$((before + 1))" "$run/game-fixture.json"
     jq -e ".desktopClicks==$((expected - 1))" "$state" >/dev/null
