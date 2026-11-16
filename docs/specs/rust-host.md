@@ -116,11 +116,26 @@ and Rust release tests passed with Cargo build phases offline.
 The byte-journal and trace comparisons above are semantic comparisons, not
 byte-identical JSON serialization. The isolated X11 test is skipped by ordinary
 Cargo discovery and was executed separately; its result is not inferred from the
-31 default tests. Live Steam namespace joining and Hyprland input remain untested
-for the migrated host. No installed service has been switched to this build.
+31 default tests. These initial results preceded the live acceptance below.
 
 Clean revision `e653143` also passes the real isolated WPF replay on the seed's
 Proton 11.0 with plugin, particles suppressed, Battlegrounds tabs and diagnostics.
 The native collector/exporter executes in that replay. An Experimental attempt
 timed out before UI execution; a mutable outer-script attempt has no accepted
 completion result. Neither is counted as a pass. See [Rust host](../RUST.md).
+
+## Review and live acceptance, 2026-11-16
+
+Revision `9c16a00` passed full Nix checks and remote CI. The retained subprocess
+suite now has 23 tests and 73 assertions, including refusal to combine canonical
+publisher and diagnostics replay modes. Separate canonical and WPF/diagnostics
+replays passed on the isolated Proton 11.0 seed, as did the actual X11 test.
+Three independent source reviews covered launch/setup, overlay/UI, and diagnostics.
+
+The operator then authorized switching only HDT to the reviewed Rust package
+through a temporary service override while Hearthstone remained running under
+Experimental. Same-prefix process inspection and user-driven Arena pick/rating,
+menu, alignment, preview, and input checks passed. The operator reported smoother
+Settings transitions; no controlled performance measurement was made.
+[Observed compatibility](../COMPATIBILITY.md#rust-host-acceptance-2026-11-16)
+is the authoritative live acceptance record, including untested paths.

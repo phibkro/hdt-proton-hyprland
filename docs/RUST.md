@@ -95,8 +95,9 @@ devenv shell -- bash scripts/check-rust-x11.sh
 The default Rust suite deliberately excludes that explicitly isolated test; its
 separate result is required evidence. It does not establish real Hyprland,
 Steam namespace, Wine, HearthMirror or ArenaSmith behavior. Live end-to-end
-acceptance is still required before replacing the working installed launcher.
-No service or live prefix is changed by building/testing this branch.
+acceptance was subsequently recorded in [Observed compatibility](COMPATIBILITY.md#rust-host-acceptance-2026-11-16).
+Building and isolated testing do not change the installed service or live prefix;
+the desktop acceptance used an explicit temporary service override.
 
 See [the migration contract](specs/rust-host.md) for recorded results and limits.
 Tier-five particles remain suppressed; a language migration does not fix the
@@ -114,5 +115,8 @@ submenu observations or change the recommended Experimental baseline.
 An earlier Experimental attempt timed out during plugin compilation before the
 UI sequence. A second attempt was invalidated by editing its outer script while
 it ran and is not accepted evidence. The clean committed rerun above supplies
-the accepted result. Experimental replay startup and live Steam/Hyprland
-acceptance of the Rust host remain outstanding.
+the accepted result. Clean revision `9c16a00` subsequently passed separate canonical
+event and WPF/diagnostics replays, including Battlegrounds tabs, on the isolated
+Proton 11.0 seed. Live Steam/Hyprland acceptance then passed on Experimental;
+see the compatibility record for its scope. The isolated Experimental startup
+timeout remains unresolved.

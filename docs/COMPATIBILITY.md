@@ -50,6 +50,27 @@ Stable 11.0-2. The [test procedure](TESTING.md#test-stable-proton) covers a futu
 comparison. The [XInput investigation](specs/xinput-device-race.md) describes
 the separate fatal-error reproduction and its limits.
 
+## Rust host acceptance, 2026-11-16
+
+The reviewed Rust package was activated through a temporary user-service override
+while Hearthstone kept running under Proton Experimental. Process inspection
+confirmed the native host, Microsoft CLR, and the shared Steam mount namespace.
+This test changes the launcher and Linux helpers; HDT remains the Windows WPF app.
+
+| Path | Result | Evidence and limits |
+|---|---|---|
+| HDT startup and game detection | Verified | Same-prefix launch completed; HDT selected the correct log directory, and the overlay matched the game client bounds |
+| Live Arena offers and picks | Verified | After the Rust-backed restart, the operator made another pick and confirmed the following offer updated |
+| ArenaSmith ratings | Verified | The operator confirmed ratings on the paused offer and updates after another pick |
+| Overlay alignment and input | Verified | The operator confirmed movement, resizing, Alt-Tab, preview clearing, transparent click-through, and working overlay controls |
+| Main-window menus | Verified | The operator confirmed Settings and other menus responded. Settings reportedly slid smoothly without jitter; this is an observation, not a performance benchmark |
+| Ordinary Arena and other match tracking | Untested in this acceptance session | Earlier saved-match results below remain separate evidence; the draft checks do not establish match recording with this package |
+| Long-session reliability | Untested | A later tracker restart was manual, as confirmed by the operator; these checks do not establish crash-free operation |
+
+The runtime override is temporary. Building or merging the package does not
+update the workstation's declarative Nix configuration. Other desktops and
+mixed-DPI layouts remain outside this acceptance result.
+
 ## Tracking results
 
 | Path | Result | Evidence and limits |
