@@ -197,7 +197,7 @@ public sealed class MainWindow : Window
             var observation = await _nativeReader.ReadAsync(_lifetime.Token);
             if (_lifetime.IsCancellationRequested) return;
             _nativeObservedAt = observation.ObservedAt;
-            GameView.Apply(observation);
+            GameView.Apply(NativeGamePresentation.Project(observation));
             NativeOverlay.Publish(observation, _settings);
             _frames = [observation.Arena!]; _index = 0; Render();
             _status.Text = $"Game observation file • {observation.Mode} • updated {observation.ObservedAt.ToLocalTime():T}";

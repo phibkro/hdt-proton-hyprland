@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Hdt.Avalonia;
@@ -552,7 +553,12 @@ try
     using var nativePublisher = new NativeSnapshotWriter(nativeFile,
         snapshot => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(snapshot, ReplaySource.JsonOptions),
         () => Interlocked.Increment(ref publishFailures));
-    var startNative = NativeFrame("Constructed", 1);
+    var startNative = NativeFrame("Constructed", 1) with
+    {
+        PlayerHealth = null,
+        OpponentHealth = 0,
+        KnownHand = [new("hand-fixture", 78, "Long supplied known hand name for width containment", 5, 2, 0)]
+    };
     ownedWriters.Add(nativePublisher);
     nativePublisher.Offer(startNative);
     PumpUntil(() => File.Exists(nativeFile), "actual optional snapshot publisher emits initial observation");
@@ -560,6 +566,24 @@ try
     window.Show(); Wait(window.Initialization);
     var nativeTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
     Check(window.SelectedPage == 5 && window.GameView.ModeText.Contains("Constructed") && window.GameView.CardCount == 4, "native game view consumes actual worker publication through bounded Rust reader");
+    bool DeckSectionVisible() => window.GameView.GetVisualDescendants().OfType<TextBlock>()
+        .Any(text => text.Text == "OBSERVED REMAINING DECK" && text.IsEffectivelyVisible);
+    Check(HasText("Your health unknown") && HasText("Opponent health 0") && HasText("×2 • 0 health"),
+        "F# live view distinguishes unknown from zero in observed counts and card health");
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height; Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
+        var lists = window.GameView.GetVisualDescendants().OfType<ListBox>().ToArray();
+        Check(lists.Length == 4 && DeckSectionVisible(), $"{size.Width}: constructed game exposes four supplied card lists");
+        foreach (var list in lists) Fits(list, $"{size.Width}: live-game list stays inside the window");
+        Ordered(lists[0], lists[1], $"{size.Width}: deck and player columns do not overlap");
+        Ordered(lists[1], lists[3], $"{size.Width}: player and opponent columns do not overlap");
+        var longName = window.GameView.GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => text.Text?.Contains("Long supplied known hand name") == true);
+        Check(longName.Bounds.Width <= lists[1].Bounds.Width, $"{size.Width}: supplied long card name wraps inside its list");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"native-game-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+    window.Width = 1120; window.Height = 760; Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
     window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-constructed.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     Click((TabItem)nativeTabs.Items[1]!);
     nativePublisher.Offer(NativeFrame("Arena", 2, frames[0]));
@@ -581,12 +605,14 @@ try
     Wait(window.RefreshNativeAsync());
     Check(window.Library.State.Revision == historyRevision, "repeated observation does not duplicate history or rewrite the library");
     Click((TabItem)nativeTabs.Items[5]!);
+    Check(!DeckSectionVisible() && window.GameView.CardCount == 3,
+        "Battlegrounds hides and clears remaining-deck rows while preserving supplied hand and public boards");
     window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-battlegrounds.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     var staleNative = NativeFrame("Arena", 5, frames[1]);
     staleNative = staleNative with { ObservedAt = DateTimeOffset.UtcNow.AddSeconds(-10), Arena = staleNative.Arena! with { ObservedAt = DateTimeOffset.UtcNow.AddSeconds(-10) } };
     nativePublisher.Offer(staleNative);
     PumpUntil(() => window.GameView.ModeText.Contains("unavailable"), "native source freshness clears previous game data");
-    Check(window.GameView.CardCount == 0 && window.OfferCount == 0 && window.PickedCount == 0, "stale native source cannot leave cards, picks or offers apparently live");
+    Check(window.GameView.CardCount == 0 && window.OfferCount == 0 && window.PickedCount == 0 && !DeckSectionVisible(), "stale native source cannot leave cards, picks, offers or deck sections apparently live");
     window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-observation-stale.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     nativeSession = Guid.NewGuid().ToString();
     nativePublisher.Offer(NativeFrame("Menu", 1));
@@ -595,6 +621,8 @@ try
     var rollback = NativeFrame("Constructed", 2);
     nativePublisher.Offer(rollback);
     PumpUntil(() => window.GameView.ModeText.StartsWith("Constructed"), "fresh native source advances");
+    Check(DeckSectionVisible() && window.GameView.CardCount == 4,
+        "fresh constructed recovery restores the deck section and replaces unavailable data");
     nativePublisher.Offer(NativeFrame("Battlegrounds", 1));
     PumpUntil(() => window.GameView.ModeText.Contains("unavailable"), "backwards sequence is rejected");
     Check(window.GameView.CardCount == 0, "backwards native source sequence cannot replace current facts");
@@ -683,9 +711,28 @@ try
 
     var overlaySpec = Result(SnapshotFiles.InvokeJsonAsync<OverlaySpec>(["native-overlay", "info"], SnapshotFiles.StatusBytes));
     overlaySpec.Validate();
+    void SaveOverlayFrame(OverlayRaster raster, string name) => File.WriteAllText(Path.Combine(evidence, name), System.Text.Json.JsonSerializer.Serialize(new
+    {
+        kind = "frame",
+        schemaVersion = 1,
+        sourceSession = raster.SourceSession,
+        sequence = raster.Sequence,
+        observedMs = raster.ObservedMs,
+        width = overlaySpec.Width,
+        height = overlaySpec.Height,
+        pixelFormat = overlaySpec.PixelFormat,
+        pixels = Convert.ToBase64String(raster.Pixels)
+    }));
     var overlayObservation = NativeFrame("Arena", 20, frames[1]);
     File.WriteAllText(Path.Combine(evidence, "native-overlay-observation.json"), System.Text.Json.JsonSerializer.Serialize(overlayObservation,
         new System.Text.Json.JsonSerializerOptions(ReplaySource.JsonOptions) { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+    var constructedOverlay = startNative with { RemainingDeck = [new("private-fixture-id", 79, "Supplied overlay card", 0, 0, 0)] };
+    var constructedContent = OverlayRendering.CreateContent(constructedOverlay, new TrackerSettings(), overlaySpec);
+    var overlayLabels = constructedContent.GetLogicalDescendants().OfType<TextBlock>().Select(text => text.Text).ToArray();
+    Check(overlayLabels.Contains("0   Supplied overlay card ×0 • 0 health") && !overlayLabels.Any(text => text?.Contains("DbfId") == true),
+        "production non-Arena overlay renders shared F# card text, preserving zero values without wire diagnostic fields");
+    var constructedRaster = OverlayRendering.Render(constructedOverlay, new TrackerSettings(), overlaySpec, Path.Combine(evidence, "native-constructed-overlay.png"));
+    SaveOverlayFrame(constructedRaster, "native-constructed-overlay-frame.json");
     var overlayRaster = OverlayRendering.Render(overlayObservation, new TrackerSettings(), overlaySpec, Path.Combine(evidence, "native-overlay-render.png"));
     Check(overlayRaster.Pixels.Length == overlaySpec.Width * overlaySpec.Height * 4
         && Enumerable.Range(0, overlayRaster.Pixels.Length / 4).All(index => overlayRaster.Pixels[index * 4 + 3] == 255), "actual Avalonia renderer produces a complete opaque bounded raster for Rust-owned overlay");
@@ -699,18 +746,7 @@ try
     File.WriteAllText(Path.Combine(evidence, "native-overlay-alternate.json"), System.Text.Json.JsonSerializer.Serialize(NativeFrame("Arena", 21, frames[0]),
         new System.Text.Json.JsonSerializerOptions(ReplaySource.JsonOptions) { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     Check(!overlayRaster.Pixels.SequenceEqual(alternateRaster.Pixels), "native overlay pixels change when observed offers and picks replace each other");
-    File.WriteAllText(Path.Combine(evidence, "native-overlay-frame.json"), System.Text.Json.JsonSerializer.Serialize(new
-    {
-        kind = "frame",
-        schemaVersion = 1,
-        sourceSession = overlayRaster.SourceSession,
-        sequence = overlayRaster.Sequence,
-        observedMs = overlayRaster.ObservedMs,
-        width = overlaySpec.Width,
-        height = overlaySpec.Height,
-        pixelFormat = overlaySpec.PixelFormat,
-        pixels = Convert.ToBase64String(overlayRaster.Pixels)
-    }));
+    SaveOverlayFrame(overlayRaster, "native-overlay-frame.json");
     window = CreateWindow(new(fixture, Path.Combine(evidence, "overlay-fault-settings.json")));
     window.Show(); Wait(window.Initialization);
     var slowOverlay = Path.Combine(evidence, $"slow-overlay-{Guid.NewGuid():N}.sh");

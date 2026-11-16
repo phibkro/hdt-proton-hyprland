@@ -22,7 +22,7 @@ public sealed record OverlayRaster(string SourceSession, int Sequence, long Obse
 public sealed record OverlayNotice(string RendererSession, int Sequence, long RenderedMs, byte[] Pixels) : OverlayUpdate(Pixels);
 public static class OverlayRendering
 {
-    public static OverlayRaster Render(NativeObservation value, TrackerSettings settings, OverlaySpec spec, string? capture = null)
+    public static Border CreateContent(NativeObservation value, TrackerSettings settings, OverlaySpec spec)
     {
         spec.Validate();
         var content = new StackPanel { Spacing = 7 };
@@ -44,7 +44,7 @@ public static class OverlayRendering
             foreach (var card in cards.Take(22))
                 content.Children.Add(new TextBlock
                 {
-                    Text = card.ToString(),
+                    Text = NativeGamePresentation.Card(card).ToString(),
                     Foreground = Brushes.White,
                     Opacity = card.Count == 0 ? 0.5 : 1,
                     FontSize = 14,
@@ -63,6 +63,11 @@ public static class OverlayRendering
             Background = new SolidColorBrush(Color.Parse("#182831")),
             Child = content
         };
+        return root;
+    }
+    public static OverlayRaster Render(NativeObservation value, TrackerSettings settings, OverlaySpec spec, string? capture = null)
+    {
+        var root = CreateContent(value, settings, spec);
         root.Measure(new Size(spec.Width, spec.Height)); root.Arrange(new Rect(0, 0, spec.Width, spec.Height)); root.UpdateLayout();
         using var image = new RenderTargetBitmap(new PixelSize(spec.Width, spec.Height), new Vector(96, 96));
         image.Render(root);
