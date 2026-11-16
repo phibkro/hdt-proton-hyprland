@@ -137,6 +137,11 @@
           "Avalonia.Skia": "12.1.6"
         }
       },
+      "FSharp.Core": {
+        "type": "Transitive",
+        "resolved": "10.1.401",
+        "contentHash": "z8ETA6rK8VaZqrQgxTS46UyAui6NUvQIDz2tHuZ740qp1FGZKUnbmEwplZBW8apU8r7/bn7r8fkFnauttpBM5Q=="
+      },
       "HarfBuzzSharp": {
         "type": "Transitive",
         "resolved": "8.3.1.3",
@@ -209,7 +214,15 @@
         "type": "Project",
         "dependencies": {
           "Avalonia.Desktop": "[12.1.6, )",
-          "Avalonia.Themes.Fluent": "[12.1.6, )"
+          "Avalonia.Themes.Fluent": "[12.1.6, )",
+          "Hdt.Views": "[1.0.0, )"
+        }
+      },
+      "hdt.views": {
+        "type": "Project",
+        "dependencies": {
+          "Avalonia": "[12.1.6, )",
+          "FSharp.Core": "[10.1.401, )"
         }
       }
     }

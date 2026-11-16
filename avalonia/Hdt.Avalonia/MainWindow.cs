@@ -89,7 +89,8 @@ public sealed class MainWindow : Window
             Text("These preferences affect the native draft view and are saved locally.", 15),
             Text("Hero identities require an explicit observation source. Hero statistics, related-card tooltips and redraft suggestions are unavailable.", 13) }
         };
-        SettingsPanel = new(optionsPane, NativeOverlay, options);
+        SettingsPanel = new(optionsPane, NativeOverlay, new SettingsPaths(options.Settings,
+            options.ClientData ?? "library.json beside the preferences file", options.NativeState ?? "No source configured."));
         _tabs = new TabControl
         {
             ItemsSource = new TabItem[] {

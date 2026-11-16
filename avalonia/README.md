@@ -15,6 +15,23 @@ Native rendered pixels ──bounded stream─────────▶ Rust-o
 
 ## Run
 
+The Options page and shared section layout live in the F# `Hdt.Views` library.
+The C# application supplies its Arena and native overlay controls plus explicit
+display paths; the F# library does not depend on the application or read game
+state. Other views and the observation contracts remain C#. The same rendered
+acceptance driver covers both languages. See the [migration slice](../docs/specs/native-fsharp-options.md).
+
+F# formatting uses pinned Fantomas; restore it once before committing:
+
+```sh
+nix-shell avalonia/shell.nix --run 'dotnet tool restore --tool-manifest avalonia/dotnet-tools.json'
+nix-shell avalonia/shell.nix --run 'bash scripts/check-fsharp.sh'
+```
+
+The fast hook checks versioned F# source and tests without installing tools.
+The PR workflow restores that same tool version, checks formatting, builds both
+languages with warnings as errors, and runs the rendered and private X11 journeys.
+
 From the repository root:
 
 ```sh
