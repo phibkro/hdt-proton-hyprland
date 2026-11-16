@@ -118,3 +118,9 @@ byte-identical JSON serialization. The isolated X11 test is skipped by ordinary
 Cargo discovery and was executed separately; its result is not inferred from the
 31 default tests. Live Steam namespace joining and Hyprland input remain untested
 for the migrated host. No installed service has been switched to this build.
+
+Clean revision `e653143` also passes the real isolated WPF replay on the seed's
+Proton 11.0 with plugin, particles suppressed, Battlegrounds tabs and diagnostics.
+The native collector/exporter executes in that replay. An Experimental attempt
+timed out before UI execution; a mutable outer-script attempt has no accepted
+completion result. Neither is counted as a pass. See [Rust host](../RUST.md).

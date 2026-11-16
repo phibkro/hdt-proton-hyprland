@@ -38,11 +38,13 @@ devenv shell -- cargo deny --config tooling/rust/deny.toml check
 devenv shell -- cargo machete
 ```
 
-`cargo fmt` owns Rust formatting; Clippy and compiler warnings check all targets,
-including tests. rust-analyzer provides editor navigation and diagnostics.
-Nextest runs tests; doctests remain a separate Cargo command. cargo-deny checks
+[rustfmt](https://github.com/rust-lang/rustfmt) owns Rust formatting;
+[Clippy](https://doc.rust-lang.org/clippy/) and compiler warnings check all targets,
+including tests. [rust-analyzer](https://rust-analyzer.github.io/book/) provides editor navigation and diagnostics.
+[Nextest](https://nexte.st/) runs tests; doctests remain a separate Cargo command.
+[cargo-deny](https://embarkstudios.github.io/cargo-deny/) checks
 advisories, licenses, dependency bans and sources; its advisory database requires
-network access on initial setup. cargo-machete detects unused direct dependencies.
+network access on initial setup. [cargo-machete](https://github.com/bnjbvr/cargo-machete) detects unused direct dependencies.
 These are checks with different scopes, not interchangeable proofs of safety.
 
 The central quality driver exposes `rust-fast` for staged format/Clippy checks
@@ -99,3 +101,18 @@ No service or live prefix is changed by building/testing this branch.
 See [the migration contract](specs/rust-host.md) for recorded results and limits.
 Tier-five particles remain suppressed; a language migration does not fix the
 underlying WPF rendering path or native Wine XInput failures.
+
+## Recorded replay result
+
+Committed revision `e653143` passed the isolated WPF sequence with the plugin,
+particle suppression, Battlegrounds tabs, and diagnostics. Its result records a
+clean source tree, exit status zero, and a hashed source/binary snapshot. The Rust
+collector and exporter ran alongside the actual HDT/WPF controls on Proton 11.0
+from the existing account-free seed. This does not overturn the live Stable
+submenu observations or change the recommended Experimental baseline.
+
+An earlier Experimental attempt timed out during plugin compilation before the
+UI sequence. A second attempt was invalidated by editing its outer script while
+it ran and is not accepted evidence. The clean committed rerun above supplies
+the accepted result. Experimental replay startup and live Steam/Hyprland
+acceptance of the Rust host remain outstanding.

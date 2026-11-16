@@ -142,7 +142,7 @@ The hook checks without rewriting files or downloading dependencies.
 
 | Boundary | Checks |
 | --- | --- |
-| Pre-commit | Rust format/Clippy for changed Rust targets; changed-file formatting/lint, TypeScript types when TS changes, C syntax/warnings, Lua lint, C# whitespace, ShellCheck/shfmt, actionlint |
+| Pre-commit | Rust format/Clippy for changed Rust targets; changed-file formatting/lint, TypeScript types when TS changes, C compile-only warnings, Lua lint, C# whitespace, ShellCheck/shfmt, actionlint |
 | PR and merge queue | Frozen dependency restore; Rust format/Clippy, nextest, doctests, dependency policy and unused dependencies; all owned TS format/lint/types; portable C# analysis; Nix package, unit tests, native C analysis/input parsing, Lua, C# formatting, ShellCheck/shfmt, workflow lint |
 | Local pre-merge evidence | Full C# semantic analysis with original HDT; isolated native/WPF replay for affected runtime boundaries |
 
