@@ -237,6 +237,16 @@ if [[ "$reference_views" == true ]]; then
     magick import -window "$main_window" "$run/reference/new-deck-dialog.png"
     jq -c '{kind:"dialog",image:"new-deck-dialog.png",types:.visibleDialogTypes}' "$run/state.json" >>"$run/reference/index.jsonl"
     jq -s '.' "$run/reference/index.jsonl" >"$run/reference/index.json"
+    jq -r '
+        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Original HDT reference atlas</title>" +
+        "<style>body{font:16px system-ui;background:#151b21;color:#eef3f7;max-width:1320px;margin:auto;padding:24px}a{color:#71caff}details{background:#20262d;margin:12px 0;padding:14px}summary{cursor:pointer}img{display:block;max-width:100%;height:auto;margin-top:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>" +
+        "<h1>Original HDT reference atlas</h1><p>Private original-WPF captures; synthetic game models; no account session. Not every HDT state.</p>" +
+        "<p>" + (length|tostring) + " images; " + ([.[]|select(.kind=="settings")|.state.page]|unique|length|tostring) +
+        " settings pages. <a href=\"index.json\">View manifest</a> · <a href=\"../result.json\">Run identity and outcome</a></p>" +
+        (map("<details><summary>" + ((.state.title // .scene // .kind)|@html) + " — " + (.image|@html) +
+            "</summary><a href=\"" + (.image|@html) + "\"><img loading=\"lazy\" src=\"" + (.image|@html) +
+            "\" alt=\"Original HDT reference\"></a><pre>" + (tojson|@html) + "</pre></details>")|join("\n")) + "</html>"
+    ' "$run/reference/index.json" >"$run/reference/index.html"
     send finish
     wait "$host_pid"
     if rg -q '^(dispatcher|command|startup) ' "$run/host.log"; then

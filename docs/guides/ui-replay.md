@@ -52,7 +52,8 @@ Exceeding that bound fails the run rather than silently truncating a page.
 The native Settings button is exercised before capture; subsequent category and
 scene selections use the fixture protocol, not native pointer input.
 
-The printed evidence directory contains `reference/index.json`, per-image
+Open `reference/index.html` in the printed evidence directory for a local
+expandable screenshot gallery. The directory also contains `reference/index.json`, per-image
 state records, `reference-options-index.json`, source hashes and `result.json`.
 Require status zero, the expected page identities and visible original control
 types, and inspect the images. File existence alone does not prove correct
