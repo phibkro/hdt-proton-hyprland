@@ -36,20 +36,18 @@ fn main() { let _: i32 = "type mismatch"; }
 RUST
 measure rust-positive 0 rustc --error-format=json "$run/sentinel/good.rs" -o "$run/sentinel/good"
 measure rust-negative 1 rustc --error-format=json "$run/sentinel/bad.rs" -o "$run/sentinel/bad"
-jq -se 'any(.[];.code.code=="E0308")' "$run/rust-negative.log" >/dev/null || overall=1
+measure rust-diagnostic 0 jq -se 'any(.[];.code.code=="E0308")' "$run/rust-negative.log"
 cat >"$run/sentinel/good.sh" <<'SHELL'
 #!/bin/sh
-value=fixture
-printf '%s\n' "$value"
+printf '%s\n' "$1"
 SHELL
 cat >"$run/sentinel/bad.sh" <<'SHELL'
 #!/bin/sh
-value=fixture
-echo $value
+printf '%s\n' $1
 SHELL
 measure shell-positive 0 shellcheck --format=json "$run/sentinel/good.sh"
 measure shell-negative 1 shellcheck --format=json "$run/sentinel/bad.sh"
-jq -e 'any(.[];.code==2086)' "$run/shell-negative.log" >/dev/null || overall=1
+measure shell-diagnostic 0 jq -e 'any(.[];.code==2086)' "$run/shell-negative.log"
 if [[ "$mode" == suite ]]; then
     measure rust-static 0 bun scripts/quality.ts check rust-fast
     measure typescript-static 0 bun run lint:ts
