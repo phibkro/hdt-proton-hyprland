@@ -51,7 +51,10 @@ const cFlags = (file: string, linking: boolean) => {
 
   if (file.endsWith("x-surface-probe.c")) {
     libraries = ["x11", "xcomposite", "xrender"];
-  } else if (file.endsWith("xinput-race.c")) {
+  } else if (
+    file.endsWith("xinput-race.c") ||
+    file.endsWith("libxi-open-device.c")
+  ) {
     libraries = ["x11", "xi"];
   }
 

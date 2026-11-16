@@ -34,6 +34,7 @@
       };
       checks.${system} = {
         inherit package host;
+        libxi-regression = pkgs.callPackage ./nix/libxi-regression.nix { };
         native-quality = pkgs.runCommand "hdt-native-source-quality" {
           nativeBuildInputs = import ./nix/tooling.nix { inherit pkgs; };
         } ''

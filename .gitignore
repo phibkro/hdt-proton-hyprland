@@ -218,3 +218,13 @@
 /tooling/rust/corpus/recorder_event/*
 !/tooling/rust/corpus/recorder_event/valid
 !/tsconfig.json
+
+!/patches/
+/patches/*
+!/patches/libxi/
+/patches/libxi/*
+!/patches/libxi/0001-retain-open-device-id.patch
+!/nix/libxi-regression.nix
+!/tests/native/libxi-open-device.c
+!/tests/native/libxi-open-device.sh
+!/docs/investigations/libxi-open-device.md
