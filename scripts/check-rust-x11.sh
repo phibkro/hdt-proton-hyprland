@@ -44,9 +44,12 @@ if [[ $native_ui == true ]]; then
         echo 'Build the selected native checks variant first.' >&2
         exit 2
     }
-    if [[ $watcher_events == false ]] && rg --files --hidden --no-ignore "$managed" | rg -q '/(HearthWatcher|HearthMirror)\.dll$'; then
-        echo 'Ordinary native checks contain optional vendor assemblies; refusing to bundle them.' >&2
-        exit 2
+    if [[ $watcher_events == false ]]; then
+        vendor_files=$(rg --files --hidden --no-ignore -g HearthWatcher.dll -g HearthMirror.dll "$managed") || [[ $? == 1 ]]
+        if [[ -n $vendor_files ]]; then
+            echo 'Ordinary native checks contain optional vendor assemblies; refusing to bundle them.' >&2
+            exit 2
+        fi
     fi
     cp -R "$managed" "$run/managed"
     cp -- "$(dirname -- "$frame")/native-overlay-observation.json" "$run/ui-observation.json"
