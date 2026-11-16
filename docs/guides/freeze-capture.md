@@ -65,3 +65,66 @@ across HDT restarts.
 If the journal reports capacity exhaustion, retain the completed directory and
 start a capture in a new directory. The command exits nonzero rather than
 overwriting existing evidence.
+
+## Native XInput exits
+
+A fatal `XI_BadDevice` / `X_GetDeviceButtonMapping` message comes from the
+native Wine/X11 path. The managed recorder may stop without an exception.
+Keep the independent journal running across HDT restarts. Recover only HDT with
+`hdt-proton restart`; the existing command checks that Hearthstone is outside
+its service before restarting it. The watcher already retries nonzero exits
+with a bounded backoff and pauses after repeated failures.
+
+For device-lifecycle evidence, build the development host and run a separate
+read-only observer from this checkout:
+
+```sh
+devenv shell -- cargo build --locked --bin hdt-host
+mkdir -p evidence
+devenv shell -- hdt-proton xinput-watch \
+  --output "$PWD/evidence/xinput-$(date -u +%Y%m%dT%H%M%S).jsonl" \
+  --seconds 3600
+```
+
+This development command is not available in older installed packages. It
+subscribes only to XInput hierarchy and device-change notifications, records
+numeric device identities and UTC/monotonic timestamps, and exits after the
+explicit duration or at 32 MiB. It does not record keys, button presses,
+coordinates or device names, change devices, or depend on HDT's process. A new
+output file is required; an existing file is never overwritten. An abrupt
+termination can leave the capture without its final stop record.
+
+After a failure, preserve the corresponding native messages using a narrow
+local time interval around the incident:
+
+```sh
+umask 077
+journalctl _COMM=HearthstoneDeck --since '5 minutes ago' \
+  --no-pager -o short-iso > evidence/hdt-native-exit.txt
+```
+
+Keep raw evidence private. Correlate the device events with the native exit;
+a nearby device change alone does not prove causation. This observer does not
+capture Wine's native caller stack, button-mapping contents or every possible
+mapping change. Do not disable all X11 errors or modify the running game's
+Proton driver. The existing scoped-error fixture and the independent observer
+can be checked together with `devenv shell -- bash scripts/check-xinput.sh`.
+
+If the observer reports `Connection refused`, check its display namespace.
+On the observed desktop, `DISPLAY=:0` had only `/tmp/.X11-unix/X0_` exposed to
+this shell. A private mount alias allowed a read-only sample to connect:
+
+```sh
+devenv shell -- bwrap --bind / / \
+  --tmpfs /tmp/.X11-unix \
+  --ro-bind /tmp/.X11-unix/X0_ /tmp/.X11-unix/X0 \
+  -- ./local/rust-target/debug/hdt-host xinput-watch \
+  --output "$PWD/evidence/xinput-mapped-$(date -u +%Y%m%dT%H%M%S).jsonl" \
+  --seconds 3600
+```
+
+Use this only for that verified socket layout. The alias exists solely inside
+the observer's mount namespace; do not replace the desktop's shared socket or
+change Steam's display settings. This command inherits the current shell's
+permissions and is not an isolation sandbox. The separate acceptance script
+uses a private server with the operator's desktop sockets absent.
