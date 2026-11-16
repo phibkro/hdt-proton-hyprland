@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   merge_group:
   workflow_dispatch:
 
@@ -60,5 +59,16 @@ jobs:
         run: nix-shell avalonia/shell.nix --run 'bash scripts/check-native-failure.sh'
       - name: Exercise rendered native controls
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalonia-evidence'
+      - name: Allow the pinned Bubblewrap binary to create private namespaces
+        # Ubuntu requires an explicit userns profile for Nix-store executables.
+        # Keep tests rootless and leave global namespace restrictions unchanged.
+        run: |
+          bwrap_path=$(nix-shell avalonia/shell.nix --run 'command -v bwrap')
+          bwrap_path=$(readlink -f "$bwrap_path")
+          case "$bwrap_path" in /nix/store/*/bin/bwrap) ;; *) exit 1 ;; esac
+          printf 'abi <abi/4.0>,\ninclude <tunables/global>\nprofile hdt-avalonia-ci %s flags=(unconfined) {\n  userns,\n}\n' "$bwrap_path" > "$RUNNER_TEMP/hdt-avalonia-ci.profile"
+          sudo apparmor_parser --replace "$RUNNER_TEMP/hdt-avalonia-ci.profile"
       - name: Verify rendered pixels and input-empty overlay in isolated X11
         run: nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json --native-ui'
+      - name: Verify independent real UI process lifetimes and pixels
+        run: nix-shell avalonia/shell.nix --run 'bash scripts/check-native-isolation.sh local/avalonia-evidence'

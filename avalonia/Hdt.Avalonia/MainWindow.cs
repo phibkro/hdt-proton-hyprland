@@ -60,7 +60,7 @@ public sealed class MainWindow : Window
         _store = new(options.Settings);
         Library = new(options.ClientData ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.Settings))!, "library.json"), _lifetime.Token);
         DeckLibrary = new(Library, _lifetime.Token);
-        NativeOverlay = new(options.NativeState is not null, _lifetime.Token);
+        NativeOverlay = new(options.NativeState is not null && options.SessionRole is null, _lifetime.Token, options.SessionRole is null ? null : "Independent overlay lifetime belongs to the native session owner. This main window does not render or control it.");
         ScoresToggle.IsEnabled = SynergiesToggle.IsEnabled = false;
         ScoresToggle.IsCheckedChanged += (_, _) => StartPreferencesSave();
         SynergiesToggle.IsCheckedChanged += (_, _) => StartPreferencesSave();

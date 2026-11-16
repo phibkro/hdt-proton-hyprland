@@ -20,23 +20,29 @@ public sealed class NativeOverlayActor
     private static readonly JsonSerializerOptions ReplyOptions = new(ReplaySource.JsonOptions)
     { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter<OverlayReplyKind>(JsonNamingPolicy.CamelCase, allowIntegerValues: false) } };
     private readonly CancellationTokenSource _lifetime;
-    private readonly Channel<OverlayRaster?> _frames = Channel.CreateBounded<OverlayRaster?>(new BoundedChannelOptions(1)
+    private readonly Channel<OverlayUpdate?> _frames = Channel.CreateBounded<OverlayUpdate?>(new BoundedChannelOptions(1)
     { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.DropOldest });
     private readonly TaskCompletionSource<OverlaySpec> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Action<string> _status;
     public Task<OverlaySpec> Ready => _ready.Task;
     public Task Completion { get; }
+    public uint Window { get; private set; }
+    public int ChildPid { get; private set; }
     public NativeOverlayActor(GameWindowChoice game, Action<string> status, CancellationToken lifetime = default)
+        : this(new GameIdentity(game.Window, game.Pid, game.Class), status, lifetime) { }
+    public static NativeOverlayActor ForIdentity(GameIdentity game, Action<string> status, CancellationToken lifetime = default) => new(game, status, lifetime);
+    private NativeOverlayActor(GameIdentity game, Action<string> status, CancellationToken lifetime)
     {
         _status = status; _lifetime = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
         Completion = Task.Run(() => RunAsync(game));
     }
-    public void Offer(OverlayRaster? frame) => _frames.Writer.TryWrite(frame);
+    public void Offer(OverlayUpdate? frame) => _frames.Writer.TryWrite(frame);
     public void Stop() { try { _lifetime.Cancel(); } catch (ObjectDisposedException) { } }
     public async Task StopAsync() { Stop(); await Completion; }
-    private async Task RunAsync(GameWindowChoice game)
+    private async Task RunAsync(GameIdentity game)
     {
         Process? child = null;
+        SnapshotFiles.OwnedNativeChild? owned = null;
         var tasks = new List<Task>();
         try
         {
@@ -52,13 +58,14 @@ public sealed class NativeOverlayActor
             };
             foreach (var value in new[] { "native-overlay", "run", game.Window.ToString(System.Globalization.CultureInfo.InvariantCulture), game.Pid.ToString(System.Globalization.CultureInfo.InvariantCulture), game.Class })
                 start.ArgumentList.Add(value);
-            child = Process.Start(start) ?? throw new IOException("Native overlay owner could not start.");
+            owned = new(start); child = owned.Child;
             var diagnostics = ReadDiagnosticsAsync(child.StandardError.BaseStream, _lifetime.Token); tasks.Add(diagnostics);
             var hello = await ReadReplyAsync(child.StandardOutput.BaseStream, _lifetime.Token);
             if (hello.Kind != OverlayReplyKind.Ready || hello.SchemaVersion != 1 || hello.Window == 0 || hello.Pid != child.Id
                 || hello.InputRectangles != 0 || hello.Width is null || hello.Height is null || hello.PixelFormat is null)
                 throw new InvalidDataException("Native overlay did not prove input-empty preparation.");
             var spec = new OverlaySpec(hello.SchemaVersion, hello.Width.Value, hello.Height.Value, hello.PixelFormat); spec.Validate();
+            Window = hello.Window; ChildPid = child.Id;
             _ready.TrySetResult(spec);
             _status("Native overlay prepared; return to the selected Hearthstone window.");
             var writer = WriteFramesAsync(child, spec, _lifetime.Token); tasks.Add(writer);
@@ -85,7 +92,7 @@ public sealed class NativeOverlayActor
                 // Never release the controller's owner while this child still exists.
                 await child.WaitForExitAsync();
                 try { await Task.WhenAll(tasks); } catch (Exception) { /* Primary failure already surfaced; pipes close on owned exit. */ }
-                child.Dispose();
+                owned!.Dispose();
             }
             _ready.TrySetCanceled(); _lifetime.Dispose();
         }
@@ -96,22 +103,38 @@ public sealed class NativeOverlayActor
         {
             object packet;
             if (frame is null) packet = new { kind = "hide" };
-            else
+            else if (frame is OverlayNotice notice)
             {
-                if (frame.Pixels.Length != checked(spec.Width * spec.Height * 4)) throw new InvalidDataException("Incomplete native raster frame.");
+                packet = new
+                {
+                    kind = "notice",
+                    schemaVersion = 1,
+                    rendererSession = notice.RendererSession,
+                    sequence = notice.Sequence,
+                    renderedMs = notice.RenderedMs,
+                    width = spec.Width,
+                    height = spec.Height,
+                    pixelFormat = spec.PixelFormat,
+                    pixels = Convert.ToBase64String(notice.Pixels)
+                };
+            }
+            else if (frame is OverlayRaster observation)
+            {
+                if (observation.Pixels.Length != checked(spec.Width * spec.Height * 4)) throw new InvalidDataException("Incomplete native raster frame.");
                 packet = new
                 {
                     kind = "frame",
                     schemaVersion = 1,
-                    sourceSession = frame.SourceSession,
-                    sequence = frame.Sequence,
-                    observedMs = frame.ObservedMs,
+                    sourceSession = observation.SourceSession,
+                    sequence = observation.Sequence,
+                    observedMs = observation.ObservedMs,
                     width = spec.Width,
                     height = spec.Height,
                     pixelFormat = spec.PixelFormat,
-                    pixels = Convert.ToBase64String(frame.Pixels)
+                    pixels = Convert.ToBase64String(observation.Pixels)
                 };
             }
+            else throw new InvalidDataException("Unknown overlay presentation update.");
             var json = JsonSerializer.Serialize(packet);
             if (Encoding.UTF8.GetByteCount(json) + 1 > 2 * 1024 * 1024) throw new InvalidDataException("Native raster request exceeds line bound.");
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime); deadline.CancelAfter(TimeSpan.FromSeconds(2));

@@ -13,6 +13,15 @@ var ownedWriters = new List<NativeSnapshotWriter>();
 MainWindow CreateWindow(LaunchOptions options) { var value = new MainWindow(options); ownedWindows.Add(value); return value; }
 try
 {
+    if (args is ["--overlay-reference", var sourcePath, var settingsPath, var outputPath])
+    {
+        AppBuilder.Configure<App>().UseHeadless(new() { UseHeadlessDrawing = false }).UseSkia().SetupWithoutStarting();
+        var observation = new NativeObservationReader(sourcePath).ReadAsync().GetAwaiter().GetResult();
+        var preferences = new SettingsStore(settingsPath).LoadAsync().GetAwaiter().GetResult();
+        var spec = SnapshotFiles.InvokeJsonAsync<OverlaySpec>(["native-overlay", "info"], SnapshotFiles.StatusBytes).GetAwaiter().GetResult();
+        File.WriteAllBytes(outputPath, OverlayRendering.Render(observation, preferences, spec).Pixels);
+        return;
+    }
     var negativeControl = args is ["--negative-control", _, _];
     if (negativeControl) args = args[1..];
     if (args is ["--desktop-overlay-ui", var desktopEvidence])
@@ -521,6 +530,8 @@ try
     Check(overlayRaster.Pixels.Length == overlaySpec.Width * overlaySpec.Height * 4
         && Enumerable.Range(0, overlayRaster.Pixels.Length / 4).All(index => overlayRaster.Pixels[index * 4 + 3] == 255), "actual Avalonia renderer produces a complete opaque bounded raster for Rust-owned overlay");
     var alternateRaster = OverlayRendering.Render(NativeFrame("Arena", 21, frames[0]), new TrackerSettings(), overlaySpec);
+    File.WriteAllText(Path.Combine(evidence, "native-overlay-alternate.json"), System.Text.Json.JsonSerializer.Serialize(NativeFrame("Arena", 21, frames[0]),
+        new System.Text.Json.JsonSerializerOptions(ReplaySource.JsonOptions) { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     Check(!overlayRaster.Pixels.SequenceEqual(alternateRaster.Pixels), "native overlay pixels change when observed offers and picks replace each other");
     File.WriteAllText(Path.Combine(evidence, "native-overlay-frame.json"), System.Text.Json.JsonSerializer.Serialize(new
     {

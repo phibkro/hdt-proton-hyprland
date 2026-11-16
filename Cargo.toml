@@ -61,6 +61,10 @@ name = "rust-x11-isolated"
 path = "tests/host/rust-x11-isolated.rs"
 
 [[test]]
+name = "rust-native-session-isolated"
+path = "tests/host/rust-native-session-isolated.rs"
+
+[[test]]
 name = "rust-x11"
 path = "tests/host/rust-x11.rs"
 

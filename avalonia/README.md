@@ -431,3 +431,60 @@ copyright with all rights reserved; its website's CC0 notice does not license
 that data. This client reads supplied runtime files and distributes none of
 those files, card text or artwork. See the provider's
 [copyright notice](https://hearthstonejson.com/docs/cards.html).
+
+## Opt-in independent Main and overlay processes
+
+The ordinary launch above retains its original Main-owned overlay lifetime.
+For independent UI lifetimes, use `hdt-host native-session run CONFIG.json`.
+The Rust owner holds an exclusive private-directory lease and launches sibling
+Main and overlay-renderer processes; both read the same observation source
+directly. Main alone writes preferences/library. A Main freeze/crash therefore
+need not stop overlay rendering, and a renderer freeze/crash need not stop Main.
+The original cached-HDT observation producer still depends on WPF: acquisition
+independence is not implemented by this process split.
+
+Create an owned directory with mode0700. Supply this explicit version1 config
+with absolute paths and a previously verified game XID/PID/WM_CLASS:
+
+```json
+{
+  "schemaVersion": 1,
+  "sessionRoot": "/absolute/private/native-session",
+  "dotnet": "/absolute/pinned/dotnet",
+  "application": "/absolute/build/Hdt.Avalonia.dll",
+  "observationFile": "/absolute/observations.json",
+  "game": { "window": 123, "pid": 456, "class": "verified-class" }
+}
+```
+
+These identity numbers are placeholders, not discovery or implicit attachment.
+Invalid configuration fails; isolation never silently falls back. Preferences
+and library live at `preferences.json` and `library.json` inside sessionRoot.
+Do not launch a second writer outside this owner against those files.
+
+The owner accepts bounded newline-delimited JSON on stdin:
+
+```json
+{"schemaVersion":1,"command":"status"}
+{"schemaVersion":1,"command":"restart","role":"overlay"}
+{"schemaVersion":1,"command":"restart","role":"main"}
+{"schemaVersion":1,"command":"shutdown"}
+```
+
+Keep stdin open for the session. EOF, shutdown or TERM ends both owned roles.
+Status reports actual dispatcher acknowledgement, not background-thread health.
+There are no automatic restarts; each explicit restart reaps the old exact role
+process/group first. A frozen or dead child leaves its sibling running; the
+external owner's control status remains available. The owner inherits only an
+allowlist of display/runtime variables and never prints environment values.
+
+The renderer clears advice and displays an explicit unavailable notice for
+stale/invalid/unavailable source or preferences, independently of Main. Notices
+have separate renderer transport identity and cannot refresh tracker facts.
+Game-focus loss hides facts and notices. A stopped renderer cannot render its
+own error visual; the owner reports its failed health and the existing raster
+window clears after its five-second deadline. Explicit restart is the recovery
+path. Linux/X11 only; no compositor-independent Wayland overlay is implied.
+
+Read [the bounded ownership/acceptance contract](../docs/specs/native-ui-isolation.md)
+and [the executable verification recipe](../.cursor/skills/verify-hdt-proton/features/native-avalonia.md#independent-ui-lifetimes-explicit-opt-in).

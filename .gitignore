@@ -270,3 +270,10 @@
 !/avalonia/Hdt.Avalonia/TrackerLayout.cs
 !/avalonia/Hdt.Avalonia/SettingsView.cs
 !/scripts/check-native-failure.sh
+
+!/docs/specs/native-ui-isolation.md
+!/src/host/native_session.rs
+!/avalonia/Hdt.Avalonia/SessionProtocol.cs
+!/avalonia/Hdt.Avalonia/IndependentOverlay.cs
+!/tests/host/rust-native-session-isolated.rs
+!/scripts/check-native-isolation.sh

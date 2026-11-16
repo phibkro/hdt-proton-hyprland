@@ -33,6 +33,43 @@ public static class SnapshotFiles
         return host;
     }
 
+    // Linux parent-death signals follow the creating native thread. Keep that
+    // thread alive through the exact child's wait, rather than borrowing a pool
+    // thread that may retire while a long-lived raster child is still running.
+    // Both callers run on their existing background actors, never the dispatcher.
+    internal sealed class OwnedNativeChild : IDisposable
+    {
+        private readonly Thread _parent;
+        private readonly TaskCompletionSource _completed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Process Child { get; }
+        public OwnedNativeChild(ProcessStartInfo start)
+        {
+            start.Environment["HDT_OWNED_PARENT_PID"] = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var started = new TaskCompletionSource<Process>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _parent = new Thread(() =>
+            {
+                try
+                {
+                    var child = Process.Start(start) ?? throw new IOException("Owned native child could not start.");
+                    started.SetResult(child);
+                    child.WaitForExit();
+                    _completed.SetResult();
+                }
+                catch (Exception error) { started.TrySetException(error); _completed.TrySetException(error); }
+            })
+            { IsBackground = true, Name = "HDT owned native child" };
+            _parent.Start();
+            try { Child = started.Task.GetAwaiter().GetResult(); }
+            catch { _parent.Join(); _ = _completed.Task.Exception; throw; }
+        }
+        public void Dispose()
+        {
+            _parent.Join();
+            try { _completed.Task.GetAwaiter().GetResult(); }
+            finally { Child.Dispose(); }
+        }
+    }
+
     private static async Task<byte[]> ExecuteAsync(IReadOnlyList<string> arguments, int maximum, CancellationToken cancellation, string? standardInput)
     {
         if (maximum is < 1 or > ReplayBytes) throw new ArgumentOutOfRangeException(nameof(maximum));
@@ -41,13 +78,14 @@ public static class SnapshotFiles
         deadline.CancelAfter(Deadline);
         var acquired = false;
         Process? child = null;
+        OwnedNativeChild? owned = null;
         try
         {
             await Slot.WaitAsync(deadline.Token).ConfigureAwait(false);
             acquired = true;
             var start = new ProcessStartInfo(host) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = standardInput is not null, CreateNoWindow = true };
             foreach (var argument in arguments) start.ArgumentList.Add(argument);
-            child = Process.Start(start) ?? throw new IOException("Snapshot reader could not start.");
+            owned = new(start); child = owned.Child;
             var output = ReadPipeAsync(child.StandardOutput.BaseStream, maximum, deadline.Token);
             var error = ReadPipeAsync(child.StandardError.BaseStream, 4096, deadline.Token);
             var input = standardInput is null ? Task.CompletedTask : WriteInputAsync(child, standardInput, deadline.Token);
@@ -63,20 +101,23 @@ public static class SnapshotFiles
         { throw new IOException("Rust snapshot reader could not start.", error); }
         finally
         {
-            if (child is not null)
+            try
             {
-                if (!child.HasExited)
+                if (child is not null)
                 {
-                    try { child.Kill(entireProcessTree: true); }
-                    catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
-                    // Retain custody and the actor slot until the exact child exits.
-                    // A kernel-stalled child must not create an unbounded chain of replacements.
-                    _ = ReapAsync(child);
-                    acquired = false;
+                    if (!child.HasExited)
+                    {
+                        try { child.Kill(entireProcessTree: true); }
+                        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+                        // Retain custody and the actor slot until the exact child exits.
+                        // A kernel-stalled child must not create an unbounded chain of replacements.
+                        _ = ReapAsync(owned!);
+                        acquired = false;
+                    }
+                    else owned!.Dispose();
                 }
-                else child.Dispose();
             }
-            if (acquired) Slot.Release();
+            finally { if (acquired) Slot.Release(); }
         }
     }
     private static async Task WriteInputAsync(Process child, string input, CancellationToken cancellation)
@@ -85,10 +126,11 @@ public static class SnapshotFiles
         await child.StandardInput.WriteAsync(input.AsMemory(), cancellation).ConfigureAwait(false);
         child.StandardInput.Close();
     }
-    private static async Task ReapAsync(Process child)
+    private static async Task ReapAsync(OwnedNativeChild owned)
     {
-        try { await child.WaitForExitAsync().ConfigureAwait(false); }
-        finally { child.Dispose(); Slot.Release(); }
+        try { try { await owned.Child.WaitForExitAsync().ConfigureAwait(false); } finally { owned.Dispose(); } }
+        catch (Exception error) { Console.Error.WriteLine($"Owned native child reap failed: {error}"); }
+        finally { Slot.Release(); }
     }
     private static async Task<byte[]> ReadPipeAsync(Stream stream, int maximum, CancellationToken cancellation)
     {
