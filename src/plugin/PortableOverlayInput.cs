@@ -30,6 +30,9 @@ sealed class PortableOverlayInput
         public bool active { get; set; }
         public bool focused { get; set; }
         public bool pointerOverControl { get; set; }
+        public bool pointerInsideOverlay { get; set; }
+        public int pointerScreenX { get; set; }
+        public int pointerScreenY { get; set; }
         public long overlayHwnd { get; set; }
         public long observedMS { get; set; }
     }
@@ -45,17 +48,14 @@ sealed class PortableOverlayInput
     FrameworkElement inputSurface;
     bool surfaceOwned;
     public string OwnerGeneration { get; private set; }
-    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
-    [DllImport("user32.dll")] static extern bool GetCursorPos(out NativePoint point);
-
-    bool PointerInsideSurface(Window overlay)
+    bool PointerInsideSurface(Window overlay, Acknowledgement ack)
     {
-        NativePoint cursor;
         var owner = Hearthstone_Deck_Tracker.API.Core.OverlayWindow;
-        if (owner != overlay || !owner.IsContentVisible || !overlay.IsVisible || !GetCursorPos(out cursor)) return false;
-        return owner.ElementContains(inputSurface, inputSurface.PointFromScreen(new Point(cursor.X, cursor.Y)));
+        if (owner != overlay || !owner.IsContentVisible || !overlay.IsVisible || !ack.pointerInsideOverlay) return false;
+        // Wine's cursor cache can stop advancing after leaving its windows.
+        // Use the native owner's observed root coordinates, not that cache.
+        return owner.ElementContains(inputSurface, inputSurface.PointFromScreen(new Point(ack.pointerScreenX, ack.pointerScreenY)));
     }
-    MethodInfo setClickthrough;
 
     public bool PreparedFor(IntPtr hwnd)
     {
@@ -141,7 +141,7 @@ sealed class PortableOverlayInput
             }
             // The native owner keeps input empty until this preparation is
             // published. Make Wine receptive before X11 delivers pointer entry.
-            if (ack.active && PointerInsideSurface(overlay)) setClickthrough.Invoke(overlay, new object[] { false });
+            if (ack.active && PointerInsideSurface(overlay, ack)) setClickthrough.Invoke(overlay, new object[] { false });
             var foreground = Hearthstone_Deck_Tracker.User32.GetForegroundWindow();
             if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl && (foreground != hwnd || !overlay.IsActive))
                 focusOwned = overlay.Activate();

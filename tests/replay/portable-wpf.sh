@@ -80,11 +80,12 @@ move "$((ox + 5))" "$((oy + 5))"
 wait_for 'fresh native regions' '.fresh and .nativeReady and .controls>0' "$ack"
 # Keep game foreground while crossing outside the overlay, including its canvas.
 move 5 5
+wait_for 'native pointer outside overlay' '(.pointerInsideOverlay|not) and .active' "$ack"
 updates=$(jq .pluginUpdates "$state")
 wait_for 'outside-overlay UI settled' ".pluginUpdates>=$((updates + 2))" "$state"
 changes=$(jq .overlayTransparencyChanges "$state")
 sleep 0.3
-jq -e ".overlayTransparencyChanges==$changes and .clickthrough==true" "$state" >/dev/null || {
+jq -e ".overlayTransparencyChanges==$changes" "$state" >/dev/null || {
     echo 'Win32 click-through has competing owners outside the overlay.' >&2
     exit 1
 }

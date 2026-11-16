@@ -530,7 +530,9 @@ impl Bridge {
         Ok(
             json!({"kind":"state","observedMS":SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
             "fresh":fresh,"active":active,"focused":self.display.focused_within(self.overlay)?,
-            "pointerOverControl":hit,"controls":rectangles.len(),"inputControls":admitted.len()}),
+            "pointerOverControl":hit,"pointerInsideOverlay":pointer.same_screen && pointer.win_x >= 0 && pointer.win_y >= 0 && i32::from(pointer.win_x)<i32::from(geometry.width) && i32::from(pointer.win_y)<i32::from(geometry.height),
+            "pointerScreenX":pointer.root_x,"pointerScreenY":pointer.root_y,
+            "controls":rectangles.len(),"inputControls":admitted.len()}),
         )
     }
     fn cleanup(&mut self) -> Result<()> {
