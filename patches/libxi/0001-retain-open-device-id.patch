@@ -1,0 +1,28 @@
+From 210ce76d193c4e61a62c768159ecc610ee9db313 Mon Sep 17 00:00:00 2001
+From: "Philip B. Krogh" <71797726+phibkro@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 19:24:41 +0100
+Subject: [PATCH] XOpenDevice: retain the requested ID across the reply wait
+
+_XReply may release the display lock while waiting for the server. Another thread can then reuse the output request buffer before XOpenDevice reads req->deviceid. Preserve the caller-supplied ID instead of reading the potentially overwritten request.
+
+A real two-thread Xvfb reproducer requests device 4 while a second thread sends XNoOp requests on the same display. The unpatched library returns device 127; the patched library completes 50000 open/close cycles without an ID mismatch.
+---
+ src/XOpenDev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/XOpenDev.c b/src/XOpenDev.c
+index 4b3c460..0859825 100644
+--- a/src/XOpenDev.c
++++ b/src/XOpenDev.c
+@@ -99,7 +99,7 @@ XOpenDevice(
+     if (dev) {
+ 	int dlen;	/* data length */
+ 
+-	dev->device_id = req->deviceid;
++	dev->device_id = id;
+ 	dev->num_classes = rep.num_classes;
+ 	dev->classes = (XInputClassInfo *) ((char *)dev + sizeof(XDevice));
+ 	dlen = rep.num_classes * sizeof(xInputClassInfo);
+-- 
+2.55.0
+

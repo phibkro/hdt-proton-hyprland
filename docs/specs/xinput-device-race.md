@@ -140,3 +140,11 @@ It was not attached to the debugger, so this repeat adds an error record but no
 native caller stack. The original complete capture and both error records are
 preserved privately. The installed driver remains unchanged; capture does not
 prevent the fatal Xlib handler from terminating HDT.
+
+## libXi request-buffer investigation
+
+A subsequent private test reproduced incorrect `XOpenDevice` IDs under concurrent
+requests without device removal. A one-line libXi patch passes the corresponding
+original-versus-patched regression. See the
+[libXi investigation and upstream submission draft](../investigations/libxi-open-device.md)
+for the source, check, evidence scope, and remaining live-causality limits.
