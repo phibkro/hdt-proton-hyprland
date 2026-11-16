@@ -310,3 +310,6 @@
 !/docs/specs/native-arena-event-bridge.md
 
 !/tests/native/NativeWatcherChecks.cs
+
+!/avalonia/Hdt.Views/NativeGameView.fs
+!/docs/specs/fsharp-live-game-view.md

@@ -2,6 +2,7 @@
   <ItemGroup>
     <Compile Include="TrackerLayout.fs" />
     <Compile Include="ArenaChoices.fs" />
+    <Compile Include="NativeGameView.fs" />
     <Compile Include="SettingsView.fs" />
     <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
   </ItemGroup>

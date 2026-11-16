@@ -26,7 +26,7 @@ platform parity. The F# Arena display model and choice renderer are shared by
 Main and overlay; C# projects validated observations into that model without
 changing wire formats or treating unavailable advice as live ratings.
 
-The Options page, Arena choice visuals and shared section layout live in the F# `Hdt.Views` library.
+The Options page, live-game view, Arena choice visuals and shared section layout live in the F# `Hdt.Views` library.
 The C# application supplies its Arena and native overlay controls plus explicit
 display paths; the F# library does not depend on the application or read game
 state. Other views and the observation contracts remain C#. The same rendered
