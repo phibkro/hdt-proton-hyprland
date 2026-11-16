@@ -158,3 +158,14 @@
 /tooling/shell/*
 !/tooling/shell/shellcheckrc
 !/.shellcheckrc
+
+# Reviewed native Rust host and language tooling.
+!/Cargo.toml
+!/Cargo.lock
+!/src/host/
+/src/host/*
+!/src/host/*.rs
+!/docs/specs/rust-host.md
+!/tooling/rust/
+/tooling/rust/*
+!/tooling/rust/*.toml

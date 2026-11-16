@@ -2,6 +2,14 @@
 with pkgs;
 [
   bun
+  rustc
+  cargo
+  rustfmt
+  clippy
+  rust-analyzer
+  cargo-nextest
+  cargo-deny
+  cargo-machete
   clang-tools
   clang
   pkg-config

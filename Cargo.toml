@@ -1,0 +1,40 @@
+[package]
+name = "hdt-host"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[lib]
+path = "src/host/lib.rs"
+
+[[bin]]
+name = "hdt-host"
+path = "src/host/main.rs"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+nix = { version = "0.30", features = ["fs", "process", "signal", "user", "sched"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+signal-hook = "0.3"
+uuid = { version = "1", features = ["v4"] }
+x11rb = { version = "0.13", features = ["composite", "render", "xinput"] }
+sha2 = "0.10"
+quick-xml = "0.38"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

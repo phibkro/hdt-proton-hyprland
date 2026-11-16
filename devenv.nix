@@ -4,6 +4,8 @@ let
 in
 {
   packages = (with pkgs; [ bash shellcheck actionlint bun nodejs_24 protontricks winetricks steam-run util-linux procps ripgrep jq unzip git rsync gitleaks libnotify xorg.xwininfo xorg.xprop xorg.xorgserver xcompmgr openbox xdotool imagemagick bubblewrap gcc pkg-config libx11 libxi libxcomposite libxrender ]) ++ import ./nix/tooling.nix { inherit pkgs; };
+  env.CARGO_HOME = "${config.devenv.root}/cache/cargo";
+  env.CARGO_TARGET_DIR = "${config.devenv.root}/local/rust-target";
   env.REA_PROJECT = config.devenv.root;
   env.W_CACHE = "${config.devenv.root}/cache/winetricks";
   env.npm_config_cache = "${config.devenv.root}/cache/npm";
