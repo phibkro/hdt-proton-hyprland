@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Web.Script.Serialization;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Interop;
 using Hearthstone_Deck_Tracker.Utility.Logging;
 
@@ -105,11 +104,6 @@ sealed class PortableOverlayInput
                 focusOwned = false;
             }
             else if (!ack.active) focusOwned = false;
-            // Native focus/input shaping can change beneath a stationary pointer.
-            // Refresh WPF's own hit testing without injecting native input.
-            if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl &&
-                Hearthstone_Deck_Tracker.User32.GetForegroundWindow() == hwnd)
-                Mouse.Synchronize();
         }
         catch (Exception error)
         {
