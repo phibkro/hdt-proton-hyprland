@@ -121,6 +121,7 @@
 !/scripts/check-rust-x11.sh
 !/scripts/check-xinput.sh
 !/scripts/check-xinput-watch.sh
+!/scripts/capture-native-error.sh
 !/scripts/check.sh
 !/scripts/ci-scope.sh
 !/scripts/desktop.sh
@@ -143,6 +144,7 @@
 !/src/diagnostics/
 /src/diagnostics/*
 !/src/diagnostics/window-probe.cs
+!/src/diagnostics/xlib-fatal.gdb
 !/src/host/
 /src/host/*
 !/src/host/config.rs

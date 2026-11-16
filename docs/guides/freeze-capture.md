@@ -128,3 +128,44 @@ the observer's mount namespace; do not replace the desktop's shared socket or
 change Steam's display settings. This command inherits the current shell's
 permissions and is not an isolation sandbox. The separate acceptance script
 uses a private server with the operator's desktop sockets absent.
+
+## Capture the native Xlib error stack
+
+The device observer provides timing, not a caller stack. For the native
+`XI_BadDevice` exit, the development checkout also supplies a bounded GDB
+capture. Choose the current HDT Linux PID explicitly, then run:
+
+```sh
+HDT_PID=12345 # Replace with the current HDT PID, not Hearthstone's PID.
+devenv shell -- bash scripts/capture-native-error.sh "$HDT_PID" \
+  "$PWD/evidence/native-xlib-$(date -u +%Y%m%dT%H%M%S)" 1800
+```
+
+The script rejects a non-HDT process, an existing debugger and an existing
+output directory. It records the Wine executable and process start metadata,
+disables debugger startup files and automatic script loading, and attaches to
+that PID only. Attachment briefly pauses HDT. It neither follows new tracker
+processes nor attaches to Hearthstone or the Wine server. A refused attachment
+is a failure; do not lower the machine's ptrace restrictions to bypass it.
+
+After attaching, require `HDT_NATIVE_CAPTURE_ARMED` in the private `gdb.log`,
+and check that the hardware breakpoint address matches the displayed
+`_XDefaultError` symbol address. The capture explicitly selects the Linux
+x86-64 ABI after attachment: Wine's mixed architecture reporting caused a
+symbolic prologue breakpoint to truncate its address in the observed session.
+The exact-entry hardware breakpoint avoids that prologue selection.
+
+Routine Wine/CLR signals pass through to their existing handlers. At Xlib's
+default fatal-error handler, the capture saves three numeric error fields,
+register addresses, up to 24 current-thread stack frames without arguments,
+and the loaded-library list. It detaches without suppressing the error. On
+the explicit deadline it terminates the debugger; the private lifetime test
+verified that an attached target remains running and untraced after this path.
+The exit status and incomplete-capture message distinguish a deadline or
+unexpected stop from a recorded fatal-error stack.
+
+This is a one-shot Linux x86-64 Xlib capture, not general managed exception,
+segmentation-fault or freeze diagnosis. Some Wine/managed frames may lack
+symbols or unwind information. It records no locals or complete memory dump,
+but paths and stack information remain private. After HDT restarts, select
+its new PID and use a new output directory.
