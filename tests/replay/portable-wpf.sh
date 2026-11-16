@@ -87,7 +87,7 @@ for ((expected = 1; expected <= 6; expected++)); do
     jq -e ".desktopClicks==$((expected - 1))" "$state" >/dev/null
     move "$cx" "$cy"
     wait_for 'Win32 activation and cached click-through' '.foregroundHwnd==.overlayHwnd and .clickthrough==false' "$state"
-    wait_for 'native control focus' '.fresh and .active and .focused and .pointerOverControl' "$ack"
+    wait_for 'native control admission' '.fresh and .active and .focused and .pointerOverControl and .inputControls>0' "$ack"
     # Native focus acknowledgement can precede WPF's pointer-event dispatch.
     # Observe the actual control before sending its click; keep the click assertion.
     wait_for 'WPF control pointer delivery' '.desktopControlHovered==true' "$state"
