@@ -239,6 +239,14 @@ try
     var clientTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
     Click((TabItem)clientTabs.Items[0]!);
     var editor = window.DeckLibrary;
+    Check(editor.GetType().BaseType == typeof(DeckLibrarySurface)
+        && editor.Catalog.GetType().BaseType == typeof(CatalogSurface)
+        && editor.GetVisualDescendants().OfType<HistorySurface>().Any()
+        && typeof(DeckLibrarySurface).Assembly == typeof(SettingsView).Assembly,
+        "production library, editor, catalog and embedded history use the F# presentation assembly");
+    Check(editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "No deck selected")
+        && editor.SaveButton.IsEnabled == (window.Library.Ready && !window.Library.Busy),
+        "empty F# library renders explicit empty selection with verified-storage availability");
     void Fill(TextBox box, string text)
     {
         Click(box);
@@ -259,6 +267,9 @@ try
     Fill(editor.NotesBox, "Native pointer and keyboard acceptance");
     Click(editor.SaveButton); Wait(editor.PendingAction);
     Check(window.Library.State.Decks.Length == 1 && window.Library.State.Decks[0].Name == "Native fixture deck", "native deck editor saves through real Rust transaction boundary");
+    Check(editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "Native fixture deck")
+        && editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "2 × DBF 100"),
+        "F# selected facts render saved identities and multiplicity rather than unsaved input");
     Click(editor.ExportButton); Wait(editor.PendingAction);
     Fits(editor.CodeBox, "Export action exposes code before input helper scrolling");
     Check(editor.CodeBox.Text?.Contains("AAECAf0EAU0BZAAA") == true, "native export produces independently specified Hearthstone deckstring");
@@ -280,6 +291,8 @@ try
     var record = new MatchRecord(Guid.NewGuid().ToString(), window.Library.State.Decks[1].Id, DateTimeOffset.UtcNow.ToString("o"), "Manual acceptance fixture", "Win", "Mage", "Warrior", 8, null, "Anonymous test data");
     Wait(window.Library.RecordAsync(record));
     // Representative-size acceptance exercises real controls, not only style constants.
+    var longSavedNotes = "Saved notes — " + new string('N', 600);
+    Fill(editor.NotesBox, longSavedNotes);
     Fill(editor.NameBox, "Long native deck name — " + new string('W', 110));
     Click(editor.SaveButton); Wait(editor.PendingAction);
     Click(editor.OverviewButton);
@@ -306,6 +319,9 @@ try
         Fits(editor.SelectedPanel, $"{size.Width}: long selected deck facts remain inside viewport");
         Ordered(editor.BrowserPanel, editor.GamesPanel, $"{size.Width}: browser and games do not overlap");
         Ordered(editor.GamesPanel, editor.SelectedPanel, $"{size.Width}: games and selected deck do not overlap");
+        var savedNotesLabel = editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == longSavedNotes);
+        Check(savedNotesLabel.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap && savedNotesLabel.Bounds.Width <= editor.SelectedPanel.Bounds.Width,
+            $"{size.Width}: long saved F# notes wrap within selected-deck facts");
         foreach (var tab in clientTabs.Items.Cast<TabItem>()) Fits(tab, $"{size.Width}: navigation {tab.Header} remains visible");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-library-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         Click((TabItem)clientTabs.Items[3]!);
@@ -362,6 +378,9 @@ try
     Click(editor.NewButton);
     Check(editor.SearchBox.Text == "", "New clears an active browser search so a newly saved deck cannot remain hidden");
     Fits(editor.NameBox, "New from archived browsing exposes name in one action before helper scrolling");
+    Check(editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "No deck selected")
+        && !editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "2 × DBF 100"),
+        "F# New transition clears previous selected cards even while the overview is hidden");
     Check(editor.ShowArchived.IsChecked == false && !editor.NameBox.IsReadOnly && editor.NameBox.Text == "" && editor.SaveButton.IsEnabled && editor.EditorPane.IsExpanded,
         "new deck leaves archive-only browsing so newly saved decks cannot disappear into a hidden active list");
     var savedLibrary = window.Library.State;
@@ -371,16 +390,21 @@ try
     Click(editor.ReloadButton); Wait(editor.PendingAction);
     Check(window.Library.Ready && window.Library.State.Decks.Length == savedLibrary.Decks.Length && window.Library.State.Matches.Length == 1, "native library recovers from failed import by verifying the actual persisted state");
     Click(editor.NewButton);
-    var catalogPath = Path.Combine(evidence, "illustrative-catalog.json");
+    var catalogPath = Path.Combine(evidence, new string('c', 120), "illustrative-catalog.json");
+    Directory.CreateDirectory(Path.GetDirectoryName(catalogPath)!);
+    window.Width = 800; window.Height = 600;
+    Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
     var catalogJson = "[{\"dbfId\":777,\"id\":\"FIXTURE_CATALOG\",\"name\":\"Illustrative catalog card\",\"type\":\"MINION\",\"cardClass\":\"MAGE\",\"cost\":2,\"collectible\":true},{\"dbfId\":637,\"id\":\"HERO_FIXTURE\",\"name\":\"Illustrative base hero\",\"type\":\"HERO\",\"cardClass\":\"MAGE\"}]";
     File.WriteAllText(catalogPath, catalogJson);
     var catalog = editor.Catalog;
     Click((Expander)catalog.Content!);
     Fill(catalog.PathBox, catalogPath); Fill(catalog.QueryBox, "catalog mage");
+    Fits(catalog.PathBox, "minimum-width catalog confines a long local path to its input");
     Click(catalog.SearchButton); Wait(catalog.PendingSearch);
     Click(catalog.Results.GetVisualDescendants().OfType<ListBoxItem>().Single());
     Click(catalog.AddButton); Click(catalog.AddButton);
     Click(catalog.RemoveButton);
+    Fits(catalog.RemoveButton, "minimum-width catalog card actions wrap within the editor");
     Check(editor.CardsBox.Text == "777 1", "catalog remove action decrements the selected card without changing its identity");
     Click(catalog.RemoveButton);
     Check(editor.CardsBox.Text == "", "removing the final catalog copy removes the card rather than persisting a zero count");
@@ -391,6 +415,12 @@ try
     Click(catalog.SearchButton); Wait(catalog.PendingSearch);
     Click(catalog.Results.GetVisualDescendants().OfType<ListBoxItem>().Single()); Click(catalog.HeroButton);
     Check(editor.HeroBox.Text == "637" && editor.ClassBox.Text == "MAGE", "explicit catalog hero choice sets exact hero identity without guessing a class mapping");
+    Fits(catalog.HeroButton, "minimum-width catalog hero action remains reachable");
+    Check(catalog.Results.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text?.Contains("? mana • Illustrative base hero") == true),
+        "F# catalog row renders unavailable cost as unknown rather than zero");
+    window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "layout-catalog-800.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    window.Width = 1120; window.Height = 760;
+    Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
     window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-card-catalog.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     var catalogRevision = window.Library.State.Revision;
     File.WriteAllText(catalogPath, "{}"); Click(catalog.SearchButton); Wait(catalog.PendingSearch);
@@ -402,6 +432,15 @@ try
     Click(editor.SaveButton); Wait(editor.PendingAction);
     Check(window.Library.State.Decks.Last().Name == "Catalog-built native deck" && window.Library.State.Decks.Last().Content.Cards.Single() == new CardCount(777, 2)
         && window.Library.State.Decks.Last().Content.HeroDbfId == 637, "catalog-built deck persists through real Rust library transaction");
+    Fill(editor.SideboardsBox, "777 100 1");
+    Click(editor.SaveButton); Wait(editor.PendingAction);
+    Check(window.Library.State.Decks.Last().Content.Sideboards.Single() == new SideboardCard(777, 100, 1),
+        "F# sideboard editor persists exact owner, card and multiplicity through Rust");
+    Click(editor.NewButton);
+    Fill(editor.SearchBox, "Catalog-built native deck");
+    Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single());
+    Check(editor.SideboardsBox.Text == "777 100 1" && editor.CardsBox.Text == "777 2" && editor.HeroBox.Text == "637" && editor.FormatBox.Text == "2",
+        "F# editor reload projects saved sideboards, cards, hero and format after clearing unsaved fields");
     window.Close();
     var heroFrame = frames[0] with
     {

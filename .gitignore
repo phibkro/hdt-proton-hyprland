@@ -313,3 +313,6 @@
 
 !/avalonia/Hdt.Views/NativeGameView.fs
 !/docs/specs/fsharp-live-game-view.md
+
+!/docs/specs/fsharp-deck-library.md
+!/avalonia/Hdt.Views/DeckLibraryView.fs
