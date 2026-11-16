@@ -71,3 +71,14 @@ devices nor session sockets, retains stderr and exact source identity, and exits
 nonzero when no real KWin client can connect. It is a doctor, never a green KDE
 acceptance substitute. A functioning rendering prerequisite inside these
 isolation constraints remains required before extending the Wine/WPF journey.
+
+The first exact-head doctor retained the renderer failure and timed out without
+a usable client. Its missing explicit Xwayland executable dependency was then
+declared in the optional shell; it must not be confused with a successful render
+device prerequisite. All owned processes remained bounded by the PID namespace.
+
+The separate libXi regression rerun satisfied all six race assertions but failed
+Nix output reproducibility: the original library's failing iteration changed
+from one to zero. The check now streams raw evidence into its build log and
+retains only stable result/executable artifacts in its output. The semantic
+original-failure/patched-success assertions are unchanged.

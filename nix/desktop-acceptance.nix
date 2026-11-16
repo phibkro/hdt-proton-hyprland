@@ -9,7 +9,7 @@ let
   pkgs = sets.legacyPackages.x86_64-linux;
 in
 pkgs.mkShell {
-  packages = with pkgs; [ bash coreutils bubblewrap dbus jq xprop gawk gnugrep git ];
+  packages = with pkgs; [ bash coreutils bubblewrap dbus jq xprop xwayland gawk gnugrep git ];
   HDT_KWIN_BINARY = "${pkgs.kdePackages.kwin}/bin/kwin_wayland";
   HDT_MESA_EGL_VENDOR = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
 }

@@ -27,10 +27,14 @@ unset DISPLAY WAYLAND_DISPLAY XAUTHORITY
 mkdir -p /tmp/.X11-unix
 server=''
 cleanup() {
+    local status=$?
+    trap - EXIT
     if [[ -n $server ]]; then
         kill "$server" 2>/dev/null || true
         wait "$server" 2>/dev/null || true
     fi
+    if [[ -f server.log ]]; then cat server.log >&2; fi
+    exit "$status"
 }
 trap cleanup EXIT
 "$xvfb" -displayfd 3 -screen 0 640x480x24 -nolisten tcp -noreset 3>display.txt >server.log 2>&1 &
@@ -50,12 +54,14 @@ for variant in original patched; do
         status=0
         HDT_LIBXI_REPRO=1 LD_LIBRARY_PATH="$library" timeout 45 "$fixture" "$display" >"$variant-$round.log" 2>&1 || status=$?
         printf '%s\n' "$status" >"$variant-$round.status"
+        printf 'variant=%s round=%d exit=%d\n' "$variant" "$round" "$status"
+        cat "$variant-$round.log"
         if [[ $variant == original ]]; then
             [[ $status == 1 ]]
-            rg '^MISMATCH iteration=[0-9]+ requested=[0-9]+ returned=[0-9]+$' "$variant-$round.log"
+            rg -q '^MISMATCH iteration=[0-9]+ requested=[0-9]+ returned=[0-9]+$' "$variant-$round.log"
         else
             [[ $status == 0 ]]
-            rg '^completed=50000 mismatch=0$' "$variant-$round.log"
+            rg -q '^completed=50000 mismatch=0$' "$variant-$round.log"
         fi
     done
 done

@@ -40,7 +40,14 @@ must complete 50,000 open/close cycles each with zero mismatches. Other failures
 timeouts, or an original run that does not expose the race fail the check.
 Because this is a concurrent race, the iteration at failure is not a contract;
 the fixture checks requested/returned identity rather than a particular wrong ID.
-Logs and exit statuses are retained in the check's output directory.
+Raw per-round logs, exit statuses and X server diagnostics are streamed into the
+retained Nix build log (`nix log .#checks.x86_64-linux.libxi-regression`). The
+output directory retains the fixture executable and canonical successful result.
+Raw race iteration counts cannot live in that reproducible output: a repeated
+check exposed a valid original mismatch at iteration zero instead of iteration
+one, making the earlier output tree differ despite all assertions passing.
+`nix build --rebuild` now checks the stable artifacts without making thread
+scheduling an accidental assertion.
 
 Initial sandbox results: all three original runs failed at iteration zero,
 requesting ID 4 and receiving 127. All three patched runs completed normally.

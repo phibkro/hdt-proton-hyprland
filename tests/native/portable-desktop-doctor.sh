@@ -13,6 +13,7 @@ fi
 if [[ ${1:-} == --inside ]]; then
     [[ ${HDT_PORTABLE_DOCTOR_NAMESPACE:-} == 1 && ! -e /run/user && ! -e /dev/dri && ! -e /dev/input ]]
     [[ -z ${DISPLAY:-} && -z ${WAYLAND_DISPLAY:-} && -z ${DBUS_SESSION_BUS_ADDRESS:-} ]]
+    command -v Xwayland >/capture/xwayland-binary.txt
     awk -F: 'NR>2 {gsub(/ /,"",$1); if($1!="lo") bad=1} END {exit bad}' /proc/net/dev
     mkdir -p /tmp/.X11-unix
     chmod 1777 /tmp/.X11-unix
