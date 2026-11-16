@@ -671,7 +671,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
         std::fs::write(
             &region,
             serde_json::to_vec(&json!({"session":session,"observedMS":now-age,
-            "overlayHwnd":123,"win32Input":win32_input,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
+            "overlayHwnd":123,"controllerGeneration":std::fs::read(&ack).ok().and_then(|bytes|serde_json::from_slice::<serde_json::Value>(&bytes).ok()).and_then(|v|v["controllerGeneration"].as_str().map(str::to_owned)),"win32Input":win32_input,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
             .unwrap(),
         )
         .unwrap();
@@ -726,6 +726,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             std::thread::sleep(Duration::from_millis(10));
         }
     };
+    wait_ack(&|v| v["nativeReady"] == true);
     publish("owned", 0, "Unprepared");
     wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == true && v["controls"] == 0);
     assert!(
@@ -819,6 +820,50 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .len(),
         1
     );
+    // A fresh snapshot from the previous owner must not bootstrap a new one.
+    let previous_generation: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&ack).unwrap()).unwrap();
+    nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(owner.0.id() as i32),
+        nix::sys::signal::Signal::SIGTERM,
+    )
+    .unwrap();
+    assert!(owner.0.wait().unwrap().success());
+    owner = Server(
+        command()
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    wait_ack(&|v| {
+        v["nativeReady"] == true
+            && v["controllerGeneration"] != previous_generation["controllerGeneration"]
+    });
+    let restarted: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&ack).unwrap()).unwrap();
+    assert_eq!(restarted["fresh"], false);
+    assert_eq!(restarted["inputControls"], 0);
+    let snapshot: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&region).unwrap()).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    assert!(
+        now.abs_diff(snapshot["observedMS"].as_i64().unwrap()) < 1500,
+        "restart must reject the old generation while its timestamp is still fresh"
+    );
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty()
+    );
+    publish("owned", 0, "Prepared");
+    wait_ack(&|v| v["fresh"] == true && v["inputControls"] == 1);
     std::fs::remove_file(&region).unwrap();
     wait_ack(&|v| v["fresh"] == false && v["controls"] == 0);
     assert!(

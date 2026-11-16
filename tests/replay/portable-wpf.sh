@@ -43,7 +43,7 @@ wait_for 'WPF control layout' '.desktopControl!=null' "$state"
 jq -e '.overlayExtendedStyle / 134217728 | floor % 2 == 1' "$state" >/dev/null
 for variant in wrong-session stale future wrong-hwnd fractional not-ready; do
     jq -n --arg variant "$variant" --argjson hwnd "$(jq .overlayHwnd "$state")" \
-        '{backend:"x11",overlayHwnd:(if $variant=="wrong-hwnd" then $hwnd+1 else $hwnd end),session:(if $variant=="wrong-session" then "wrong" else "isolated-replay" end),nativeReady:($variant!="not-ready"),observedMS:((if $variant=="fractional" then now*1000+0.5 else (now*1000|floor) end)-(if $variant=="stale" then 5000 elif $variant=="future" then -5000 else 0 end))}' >"$ack.next"
+        '{backend:"x11",controllerGeneration:"00000000-0000-4000-8000-000000000001",overlayHwnd:(if $variant=="wrong-hwnd" then $hwnd+1 else $hwnd end),session:(if $variant=="wrong-session" then "wrong" else "isolated-replay" end),nativeReady:($variant!="not-ready"),observedMS:((if $variant=="fractional" then now*1000+0.5 else (now*1000|floor) end)-(if $variant=="stale" then 5000 elif $variant=="future" then -5000 else 0 end))}' >"$ack.next"
     mv "$ack.next" "$ack"
     updates=$(jq .pluginUpdates "$state")
     # Two completed UI cycles exclude an update already in flight at rename.
@@ -77,6 +77,16 @@ xdotool windowsize "$game" "$ow" "$oh"
 xdotool windowmove "$game" "$ox" "$oy"
 xdotool windowactivate --sync "$game"
 wait_for 'fresh native regions' '.fresh and .nativeReady and .controls>0' "$ack"
+# Keep game foreground while crossing outside the overlay, including its canvas.
+move 5 5
+updates=$(jq .pluginUpdates "$state")
+wait_for 'outside-overlay UI settled' ".pluginUpdates>=$((updates + 2))" "$state"
+changes=$(jq .overlayTransparencyChanges "$state")
+sleep 0.3
+jq -e ".overlayTransparencyChanges==$changes and .clickthrough==true" "$state" >/dev/null || {
+    echo 'Win32 click-through has competing owners outside the overlay.' >&2
+    exit 1
+}
 read -r cx cy < <(jq -r '[.desktopControl.x,.desktopControl.y]|@tsv' "$state")
 for ((expected = 1; expected <= 6; expected++)); do
     before=$(jq .gameClicks "$run/game-fixture.json")

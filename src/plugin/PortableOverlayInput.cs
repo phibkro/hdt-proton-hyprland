@@ -24,6 +24,7 @@ sealed class PortableOverlayInput
     {
         public string session { get; set; }
         public string backend { get; set; }
+        public string controllerGeneration { get; set; }
         public bool nativeReady { get; set; }
         public bool fresh { get; set; }
         public bool active { get; set; }
@@ -43,6 +44,17 @@ sealed class PortableOverlayInput
     IList clickableElements;
     FrameworkElement inputSurface;
     bool surfaceOwned;
+    public string OwnerGeneration { get; private set; }
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out NativePoint point);
+
+    bool PointerInsideSurface(Window overlay)
+    {
+        NativePoint cursor;
+        var owner = Hearthstone_Deck_Tracker.API.Core.OverlayWindow;
+        if (owner != overlay || !owner.IsContentVisible || !overlay.IsVisible || !GetCursorPos(out cursor)) return false;
+        return owner.ElementContains(inputSurface, inputSurface.PointFromScreen(new Point(cursor.X, cursor.Y)));
+    }
     MethodInfo setClickthrough;
 
     public bool PreparedFor(IntPtr hwnd)
@@ -64,8 +76,9 @@ sealed class PortableOverlayInput
         {
             if (new FileInfo(path).Length > 8192) return null;
             var ack = new JavaScriptSerializer().Deserialize<Acknowledgement>(File.ReadAllText(path));
+            Guid generation;
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            return ack != null && ack.session == session && ack.backend == "x11" && ack.nativeReady &&
+            return ack != null && ack.session == session && ack.backend == "x11" && ack.nativeReady && Guid.TryParseExact(ack.controllerGeneration, "D", out generation) &&
                 ack.overlayHwnd == hwnd.ToInt64() && ack.observedMS > now - 1500 && ack.observedMS < now + 1500 ? ack : null;
         }
         catch (IOException) { return null; }
@@ -90,7 +103,7 @@ sealed class PortableOverlayInput
         if (String.IsNullOrEmpty(input) || String.IsNullOrEmpty(session) || hwnd == IntPtr.Zero) return;
         var ack = Read(Path.Combine(Path.GetDirectoryName(input), "control-input.json"), session, hwnd);
         if (ack == null) { Stop(); return; }
-        if (window != hwnd) { Stop(); window = hwnd; }
+        if (window != hwnd || OwnerGeneration != ack.controllerGeneration) { Stop(); window = hwnd; OwnerGeneration = ack.controllerGeneration; }
         try
         {
             if (!stylesOwned)
@@ -128,7 +141,7 @@ sealed class PortableOverlayInput
             }
             // The native owner keeps input empty until this preparation is
             // published. Make Wine receptive before X11 delivers pointer entry.
-            if (ack.active) setClickthrough.Invoke(overlay, new object[] { false });
+            if (ack.active && PointerInsideSurface(overlay)) setClickthrough.Invoke(overlay, new object[] { false });
             var foreground = Hearthstone_Deck_Tracker.User32.GetForegroundWindow();
             if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl && (foreground != hwnd || !overlay.IsActive))
                 focusOwned = overlay.Activate();
@@ -154,6 +167,7 @@ sealed class PortableOverlayInput
     {
         if (surfaceOwned && clickableElements != null) clickableElements.Remove(inputSurface);
         surfaceOwned = false;
+        OwnerGeneration = null;
         clickableElements = null;
         inputSurface = null;
         if (focusOwned && window != IntPtr.Zero && Hearthstone_Deck_Tracker.User32.GetForegroundWindow() == window)
