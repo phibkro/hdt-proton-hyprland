@@ -1,0 +1,45 @@
+# Deliberately narrow host surface for the compositor-loaded Lua template.
+# Object handles are owned by Hyprland and persist across template reloads.
+globals:
+  hl.window_rule:
+    args:
+      - type: table
+  hl.get_window:
+    args:
+      - type: string
+  hl.get_active_window:
+    args: []
+  hl.get_cursor_pos:
+    args: []
+  hl.timer:
+    args:
+      - type: function
+      - type: table
+  hl.on:
+    args:
+      - type: string
+      - type: function
+  hl.dispatch:
+    args:
+      - type: any
+  hl.dsp.window.alter_zorder:
+    args:
+      - type: table
+  hdtProtonOverlayRule:
+    property: full-write
+  hdtProtonMainRule:
+    property: full-write
+  hdtProtonControlRule:
+    property: full-write
+  hdtProtonControlTimer:
+    property: full-write
+  hdtProtonControls:
+    property: full-write
+  hdtProtonControlTicks:
+    property: full-write
+  hdtProtonControlActive:
+    property: full-write
+  hdtProtonStackTimer:
+    property: full-write
+  hdtProtonStackSubscription:
+    property: full-write

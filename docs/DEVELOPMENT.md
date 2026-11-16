@@ -2,6 +2,10 @@
 
 Run these procedures from the repository checkout. For command behavior and options, see the [command reference](REFERENCE.md).
 
+For formatters, static analysis, and fast commit versus full PR checks, see
+[Source tooling](TOOLING.md). Strict TypeScript lint findings are recorded there;
+the existing runtime/source checks do not replace that lint gate.
+
 ## Run the source checks
 
 Run the selected checks:
@@ -10,7 +14,7 @@ Run the selected checks:
 devenv shell -- hdt-check
 ```
 
-Confirm that the command exits with status zero. The command runs the tests listed in `scripts/check.sh`, shellcheck, TypeScript bundles, and native helper builds.
+Confirm that the command exits with status zero. The command runs `scripts/check.ts`: selected tests, ShellCheck, TypeScript bundles, and native helper builds. The `.sh` file is a compatibility entry point.
 
 Do not run unbounded test discovery in a checkout that contains private prefix backups. Those backups can contain unrelated test files.
 

@@ -95,6 +95,17 @@ LibXi is a development dependency only. No upstream code is copied into the
 fixture. A future Effect migration must retain server ownership, deadlines,
 desktop isolation, and the error-handling negative controls.
 
+## Source tooling recorded on 2026-11-16
+
+The bounded Bun quality/hook drivers compose established tools without changing
+the production supervisor. No installed Effect guidance/package or house overlay
+was present at the lookup. They reuse the existing process boundary exception.
+Ultracite supplies the Oxc presets and bundled anti-slop plugin; pre-commit owns
+temporary hiding/restoration of unstaged tracked files. There is no custom index
+or stash implementation. A future Effect rewrite must preserve these failure and
+ownership boundaries. TypeScript lint debt remains visible and blocks a clean
+full check; formatting and a passing compiler are not evidence of lint success.
+
 ## Bun shell migration recorded on 2026-11-16
 
 The operator explicitly requested readable Bun implementations. The process

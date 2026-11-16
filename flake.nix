@@ -25,8 +25,35 @@
         program = "${package}/bin/hdt-proton";
       };
       homeManagerModules.default = import ./nix/home-manager.nix self;
+      devShells.${system}.default = pkgs.mkShell {
+        packages = import ./nix/tooling.nix { inherit pkgs; };
+        DOTNET_CLI_TELEMETRY_OPTOUT = "1";
+        DOTNET_NOLOGO = "1";
+      };
       checks.${system} = {
         inherit package;
+        native-quality = pkgs.runCommand "hdt-native-source-quality" {
+          nativeBuildInputs = import ./nix/tooling.nix { inherit pkgs; };
+        } ''
+          mkdir source
+          cp -R ${./src} source/src
+          cp -R ${./tests} source/tests
+          cp -R ${./scripts} source/scripts
+          cp ${./.editorconfig} source/.editorconfig
+          cp ${./.clang-format} source/.clang-format
+          cp ${./.clang-tidy} source/.clang-tidy
+          cp ${./stylua.toml} source/stylua.toml
+          cp ${./selene.toml} source/selene.toml
+          cp ${./hdt-hyprland.yml} source/hdt-hyprland.yml
+          chmod -R u+w source
+          cd source
+          export HOME="$TMPDIR/home"
+          mkdir -p "$HOME"
+          bun scripts/quality.ts check c
+          bun scripts/quality.ts check lua
+          bun scripts/quality.ts check csharp
+          touch "$out"
+        '';
         tests = pkgs.runCommand "hdt-proton-tests" {
           nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.shellcheck pkgs.actionlint pkgs.jq pkgs.coreutils pkgs.util-linux pkgs.ripgrep ];
         } ''
