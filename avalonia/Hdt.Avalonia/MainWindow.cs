@@ -47,7 +47,7 @@ public sealed class MainWindow : Window
     public int PickedCount => _frames.Count == 0 ? 0 : _frames[_index].PickedDeck.Length;
     public string Summary => _summary.Text ?? "";
     public string Status => _status.Text ?? "";
-    public IReadOnlyList<string> Scores => _frames.Count == 0 || !_settings.ShowArenasmithScore
+    public IReadOnlyList<string> Scores => _frames.Count == 0 || !_settings.ShowArenasmithScore || _frames[_index].SchemaVersion == 3
         ? [] : _frames[_index].CardOffers.Select(o => o.DisplayScore).ToArray();
     public int SelectedPage => _tabs.SelectedIndex;
 
@@ -78,7 +78,7 @@ public sealed class MainWindow : Window
         var content = new Grid { ColumnDefinitions = new("*,280"), Margin = new(16) };
         var left = new StackPanel { Spacing = 16, Children = { _summary, _observation, controls, _offers } };
         content.Children.Add(new ScrollViewer { Content = left });
-        var deck = new StackPanel { Spacing = 12, Margin = new(20, 0, 0, 0), Children = { Text("PICKED DECK", 16), _deck } };
+        var deck = new StackPanel { Spacing = 12, Margin = new(20, 0, 0, 0), Children = { Text("PICKED CARDS", 16), _deck } };
         Grid.SetColumn(deck, 1); content.Children.Add(new ScrollViewer { Content = deck, [Grid.ColumnProperty] = 1 });
         var optionsPane = new StackPanel
         {
@@ -314,8 +314,10 @@ public sealed class MainWindow : Window
         _observation.Text = $"Observation {_index + 1}/{_frames.Count} • {frame.Description}";
         NextButton.IsEnabled = _index + 1 < _frames.Count; ResetButton.IsEnabled = _index > 0;
         foreach (var choice in ArenaPresentation.Choices(frame, _settings, 21)) _offers.Children.Add(choice);
-        foreach (var group in frame.PickedDeck.GroupBy(card => card.Id).OrderBy(g => g.First().Mana).ThenBy(g => g.First().Name))
+        var picked = frame.SchemaVersion == 3 ? frame.CachedDeck!.Cards : frame.PickedDeck;
+        if (frame.SchemaVersion == 3) _deck.Children.Add(Text("Cached HDT tile model • choice correlation unknown. Not draft pick progress.", 13));
+        foreach (var group in picked.GroupBy(card => card.Id).OrderBy(g => g.First().Mana).ThenBy(g => g.First().Name))
             _deck.Children.Add(Text($"{group.First().Mana}   {group.First().Name} ×{group.Count()}", 16));
-        if (frame.PickedDeck.Length == 0) _deck.Children.Add(Text("No picks observed yet.", 15));
+        if (picked.Length == 0) _deck.Children.Add(Text(frame.SchemaVersion == 3 ? "No cached picked cards supplied." : "No picks observed yet.", 15));
     }
 }

@@ -25,6 +25,8 @@ public sealed class NativeObservationReader(string path)
     private string? _session;
     private int _sequence = -1;
     private DateTimeOffset _observedAt;
+    private ArenaChoiceEvidence? _choiceEvidence;
+    private string? _choiceIdentity;
     public async Task<NativeObservation> ReadAsync(CancellationToken cancellation = default)
     {
         var snapshot = await SnapshotFiles.ReadJsonAsync<NativeObservation>(path, 2 * 1024 * 1024, cancellation).ConfigureAwait(false);
@@ -32,6 +34,14 @@ public sealed class NativeObservationReader(string path)
         if (snapshot.SessionId == _session && (snapshot.Sequence < _sequence
             || snapshot.Sequence == _sequence && snapshot.ObservedAt != _observedAt || snapshot.ObservedAt < _observedAt))
             throw new InvalidDataException("Observation sequence/time moved backwards inside a source session.");
+        var delivered = snapshot.Arena?.ChoiceEvidence;
+        var identity = delivered is null ? null : JsonSerializer.Serialize(snapshot.Arena!.ViewSelection, ReplaySource.JsonOptions);
+        if (snapshot.SessionId == _session && delivered is not null && _choiceEvidence is { } previous
+            && (delivered.Revision < previous.Revision || delivered.Generation < previous.Generation
+                || delivered.ReceivedAt < previous.ReceivedAt || delivered.Revision == previous.Revision && (delivered != previous || identity != _choiceIdentity)))
+            throw new InvalidDataException("Delivered choice evidence moved backwards or changed under one revision.");
+        if (snapshot.SessionId != _session) { _choiceEvidence = null; _choiceIdentity = null; }
+        if (delivered is not null) { _choiceEvidence = delivered; _choiceIdentity = identity; }
         _session = snapshot.SessionId; _sequence = snapshot.Sequence; _observedAt = snapshot.ObservedAt;
         return snapshot;
     }

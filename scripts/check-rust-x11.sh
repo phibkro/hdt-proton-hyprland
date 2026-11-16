@@ -3,6 +3,7 @@ set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 frame=
 native_ui=false
+watcher_events=false
 while (($#)); do
     case $1 in
         --native-frame)
@@ -15,13 +16,18 @@ while (($#)); do
             native_ui=true
             shift
             ;;
+        --watcher-events)
+            watcher_events=true
+            shift
+            ;;
         *)
-            echo 'Usage: check-rust-x11.sh [--native-frame FILE [--native-ui]]' >&2
+            echo 'Usage: check-rust-x11.sh [--native-frame FILE [--native-ui [--watcher-events]]]' >&2
             exit 2
             ;;
     esac
 done
 [[ $native_ui == false || -n $frame ]] || exit 2
+[[ $watcher_events == false || $native_ui == true ]] || exit 2
 mkdir -p evidence
 run=$(mktemp -d "$PWD/evidence/rust-x11-XXXXXXXX")
 chmod 700 "$run"
@@ -41,6 +47,7 @@ if [[ $native_ui == true ]]; then
         --setenv LD_LIBRARY_PATH "$LD_LIBRARY_PATH"
         --setenv DOTNET_SYSTEM_GLOBALIZATION_INVARIANT 1)
 fi
+if [[ $watcher_events == true ]]; then native_env+=(--setenv HDT_TEST_WATCHER_ACCEPTANCE 1); fi
 build=$(CARGO_BUILD_JOBS=2 cargo test --locked --test rust-x11-isolated --no-run --message-format=json)
 executable=$(jq -er 'select(.reason=="compiler-artifact" and .target.name=="rust-x11-isolated" and .executable!=null) | .executable' <<<"$build")
 CARGO_BUILD_JOBS=2 cargo build --locked

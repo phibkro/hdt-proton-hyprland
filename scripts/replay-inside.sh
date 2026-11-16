@@ -57,7 +57,7 @@ if [[ "$plugin" == true ]]; then
     for source in "$snapshot"/src/plugin/*.cs; do plugin_sources+=("$(winpath "$source")"); done
     timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
         /nologo /target:library /platform:x64 /out:ProtonCompatibility.dll /r:HearthstoneDeckTracker.exe \
-        /r:HearthMirror.dll /r:MahApps.Metro.dll /r:System.Drawing.dll /r:System.Xaml.dll /r:System.Web.Extensions.dll \
+        /r:HearthMirror.dll /r:HearthWatcher.dll /r:MahApps.Metro.dll /r:System.Drawing.dll /r:System.Xaml.dll /r:System.Web.Extensions.dll \
         /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
         "${plugin_sources[@]}" >"$run/plugin-compile.log" 2>&1
     export HDT_ALPHA_FLOOR=1 HDT_INPUT_SESSION=isolated-replay HDT_INPUT_REGION_FILE=$run/plugin-input.json

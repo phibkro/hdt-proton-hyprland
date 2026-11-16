@@ -5,7 +5,7 @@ not a replacement for HDT. It opens a native window with deck management, deckst
 match-history view, an Arena replay view and local Arena preferences. It never reads game memory or sends game input.
 
 ```
-Arena observation replay ──validated v1/v2 contract──▶ native draft view
+Arena observation replay ──validated v1/v2/v3 contract──▶ native draft view
 Native deck editor ────────Rust transactions─────▶ private native library
 MIT Proton status export ──read-only status──────▶ connection/status text
 Optional observation export ──validated v1───────▶ native game / Arena / history
@@ -170,15 +170,15 @@ regular-file/fault acceptance.
 | Native Linux window and navigation | Native | Real Avalonia menu/tabs; Options, Stats and Help navigate |
 | New/import/export menus | Native | Pointer/keyboard journey through real Rust transactions; account menu remains unavailable |
 | Arena scores and deck-synergy toggles | Native, persisted | Pointer journey and nondefault window reconstruction |
-| Offered cards and picked deck | Native rendering, replay or optional observation source | Validated snapshot replacement, duplicate-pick grouping; live producer acceptance pending |
-| Dynamic score preference / base fallback | Native | Derived from observed upstream behavior; nullable ratings stay unknown |
+| Offered cards and picked cards | Native rendering, replay or optional observation source | Raw schema 3 separates uncorrelated cached cards from draft progress; live game validation pending |
+| Dynamic score preference / base fallback | Native for supplied legacy advice | Raw event choices show unavailable; no rating-generation join is guessed |
 | Synergy calculation | Native | Enabled relations plus picked enhancer multiplicity, excluding overlap |
 | Underground color / inactive transition | Native rendering, replay or optional observation source | Observed mode drives border; inactive has no offers |
 | Existing Proton acquisition state | Read-only bridge, status only | Existing MIT status export fields contain no card/pick/score observations |
-| Live card offers / picked deck / scores | Native consumer + optional source-only Proton producer | Real public-model reference compile and owned publication/polling journey; actual game acquisition remains unverified |
+| Delivered card offers / cached picked cards | Native consumer + optional source-only Proton producer | Real watcher/scripted-provider and private X11 journey; cached deck correlation and scores unavailable; actual game acquisition unverified |
 | HSReplay login, entitlement and rating requests | Absent | No claim that upstream acquisition is a public/free API |
 | HearthMirror / game memory / log watcher | Retained Proton acquisition when optional producer is used | No native memory/log acquisition port; bridge reads public observed models only |
-| Hero selection | Native phase/identity rendering | Typed source + replay journey; public-model bridge lacks offered hero IDs; hero statistics unavailable |
+| Hero selection | Native phase/identity rendering + raw public event adapter | Actual installed watcher with scripted provider supplies IDs/opaque actor indices through native pixels; statistics and live validation unavailable |
 | Hero-power/dual-class/package selection, redraft, related tooltips | Unavailable | Explicit unsupported phase clears previous advice; no inferred variants |
 | Native overlay placement/input pass-through | Native X11 preview | Rust-owned opaque panel; private-display pixels/shape/focus/stale checks pass; real-game/compositor acceptance pending |
 | Deck editing / notes / archive / restore / selection | Native | Real private library, revision conflicts, stable IDs, atomic persistence; no game write |
@@ -212,13 +212,20 @@ legacy schema 1 inactive observations retain their original picked-deck semantic
 choices or inactive; it never guesses heroes from names, counts or zero picks.
 Hero views omit card mana/synergy/score controls. Hero statistics are unavailable.
 
-The source-only bridge publishes Arena schema 2 inside the unchanged native
-schema 1 envelope. It uses explicit cached `HeroStats`/`CardStats` presence and
-`IsRedraft`/`IsPackageSelectOpen`. Public hero statistics do not provide offered identities, so its hero
-phase has no identities and an explicit unavailable reason. Ambiguous cached
-collections and unsupported choices show unavailable. No private-field reflection,
-new HearthMirror access or HSReplay requests were added. This remains dependent
-on the existing Wine/HDT producer and has no live hero-acquisition acceptance.
+The source-only bridge now publishes Arena schema 3 inside the unchanged native
+schema 1 envelope. It subscribes to the existing public raw watcher event and
+copies offered hero/card identities independently of rating collections. Delivered
+receipt time and local revision/generation are distinct from publication time;
+the UI labels memory freshness unknown. Card ratings/synergies remain unavailable
+because cached advice has no provable shared generation. Existing public unsupported
+variant flags veto support. Late subscription awaits context rather than inferring
+it. [The event bridge contract](../docs/specs/native-arena-event-bridge.md) records
+ownership, binary provenance and the optional actual-watcher acceptance recipe.
+No new memory/account calls or watcher lifetime/context changes occur in production.
+This remains dependent on Wine/HDT acquisition and delivery. Local scripted-provider
+acceptance establishes the real watcher/API/transport/rendering boundary, not live
+hero acquisition or Wine/WPF scheduling equivalence. Original vendor binaries are
+required locally for that optional check and are never committed or distributed.
 
 Reference behavior: upstream HDT `2698623`, `ArenaPickHelperViewModel.cs`
 `UpdateChoices` clears separate hero/card collections before replacing them;

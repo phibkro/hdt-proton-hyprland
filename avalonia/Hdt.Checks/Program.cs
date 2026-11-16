@@ -13,6 +13,10 @@ var ownedWriters = new List<NativeSnapshotWriter>();
 MainWindow CreateWindow(LaunchOptions options) { var value = new MainWindow(options); ownedWindows.Add(value); return value; }
 try
 {
+#if WATCHER_ACCEPTANCE
+    if (args is ["--watcher-events", var watcherEvidence])
+    { Environment.ExitCode = NativeWatcherChecks.Run(watcherEvidence); return; }
+#endif
     if (args is ["--overlay-reference", var sourcePath, var settingsPath, var outputPath])
     {
         AppBuilder.Configure<App>().UseHeadless(new() { UseHeadlessDrawing = false }).UseSkia().SetupWithoutStarting();
@@ -406,6 +410,30 @@ try
     var menuFrame = frames[2] with { SchemaVersion = 2, Sequence = 5, PickedDeck = [], PickIndex = 0, SelectedCardId = null, Selection = new ArenaInactive() };
     ArenaObservation[] phaseFrames = [heroFrame, cardFrame, replacementFrame, unsupportedFrame, menuFrame];
     Check(frames[0].ViewSelection is ArenaCardDraft && frames[2].ViewSelection is ArenaInactive, "schema 1 adapter remains explicitly card-only");
+    var eventHero = heroFrame with
+    {
+        SchemaVersion = 3,
+        ChoiceEvidence = new(ArenaChoiceOrigin.HdtWatcherEvent, heroFrame.ObservedAt.ToUniversalTime(), 1, 0),
+        Selection = new ArenaHeroSelection(((ArenaHeroSelection)heroFrame.Selection!).Choices.Select((hero, index) => hero with { SourceIndex = index }).ToArray()),
+        CachedDeck = new(ArenaCachedDeckOrigin.HdtPublicTileModel, [])
+    };
+    ReplaySource.Validate([eventHero]);
+    Check(eventHero.ViewSelection is ArenaHeroSelection, "schema 3 retains explicit hero identity with separate event receipt evidence");
+    foreach (var invalidEvent in new[] { eventHero with { ChoiceEvidence = null }, eventHero with { SchemaVersion = 2 },
+        eventHero with { ChoiceEvidence = eventHero.ChoiceEvidence! with { Origin = (ArenaChoiceOrigin)999 } },
+        eventHero with { ChoiceEvidence = eventHero.ChoiceEvidence! with { ReceivedAt = eventHero.ObservedAt.AddSeconds(1) } },
+        eventHero with { ChoiceEvidence = eventHero.ChoiceEvidence! with { Revision = 0 } },
+        eventHero with { ChoiceEvidence = eventHero.ChoiceEvidence! with { Generation = -1 } },
+        eventHero with { Selection = new ArenaHeroSelection([new("H1", "Hero 1", null)]) },
+        eventHero with { Selection = new ArenaHeroSelection([new("H1", "Hero 1", null, 1), new("H2", "Hero 2", null, 1)]) },
+        eventHero with { CachedDeck = null },
+        eventHero with { PickedDeck = [new("OLD", "Separate cached card", 1)], PickIndex = 1 },
+        eventHero with { Selection = new ArenaInactive(), Mode = ArenaMode.Inactive },
+        cardFrame with { SchemaVersion = 3, ChoiceEvidence = eventHero.ChoiceEvidence } })
+    {
+        try { ReplaySource.Validate([invalidEvent]); throw new InvalidOperationException("Unsupported event evidence accepted."); }
+        catch (InvalidDataException) { Check(true, "raw-event provenance and unmatched rating generations fail closed"); }
+    }
     foreach (var invalidPhase in new[] { heroFrame with { Offers = frames[0].Offers }, heroFrame with { PickedDeck = frames[1].PickedDeck, PickIndex = 1 },
         heroFrame with { Selection = null }, menuFrame with { PickIndex = 1, PickedDeck = frames[1].PickedDeck }, cardFrame with { Mode = ArenaMode.Inactive }, frames[0] with { Selection = new ArenaHeroSelection([]) } })
     {

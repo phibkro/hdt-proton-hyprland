@@ -15,6 +15,7 @@ internal sealed class NativeClientExport : IDisposable
     readonly string session = Guid.NewGuid().ToString();
     readonly List<object> completed = new List<object>();
     readonly NativeSnapshotWriter writer;
+    readonly NativeArenaEventBridge arenaEvents;
     int sequence;
     DateTime lastCapture = DateTime.MinValue;
     object gameIdentity;
@@ -22,11 +23,21 @@ internal sealed class NativeClientExport : IDisposable
     bool matchRecorded;
     NativeClientExport(string path)
     {
-        writer = new NativeSnapshotWriter(path, snapshot =>
+        arenaEvents = new NativeArenaEventBridge(Hearthstone_Deck_Tracker.Hearthstone.Watchers.ArenaStateWatcher, id =>
+        {
+            var card = Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(id);
+            return card == null ? null : new NativeArenaEventBridge.Metadata(card.Id, card.LocalizedName,
+                card.Type == null ? null : card.Type.ToUpperInvariant(), card.Cost);
+        });
+        try
+        {
+            writer = new NativeSnapshotWriter(path, snapshot =>
         {
             var serializer = new JavaScriptSerializer { MaxJsonLength = 2 * 1024 * 1024, RecursionLimit = 64 };
             return new UTF8Encoding(false).GetBytes(serializer.Serialize(snapshot));
         }, () => Hearthstone_Deck_Tracker.Utility.Logging.Log.Warn("Native observation publication failed; native readers will mark old data unavailable."));
+        }
+        catch { arenaEvents.Dispose(); throw; }
     }
     public static NativeClientExport Start()
     {
@@ -37,6 +48,7 @@ internal sealed class NativeClientExport : IDisposable
     }
     public void Dispose()
     {
+        arenaEvents.Dispose();
         writer.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -80,24 +92,6 @@ internal sealed class NativeClientExport : IDisposable
             var mode = !game.IsRunning ? "Offline" : rawMode == "DRAFT" ? "Arena" : game.IsInMenu ? "Menu"
                 : matchMode == "Battlegrounds" ? "Battlegrounds" : matchMode == "Mercenaries" ? "Mercenaries"
                 : matchMode == "None" ? "Unknown" : "Constructed";
-            var offers = new List<object>();
-            if (mode == "Arena" && arena.IsDrafting && arena.CardStats != null)
-            {
-                if (arena.CardStats.Count > 12) throw new InvalidDataException();
-                foreach (var option in arena.CardStats)
-                {
-                    var ratings = option.CardStats;
-                    var related = ratings == null ? null : ratings.RelatedCards;
-                    offers.Add(new
-                    {
-                        card = ArenaCard(option.Card),
-                        baseRating = ratings == null || ratings.Arenasmith == null ? null : new { score = TextOrNull(ratings.Arenasmith.Score, 64), plaque = ratings.Arenasmith.Plaque },
-                        dynamicRating = ratings == null || ratings.ArenasmithDyn == null ? null : new { score = TextOrNull(ratings.ArenasmithDyn.Score, 64), plaque = ratings.ArenasmithDyn.Plaque },
-                        enabled = Relations(related == null || related.CardIdsEnabled == null ? null : related.CardIdsEnabled.Direct, related == null || related.CardIdsEnabled == null ? null : related.CardIdsEnabled.Indirect),
-                        enhancedBy = Relations(related == null || related.EnhancedByCardIds == null ? null : related.EnhancedByCardIds.Direct, related == null || related.EnhancedByCardIds == null ? null : related.EnhancedByCardIds.Indirect)
-                    });
-                }
-            }
             var picks = new List<object>();
             if (mode == "Arena")
             {
@@ -111,35 +105,9 @@ internal sealed class NativeClientExport : IDisposable
             var playing = game.IsRunning && !game.IsInMenu;
             var playerHero = playing ? game.Player.Hero : null;
             var opponentHero = playing ? game.Opponent.Hero : null;
-            // Phase derives only from explicit cached view-model collections, never card counts/names.
-            var drafting = mode == "Arena" && arena.IsDrafting;
-            object selection;
-            if (!drafting) selection = new { phase = "Inactive" };
-            else if (arena.IsPackageSelectOpen) selection = new { phase = "Unavailable", kind = "Package", reason = "Native package selection is unavailable." };
-            else if (arena.IsRedraft) selection = new { phase = "Unavailable", kind = "Redraft", reason = "Native redraft choices and discard suggestions are unavailable." };
-            else if (arena.DualClassHeroStats != null) selection = new { phase = "Unavailable", kind = "DualClass", reason = "Native dual-class selection is unavailable." };
-            else if (arena.HeroStats != null && arena.CardStats == null && arena.HeroPowerStats == null && arena.DualClassHeroStats == null)
-                selection = new { phase = "HeroSelection", choices = Array.Empty<object>(), unavailableReason = "The current public-model bridge does not expose offered hero identities. Hero statistics are unavailable." };
-            else if (arena.CardStats != null && arena.HeroStats == null && arena.HeroPowerStats == null && arena.DualClassHeroStats == null)
-                selection = new { phase = "CardDraft", choices = offers };
-            else selection = new { phase = "Unavailable", kind = "Unknown", reason = "No unambiguous supported cached choice model. Hero-power, dual-class, package and redraft views are unavailable." };
-            if (!drafting || arena.HeroStats != null) picks.Clear();
-            var arenaObservation = new
-            {
-                schemaVersion = 2,
-                sessionId = session,
-                observedAt = now.ToString("o"),
-                sequence = serial,
-                mode = drafting ? "Drafting" : "Inactive",
-                pickIndex = picks.Count,
-                selectedCardId = (string)null,
-                hero = playerHero == null ? "Hero not observed" : Text(playerHero.LocalizedName, 128),
-                underground = arena.IsUnderground,
-                pickedDeck = picks,
-                offers = Array.Empty<object>(),
-                selection = selection,
-                description = "Already observed public tracker models; last selected card unavailable."
-            };
+            // Raw event identities do not depend on rating/account responses. Cached flags only veto support.
+            var eventFrame = arenaEvents.Capture(mode == "Arena", arena.IsPackageSelectOpen, arena.IsRedraft, arena.DualClassHeroStats != null);
+            var arenaObservation = eventFrame.Observation(session, serial, now, picks.ToArray());
             snapshot = new
             {
                 schemaVersion = 1,
@@ -171,6 +139,7 @@ internal sealed class NativeClientExport : IDisposable
         }
         catch (Exception)
         {
+            arenaEvents.Invalidate();
             // Publish no partial/stale game facts after a capture failure.
             snapshot = new
             {
@@ -191,15 +160,7 @@ internal sealed class NativeClientExport : IDisposable
         if (value.Length > maximum) throw new InvalidDataException();
         return value;
     }
-    static string TextOrNull(string value, int maximum) { return value == null ? null : Text(value, maximum); }
     static object ArenaCard(Card card) { if (card == null) throw new InvalidDataException(); return new { id = Text(card.Id, 128), name = Text(card.LocalizedName, 512), mana = Nonnegative(card.Cost) }; }
-    static object Relations(IEnumerable<string> direct, IEnumerable<string> indirect)
-    {
-        var first = (direct ?? Array.Empty<string>()).Take(1025).Select(id => Text(id, 128)).ToArray();
-        var second = (indirect ?? Array.Empty<string>()).Take(1025).Select(id => Text(id, 128)).ToArray();
-        if (first.Length + second.Length > 1024) throw new InvalidDataException();
-        return new { direct = first, indirect = second };
-    }
     static object[] Cards(IEnumerable<Card> cards)
     {
         var result = cards.Take(501).Select(card => (object)new

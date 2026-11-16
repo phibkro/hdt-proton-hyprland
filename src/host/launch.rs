@@ -322,6 +322,7 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
                 "/r:System.Drawing.dll".into(),
                 "/r:System.Xaml.dll".into(),
                 format!("/r:{}", win(&cfg.app_directory.join("HearthMirror.dll"))).into(),
+                format!("/r:{}", win(&cfg.app_directory.join("HearthWatcher.dll"))).into(),
                 "/r:System.Web.Extensions.dll".into(),
                 format!("/r:{}", win(&cfg.app_directory.join("MahApps.Metro.dll"))).into(),
             ];

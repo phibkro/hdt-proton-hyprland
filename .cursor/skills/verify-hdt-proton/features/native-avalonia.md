@@ -1,6 +1,6 @@
 # Native Avalonia migration preview
 
-Feature IDs: `native-window`, `native-draft-replay`, `native-arena-phases`, `native-preferences`,
+Feature IDs: `native-window`, `native-draft-replay`, `native-arena-phases`, `native-arena-event-bridge`, `native-preferences`,
 `bounded-snapshot-io`, `proton-status-bridge`, `native-deck-library`,
 `native-deckstring`, `native-history`, `native-observation-bridge`, `native-x11-overlay`. These are preview routes; passing
 them establishes no live game offer/rating/overlay parity.
@@ -201,3 +201,14 @@ focus/geometry/empty input shape, and observes exact role/group cleanup. Inspect
 `main-stopped-overlay.png`, `preferences-overlay.png`, `stale-notice.png`,
 `isolated-desktop.png` and `session-actions.jsonl`. No setters or Main-relayed game
 facts are used. This is owned fake-game acceptance, not live game acquisition.
+
+## Delivered raw Arena events (optional original assemblies)
+
+[The frozen contract](../../../../docs/specs/native-arena-event-bridge.md) owns the
+actual-watcher recipe, evidence distinctions and binary provenance. It requires
+an explicit local `HDT_APP_DIR`; no vendor assemblies ship with native UI. Execute
+that recipe to observe the real watcher with a scripted provider through bounded
+copied events, publication, Rust file reads and rendered native controls. Retain
+assembly hashes, receipt-vs-publication evidence, paused-source negative control,
+hero/card/replacement/menu screenshots and cleanup. This does not prove live game
+memory acquisition, production Wine scheduling, or independent acquisition.
