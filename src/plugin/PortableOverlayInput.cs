@@ -1,6 +1,7 @@
 // Experimental X11-only handshake. The native owner controls input regions;
 // this adapter keeps Wine activation and HDT's cached click-through state aligned.
 using System;
+using System.Collections;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -54,6 +55,9 @@ sealed class PortableOverlayInput
     bool focusOwned;
     bool disabled;
     bool pointerAdmitted;
+    IList clickableElements;
+    FrameworkElement inputSurface;
+    bool surfaceOwned;
     MethodInfo setClickthrough;
 
     public bool PreparedFor(IntPtr hwnd)
@@ -109,6 +113,20 @@ sealed class PortableOverlayInput
                 setClickthrough = overlay.GetType().GetMethod("SetClickthrough", BindingFlags.Instance | BindingFlags.NonPublic,
                     null, new[] { typeof(bool) }, null);
                 if (setClickthrough == null) throw new MissingMethodException("HDT SetClickthrough(bool) unavailable");
+                var clickableField = overlay.GetType().GetField("_clickableElements", BindingFlags.Instance | BindingFlags.NonPublic);
+                clickableElements = clickableField == null ? null : clickableField.GetValue(overlay) as IList;
+                inputSurface = overlay.FindName("CanvasInfo") as FrameworkElement;
+                if (clickableElements == null || inputSurface == null)
+                    throw new MissingMemberException("HDT interactivity surface unavailable");
+                // Lease only HDT's Win32 click-through decision. Do not mark the
+                // surface as an exported control: native SHAPE remains the sole
+                // owner of which pixels accept input. Otherwise the original
+                // hover loop and this adapter repeatedly flip WS_EX_TRANSPARENT.
+                if (!clickableElements.Contains(inputSurface))
+                {
+                    clickableElements.Add(inputSurface);
+                    surfaceOwned = true;
+                }
                 originalBits = ExtendedStyle(hwnd, -20) & OwnedMask;
                 originalClickthrough = (ExtendedStyle(hwnd, -20) & Transparent) != 0;
                 appliedBits = originalBits;
@@ -125,7 +143,7 @@ sealed class PortableOverlayInput
             }
             // The native owner keeps input empty until this preparation is
             // published. Make Wine receptive before X11 delivers pointer entry.
-            setClickthrough.Invoke(overlay, new object[] { false });
+            if (ack.active) setClickthrough.Invoke(overlay, new object[] { false });
             var foreground = Hearthstone_Deck_Tracker.User32.GetForegroundWindow();
             if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl && (foreground != hwnd || !overlay.IsActive))
                 focusOwned = overlay.Activate();
@@ -171,6 +189,10 @@ sealed class PortableOverlayInput
 
     public void Stop()
     {
+        if (surfaceOwned && clickableElements != null) clickableElements.Remove(inputSurface);
+        surfaceOwned = false;
+        clickableElements = null;
+        inputSurface = null;
         if (focusOwned && window != IntPtr.Zero && Hearthstone_Deck_Tracker.User32.GetForegroundWindow() == window)
         {
             var game = Hearthstone_Deck_Tracker.User32.GetHearthstoneWindow();
