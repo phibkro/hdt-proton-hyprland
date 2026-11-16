@@ -98,6 +98,14 @@ process. Hearthstone retained its process identity and the same relevant
 library mappings. The packaged launcher build and private WPF replay passed;
 long-session crash prevention remains unverified.
 
+The additional portable-X11 input replay is not consistently passing: one
+patched run completed all six WPF clicks, while other runs timed out waiting for
+WPF pointer delivery. An original-library comparison passed once. Native focus
+acknowledgement alone does not establish WPF hover or Click delivery, so the
+journey now asserts those separately. The relationship to library selection is
+unresolved. Keep this integration in draft review until the failure is explained;
+do not interpret a later passing run as resolution of the earlier failures.
+
 ## Upstream submission draft
 
 Target: [libXi merge requests](https://gitlab.freedesktop.org/xorg/lib/libXi/-/merge_requests),

@@ -31,3 +31,11 @@ extension tests runtime selection separately. The Steam bundle removes its Nix
 RUNPATH and lets the existing process environment supply dependencies. The
 private replay confirms actual loading; it does not establish long-session
 desktop stability or protect against genuine device disappearance.
+
+2026-11-16: An additional portable-X11 input journey intermittently failed before
+WPF received pointer hover: native readiness alone did not establish a usable
+control. Retain an explicit control-hover assertion before the existing Click
+assertion. One original-library run and one patched run passed the complete
+journey, but other patched runs failed. A WPF synchronization experiment also
+failed and was removed. The trigger and any relationship to library selection
+remain unresolved; hold merge rather than retrying the gate into a pass.
