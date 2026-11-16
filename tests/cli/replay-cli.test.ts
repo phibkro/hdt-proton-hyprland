@@ -15,7 +15,7 @@ import nodePath from "node:path";
 const root = nodePath.resolve(import.meta.dir, "../..");
 
 test.each([false, true])(
-  "replay preserves isolation and supervisor failure (reference views: %s)",
+  "replay preserves isolation and supervisor failure (reference views: %j)",
   async (referenceViews) => {
     const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-replay-boundary-"));
 

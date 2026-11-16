@@ -60,10 +60,11 @@ Auxiliary windows
 └── Battlegrounds session / mechanic windows
 ```
 
-`Windows/OverlayWindow.xaml` owns the overlay's control hierarchy. The current
-native preview implements only the capabilities listed in its
-[parity inventory](../../avalonia/README.md#parity-inventory). Source existence,
-model-fixture rendering and live game observation are separate evidence.
+`Windows/OverlayWindow.xaml` owns the overlay's control hierarchy. The separate
+`feat/avalonia-ui` preview branch maintains its capability inventory in
+`avalonia/README.md`; that implementation is not part of this main-based
+reference branch. Source existence, model-fixture rendering and live game
+observation are separate evidence.
 
 | Interaction | State owner and effect |
 |---|---|
