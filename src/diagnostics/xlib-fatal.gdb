@@ -18,8 +18,19 @@ echo HDT_NATIVE_XLIB_FATAL_BEGIN\n
 info registers rip rsp rbp rdi rsi
 x/3ub $rsi+32
 bt 24
-info sharedlibrary
 echo HDT_NATIVE_XLIB_FATAL_END\n
 detach
 quit
+end
+set $hdt_mapping_queries = 0
+hbreak *XGetDeviceButtonMapping
+set $hdt_query_breakpoint = $bpnum
+commands
+silent
+set $hdt_mapping_queries = $hdt_mapping_queries + 1
+printf "HDT_MAPPING_QUERY count=%u thread=%u display=0x%llx device=%llu\n", $hdt_mapping_queries, $_thread, (unsigned long long)$rdi, *(unsigned long long*)$rsi
+if $hdt_mapping_queries >= 1000
+disable $hdt_query_breakpoint
+end
+continue
 end
