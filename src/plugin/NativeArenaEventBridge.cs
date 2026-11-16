@@ -1,8 +1,9 @@
+#if NET10_0_OR_GREATER
+// C# 5 represents unavailable observations and cleared watcher state with null.
+#pragma warning disable 8600, 8618, 8625
+#endif
 // Independently authored event adapter. HDT owns watcher/context/acquisition lifetime.
 // Only bounded copied values survive callbacks; no vendor objects or account IDs.
-#if NET10_0_OR_GREATER
-#nullable disable
-#endif
 using System;
 using System.Collections.Generic;
 using HearthMirror.Enums;

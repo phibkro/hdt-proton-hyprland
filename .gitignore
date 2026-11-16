@@ -283,3 +283,5 @@
 !/docs/specs/native-arena-event-bridge.md
 
 !/tests/native/NativeWatcherChecks.cs
+
+!docs/specs/shared-plugin-compiler.md
