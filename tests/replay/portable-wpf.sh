@@ -76,6 +76,7 @@ read -r ox oy ow oh < <(jq -er '.[]|select(.title=="HearthstoneOverlay")|[.at[],
 xdotool windowsize "$game" "$ow" "$oh"
 xdotool windowmove "$game" "$ox" "$oy"
 xdotool windowactivate --sync "$game"
+move "$((ox + 5))" "$((oy + 5))"
 wait_for 'fresh native regions' '.fresh and .nativeReady and .controls>0' "$ack"
 # Keep game foreground while crossing outside the overlay, including its canvas.
 move 5 5
