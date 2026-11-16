@@ -21,6 +21,25 @@ builds to two jobs and do not run multiple UI drivers against one instance.
 
 ## Generated and stateful tests
 
+Every reproduced defect needs a regression at the boundary where it failed.
+Keep the original failure artifact and a negative control: the old behavior must
+fail the assertion, while the corrected behavior passes it. A failure on one run
+and success on another is an intermittent failure, not a fixed regression.
+
+| Reported failure | Regression boundary |
+|---|---|
+| Incorrect XInput device ID | [Original-versus-patched libXi race](../investigations/libxi-open-device.md#reproduce-and-verify) |
+| Wrong or globally applied library selection | [Launcher environment tests](../../tests/host/rust-launcher.rs) and actual Wine process mappings |
+| Stale Arena advice or unusable Settings | [Real WPF transitions](../../scripts/replay-inside.sh), successive scores, menu clearing and actual Settings clicks |
+| Overlay control blocks or loses clicks | [Private WPF input journey](../../tests/replay/portable-wpf.sh), six actual clicks, empty-space delivery and controller-loss cleanup |
+
+The input journey waits for both native focus acknowledgement and WPF's actual
+control-hover state before clicking. It still requires the resulting WPF Click
+event; a readiness flag cannot substitute for the action. Retain failed runs
+without retrying them into a successful CI result. Tests requiring the private
+HDT/CLR seed run locally; hosted source and native tests do not silently count
+those unavailable proprietary components as covered.
+
 Proptest exercises the production frame parser with arbitrary bytes and checks
 rectangle acceptance against an independent geometric predicate. Generated
 producer-operation sequences cover publication, clock advance/rollback, window

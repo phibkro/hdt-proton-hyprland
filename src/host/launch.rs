@@ -41,6 +41,68 @@ pub fn tracker_environment(mut inherited: Environment) -> Environment {
     }
     inherited
 }
+/// Validate the explicitly selected Linux x86-64 shared library header.
+/// The loader still performs full dynamic-link validation when HDT starts.
+pub fn libxi_library(path: &Path) -> Result<PathBuf> {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    ensure!(path.is_absolute(), "HDT_LIBXI_LIBRARY must be absolute");
+    let path = fs::canonicalize(path).context("Resolve HDT_LIBXI_LIBRARY")?;
+    let text = path.to_str().context("HDT_LIBXI_LIBRARY must be UTF-8")?;
+    ensure!(
+        !text.chars().any(|c| c == ':' || c.is_whitespace()),
+        "HDT_LIBXI_LIBRARY cannot contain loader-list separators"
+    );
+    ensure!(
+        path.file_name().is_some_and(|name| name == "libXi.so.6"),
+        "HDT_LIBXI_LIBRARY must select the runtime bundle's libXi.so.6"
+    );
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK)
+        .open(&path)?;
+    let metadata = file.metadata()?;
+    ensure!(
+        metadata.is_file() && (64..=16 * 1024 * 1024).contains(&metadata.len()),
+        "HDT_LIBXI_LIBRARY must be a bounded regular shared-library file"
+    );
+    let mut header = [0u8; 64];
+    file.read_exact(&mut header)?;
+    ensure!(
+        &header[..4] == b"\x7fELF" && header[4..7] == [2, 1, 1] && header[16..20] == [3, 0, 62, 0],
+        "HDT_LIBXI_LIBRARY requires a Linux x86-64 ELF shared library"
+    );
+    Ok(path)
+}
+
+/// Affect only the environment of the selected HDT launch and its descendants.
+pub fn libxi_environment(environment: &mut Environment, library: &Path) -> Result<PathBuf> {
+    let selected = libxi_library(library)?;
+    let inherited = environment
+        .get(std::ffi::OsStr::new("LD_PRELOAD"))
+        .map(|value| value.to_str().context("Inherited LD_PRELOAD must be UTF-8"))
+        .transpose()?
+        .unwrap_or("");
+    let mut libraries = vec![selected.to_string_lossy().into_owned()];
+    for item in inherited
+        .split(|c: char| c == ':' || c.is_whitespace())
+        .filter(|s| !s.is_empty())
+    {
+        if Path::new(item)
+            .file_name()
+            .is_some_and(|name| name.as_encoded_bytes().starts_with(b"libXi.so"))
+        {
+            ensure!(
+                Path::new(item) == selected,
+                "Conflicting libXi in inherited LD_PRELOAD"
+            );
+        } else {
+            libraries.push(item.to_owned());
+        }
+    }
+    environment.insert("LD_PRELOAD".into(), libraries.join(":").into());
+    Ok(selected)
+}
+
 fn session(proc_root: &Path, pid: &str, prefix: &Path) -> Result<Session> {
     use std::os::unix::ffi::OsStringExt;
     let directory = proc_root.join(pid);
@@ -368,6 +430,10 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
                     .join("evidence/input-region.json")
                     .into_os_string(),
             );
+        }
+        if let Some(library) = std::env::var_os("HDT_LIBXI_LIBRARY") {
+            let selected = libxi_environment(&mut environment, Path::new(&library))?;
+            println!("HDT-only libXi selected: {}", selected.display());
         }
         let result = if enabled("HDT_DIRECT") {
             execute(

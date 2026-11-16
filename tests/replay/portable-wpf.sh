@@ -64,6 +64,9 @@ for ((expected = 1; expected <= 6; expected++)); do
     move "$cx" "$cy"
     wait_for 'Win32 activation and cached click-through' '.foregroundHwnd==.overlayHwnd and .clickthrough==false' "$state"
     wait_for 'native control focus' '.fresh and .active and .focused and .pointerOverControl' "$ack"
+    # Native focus acknowledgement can precede WPF's pointer-event dispatch.
+    # Observe the actual control before sending its click; keep the click assertion.
+    wait_for 'WPF control pointer delivery' '.desktopControlHovered==true' "$state"
     xdotool click 1
     wait_for 'actual WPF Click event' ".desktopClicks==$expected" "$state"
 done

@@ -78,6 +78,7 @@
 !/docs/specs/bun-script-migration.md
 !/docs/specs/ecosystem-tooling.md
 !/docs/specs/independent-observer.md
+!/docs/specs/hdt-libxi-runtime.md
 !/docs/specs/local-flight-recorder.md
 !/docs/specs/maintenance-ci.md
 !/docs/specs/nix-desktop.md
@@ -228,3 +229,5 @@
 !/tests/native/libxi-open-device.c
 !/tests/native/libxi-open-device.sh
 !/docs/investigations/libxi-open-device.md
+
+!/nix/libxi.nix
