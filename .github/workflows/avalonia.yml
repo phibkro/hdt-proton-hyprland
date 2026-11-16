@@ -58,3 +58,5 @@ jobs:
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet format whitespace Hdt.Avalonia/Hdt.Avalonia.csproj --no-restore --verify-no-changes && dotnet format whitespace Hdt.Checks/Hdt.Checks.csproj --no-restore --verify-no-changes'
       - name: Exercise rendered native controls
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalonia-evidence'
+      - name: Verify rendered pixels and input-empty overlay in isolated X11
+        run: nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json'

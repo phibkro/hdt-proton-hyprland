@@ -10,3 +10,5 @@ pub mod snapshot;
 pub mod status;
 pub mod trace;
 pub mod x11;
+
+pub mod native_overlay;

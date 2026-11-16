@@ -131,7 +131,7 @@ fn isolated_x11_relationship_and_argb_pixels() {
                 "1",
                 "-screen",
                 "0",
-                "128x128x24",
+                "1280x900x24",
                 "-nolisten",
                 "tcp",
                 "-ac",
@@ -415,6 +415,7 @@ fn isolated_x11_relationship_and_argb_pixels() {
     conn.free_colormap(colormap).unwrap().check().unwrap();
     conn.destroy_window(game).unwrap().check().unwrap();
     portable_bridge_acceptance(&conn, &display, root.root, pid_atom);
+    native_overlay_acceptance(&conn, &display, root.root, pid_atom);
     conn.flush().unwrap();
 }
 
@@ -803,4 +804,273 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
     assert!(owner.0.wait().unwrap().success());
     wait_ack(&|v| v["nativeReady"] == false);
     assert_eq!(property(conn, overlay), None);
+}
+
+fn native_overlay_acceptance(conn: &RustConnection, display: &str, root: u32, pid_atom: u32) {
+    use base64::Engine;
+    use serde_json::json;
+    use x11rb::protocol::xproto::{ConfigureWindowAux, ImageFormat, MapState};
+    let screen = &conn.setup().roots[0];
+    let game = conn.generate_id().unwrap();
+    conn.create_window(
+        screen.root_depth,
+        game,
+        root,
+        100,
+        100,
+        640,
+        680,
+        0,
+        WindowClass::INPUT_OUTPUT,
+        screen.root_visual,
+        &CreateWindowAux::new().background_pixel(0x334455),
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    identity(conn, game, pid_atom, std::process::id(), b"Hearthstone");
+    conn.map_window(game).unwrap().check().unwrap();
+    let active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    let set_active = |id| {
+        conn.change_property32(PropMode::REPLACE, root, active, AtomEnum::WINDOW, &[id])
+            .unwrap()
+            .check()
+            .unwrap();
+        conn.flush().unwrap();
+    };
+    set_active(game);
+    let mut owner = Server(
+        Command::new(std::env::var_os("HDT_TEST_HOST_BINARY").unwrap())
+            .args([
+                "native-overlay",
+                "run",
+                &game.to_string(),
+                &std::process::id().to_string(),
+                "hdt-fixture",
+            ])
+            .env("DISPLAY", display)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    let stdout = owner.0.stdout.take().unwrap();
+    let (sender, receiver) = mpsc::sync_channel(16);
+    let reader = std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        loop {
+            let mut line = Vec::new();
+            let count = std::io::Read::take(&mut reader, 8193)
+                .read_until(b'\n', &mut line)
+                .unwrap();
+            if count == 0 {
+                break;
+            }
+            assert!(count <= 8192 && line.last() == Some(&b'\n'));
+            if sender
+                .send(serde_json::from_slice::<serde_json::Value>(&line).unwrap())
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+    let ready = receiver.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!(ready["kind"], "ready");
+    assert_eq!(ready["inputRectangles"], 0);
+    assert_eq!(ready["pid"], owner.0.id());
+    let overlay = u32::try_from(ready["window"].as_u64().unwrap()).unwrap();
+    let width = u16::try_from(ready["width"].as_u64().unwrap()).unwrap();
+    let height = u16::try_from(ready["height"].as_u64().unwrap()).unwrap();
+    assert_eq!(property(conn, overlay), Some(game));
+    assert_eq!(
+        conn.get_window_attributes(overlay)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .map_state,
+        MapState::UNMAPPED
+    );
+    let wait = |mapped: bool| {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            assert!(
+                conn.shape_get_rectangles(overlay, SK::INPUT)
+                    .unwrap()
+                    .reply()
+                    .unwrap()
+                    .rectangles
+                    .is_empty()
+            );
+            let is_mapped = conn
+                .get_window_attributes(overlay)
+                .unwrap()
+                .reply()
+                .unwrap()
+                .map_state
+                == MapState::VIEWABLE;
+            if is_mapped == mapped {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "native overlay map state did not become {mapped}"
+            );
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    };
+    let mut frame = if let Some(path) = std::env::var_os("HDT_TEST_AVALONIA_FRAME") {
+        let bytes = std::fs::read(path).unwrap();
+        assert!(bytes.len() <= 2 * 1024 * 1024);
+        eprintln!("native overlay: exercising actual Avalonia-rendered raster");
+        serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+    } else {
+        eprintln!("native overlay: protocol-only solid raster (no managed renderer supplied)");
+        let pixels = [0x31_u8, 0x62, 0x93, 255].repeat(usize::from(width) * usize::from(height));
+        json!({"kind":"frame","schemaVersion":1,"sourceSession":"4d68a13f-4045-4a5d-b401-d107e8d15c84","sequence":1,"width":width,"height":height,
+            "pixelFormat":"bgra8888Opaque","pixels":base64::engine::general_purpose::STANDARD.encode(pixels)})
+    };
+    assert_eq!(frame["width"], width);
+    assert_eq!(frame["height"], height);
+    let pixels = base64::engine::general_purpose::STANDARD
+        .decode(frame["pixels"].as_str().unwrap())
+        .unwrap();
+    let mut stdin = owner.0.stdin.take().unwrap();
+    let send = |stdin: &mut std::process::ChildStdin, value: &serde_json::Value| {
+        serde_json::to_writer(&mut *stdin, value).unwrap();
+        stdin.write_all(b"\n").unwrap();
+        stdin.flush().unwrap();
+    };
+    let now = || chrono::Utc::now().timestamp_millis();
+    frame["observedMs"] = json!(now());
+    frame["sequence"] = json!(100);
+    send(&mut stdin, &frame);
+    wait(true);
+    let actual = conn
+        .get_image(
+            ImageFormat::Z_PIXMAP,
+            overlay,
+            0,
+            0,
+            width,
+            height,
+            u32::MAX,
+        )
+        .unwrap()
+        .reply()
+        .unwrap();
+    assert_eq!(actual.data.len(), pixels.len());
+    for (observed, expected) in actual
+        .data
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(pixels.as_chunks::<4>().0)
+    {
+        assert_eq!(
+            &observed[..3],
+            &expected[..3],
+            "real X11 raster pixel differs from source"
+        );
+    }
+    let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
+    for pixel in actual.data.as_chunks::<4>().0 {
+        ppm.extend([pixel[2], pixel[1], pixel[0]]);
+    }
+    std::fs::write("native-overlay.ppm", ppm).unwrap();
+    conn.configure_window(
+        game,
+        &ConfigureWindowAux::new()
+            .x(140)
+            .y(120)
+            .width(700)
+            .height(700),
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let bounds = conn.get_geometry(overlay).unwrap().reply().unwrap();
+        if bounds.x == 140 + 700 - i16::try_from(width).unwrap() && bounds.y == 120 {
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    set_active(root);
+    wait(false);
+    set_active(game);
+    wait(true);
+    frame["sequence"] = json!(101);
+    frame["observedMs"] = json!(now() - 6000);
+    send(&mut stdin, &frame);
+    wait(false);
+    frame["observedMs"] = json!(now());
+    send(&mut stdin, &frame);
+    wait(true);
+    send(&mut stdin, &json!({"kind":"hide"}));
+    wait(false);
+    frame["sequence"] = json!(99);
+    send(&mut stdin, &frame);
+    std::thread::sleep(Duration::from_millis(150));
+    wait(false);
+    frame["sequence"] = json!(102);
+    frame["observedMs"] = json!(now());
+    send(&mut stdin, &frame);
+    wait(true);
+    std::thread::sleep(Duration::from_millis(5100));
+    wait(false);
+    frame["sequence"] = json!(103);
+    frame["observedMs"] = json!(now());
+    send(&mut stdin, &frame);
+    wait(true);
+    drop(stdin);
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        if let Some(status) = owner.0.try_wait().unwrap() {
+            assert!(status.success());
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    drop(receiver);
+    reader.join().unwrap();
+    assert!(
+        conn.get_window_attributes(overlay)
+            .unwrap()
+            .reply()
+            .is_err(),
+        "owned raster window survived child exit"
+    );
+    let game_bounds = conn.get_geometry(game).unwrap().reply().unwrap();
+    assert_eq!(
+        (
+            game_bounds.x,
+            game_bounds.y,
+            game_bounds.width,
+            game_bounds.height
+        ),
+        (140, 120, 700, 700)
+    );
+    assert_eq!(
+        conn.shape_get_rectangles(game, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1
+    );
+    conn.destroy_window(game).unwrap().check().unwrap();
+    eprintln!(
+        "native overlay: input-empty before map, actual pixels, geometry follow, focus hide, stale/backward rejection, recovery and owned-child cleanup passed"
+    );
 }

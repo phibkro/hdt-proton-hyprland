@@ -25,12 +25,18 @@ public static class SnapshotFiles
                 ?? throw new InvalidDataException("Native response must not be null.");
         }, cancellation);
 
-    private static async Task<byte[]> ExecuteAsync(IReadOnlyList<string> arguments, int maximum, CancellationToken cancellation, string? standardInput)
+    internal static string HostBinary()
     {
-        if (maximum is < 1 or > ReplayBytes) throw new ArgumentOutOfRangeException(nameof(maximum));
         var host = Environment.GetEnvironmentVariable("HDT_HOST_BINARY");
         if (string.IsNullOrWhiteSpace(host) || !Path.IsPathFullyQualified(host))
             throw new IOException("Set HDT_HOST_BINARY to the absolute path of the built Rust host.");
+        return host;
+    }
+
+    private static async Task<byte[]> ExecuteAsync(IReadOnlyList<string> arguments, int maximum, CancellationToken cancellation, string? standardInput)
+    {
+        if (maximum is < 1 or > ReplayBytes) throw new ArgumentOutOfRangeException(nameof(maximum));
+        var host = HostBinary();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(Deadline);
         var acquired = false;
@@ -62,7 +68,7 @@ public static class SnapshotFiles
                 if (!child.HasExited)
                 {
                     try { child.Kill(entireProcessTree: true); }
-                    catch (InvalidOperationException) { }
+                    catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
                     // Retain custody and the actor slot until the exact child exits.
                     // A kernel-stalled child must not create an unbounded chain of replacements.
                     _ = ReapAsync(child);

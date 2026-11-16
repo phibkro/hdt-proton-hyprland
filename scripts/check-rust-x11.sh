@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+frame=
+if (($#)); then
+    if [[ $# != 2 || $1 != --native-frame ]]; then
+        echo 'Usage: check-rust-x11.sh [--native-frame FILE]' >&2
+        exit 2
+    fi
+    frame=$(realpath -- "$2")
+    [[ -f $frame && $(stat -c %s -- "$frame") -le 2097152 ]] || exit 2
+fi
 mkdir -p evidence
 run=$(mktemp -d "$PWD/evidence/rust-x11-XXXXXXXX")
 chmod 700 "$run"
+native_env=()
+if [[ -n $frame ]]; then
+    cp -- "$frame" "$run/native-frame.json"
+    native_env=(--setenv HDT_TEST_AVALONIA_FRAME /capture/native-frame.json)
+fi
 build=$(CARGO_BUILD_JOBS=2 cargo test --locked --test rust-x11-isolated --no-run --message-format=json)
 executable=$(jq -er 'select(.reason=="compiler-artifact" and .target.name=="rust-x11-isolated" and .executable!=null) | .executable' <<<"$build")
 CARGO_BUILD_JOBS=2 cargo build --locked
@@ -17,12 +31,13 @@ cc -Wall -Wextra -Werror tests/native/reference/x-surface-probe.c -o "$run/c-sur
 )
 xvfb=$(readlink -f "$(command -v Xvfb)")
 shell=$(readlink -f "$(command -v bash)")
-timeout --kill-after=3s 30 bwrap --unshare-all --die-with-parent --new-session --clearenv \
+timeout --kill-after=3s 45 bwrap --unshare-all --die-with-parent --new-session --clearenv \
     --ro-bind /nix/store /nix/store --proc /proc --dev /dev --tmpfs /tmp \
     --dir /bin --ro-bind "$shell" /bin/sh \
     --bind "$run" /capture --chdir /capture --setenv HOME /tmp \
     --setenv HDT_TEST_X11_ISOLATED 1 --setenv HDT_TEST_XVFB "$xvfb" \
     --setenv HDT_TEST_HOST_BINARY /capture/hdt-host --setenv HDT_TEST_C_SURFACE /capture/c-surface \
+    "${native_env[@]}" \
     /capture/acceptance --ignored --nocapture --test-threads=1 >"$run/result.txt" 2>&1
 cat "$run/result.txt"
 echo "Rust X11 acceptance passed. Evidence: $run"

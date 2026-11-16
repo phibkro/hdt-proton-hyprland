@@ -9,7 +9,8 @@ let
   pkgs = sets.legacyPackages.x86_64-linux;
   libraries = with pkgs; [ fontconfig freetype libGL libice libsm libx11 libxcursor libxrandr libxi zlib ];
 in pkgs.mkShell {
-  packages = with pkgs; [ dotnet-sdk_10 cargo rustc rustfmt clippy xorg-server xwininfo imagemagick coreutils ];
+  packages = with pkgs; [ dotnet-sdk_10 cargo rustc rustfmt clippy xorg-server xwininfo imagemagick coreutils
+    bash jq bubblewrap gcc pkg-config libx11 libxcomposite libxrender ];
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libraries;
   DOTNET_CLI_TELEMETRY_OPTOUT = "1";
   DOTNET_NOLOGO = "1";

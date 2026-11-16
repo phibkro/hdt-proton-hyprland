@@ -7,7 +7,7 @@ path to passed.
 
 - [Launch and setup](launch-setup.md): configuration, packaging, same-session launch, plugin/settings installation, desktop/service entry points.
 - [Overlay and UI](overlay-ui.md): transient relationships, pixel sampling, isolated WPF transitions and live input/geometry.
-- [Native Avalonia preview](native-avalonia.md): bounded Rust snapshot IO, native replay controls, status freshness/recovery and local preferences; separate from installed HDT acceptance.
+- [Native Avalonia preview](native-avalonia.md): bounded Rust IO, decks/history, dynamic observed views, preferences and isolated native X11 overlay; separate from installed HDT acceptance.
 - [Freeze evidence](freeze-evidence.md): independent byte capture, recorder continuity and trace export.
 
 Initialize a fresh evidence directory and doctor each CLI session. Only the

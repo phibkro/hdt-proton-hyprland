@@ -6,6 +6,10 @@ fn run() -> Result<i32> {
     let command = args.next().unwrap_or_else(|| "help".into());
     let args: Vec<_> = args.collect();
     match command.to_str().context("Command must be UTF-8")? {
+        "native-overlay" => {
+            hdt_host::native_overlay::run(&args)?;
+            Ok(0)
+        }
         "client" => {
             hdt_host::client::run(&args)?;
             Ok(0)
@@ -92,7 +96,7 @@ fn run() -> Result<i32> {
         }
         "help" | "--help" | "-h" => {
             println!(
-                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export|read-snapshot|client"
+                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export|read-snapshot|client|native-overlay"
             );
             Ok(0)
         }

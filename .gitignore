@@ -252,3 +252,11 @@
 !/src/plugin/NativeSnapshotWriter.cs
 !/tests/host/rust-client.rs
 !/tests/host/rust-snapshot.rs
+
+!/src/host/native_overlay.rs
+
+!/avalonia/Hdt.Avalonia/OverlayRaster.cs
+
+!/avalonia/Hdt.Avalonia/NativeOverlayActor.cs
+
+!/avalonia/Hdt.Avalonia/NativeOverlayControls.cs

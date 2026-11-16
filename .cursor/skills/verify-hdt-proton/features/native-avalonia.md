@@ -2,7 +2,7 @@
 
 Feature IDs: `native-window`, `native-draft-replay`, `native-preferences`,
 `bounded-snapshot-io`, `proton-status-bridge`, `native-deck-library`,
-`native-deckstring`, `native-history`, `native-observation-bridge`. These are preview routes; passing
+`native-deckstring`, `native-history`, `native-observation-bridge`, `native-x11-overlay`. These are preview routes; passing
 them establishes no live game offer/rating/overlay parity.
 
 ## Preconditions and doctor
@@ -109,3 +109,23 @@ full Framework source with `tooling/net/HdtAnalysis.csproj`, explicit
 `AnalysisScope=full` and `HdtAppDir`, without stubs. Record binary hashes and zero
 warnings/errors. Preserve no proprietary binary in source control. The export
 is disabled unless explicitly configured; its output directory must be private.
+
+## Native input-empty X11 overlay
+
+Feature ID: `native-x11-overlay`. After the rendered driver, return to the root
+and run the private protocol journey with the actual emitted frame:
+
+```sh
+nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json'
+```
+
+Require the log to say `exercising actual Avalonia-rendered raster`, all actual
+RGB pixels to match, input shape empty before first map and after geometry
+changes, inactive/stale/backward/explicit-hide transitions to unmap, subsequent
+fresh observations to recover, and owned child exit/window destruction while
+the fake game's geometry and input remain intact. Inspect retained
+`native-overlay.ppm` and the rendered driver's `native-overlay-render.png`.
+The ordinary Rust route without the frame argument reports protocol-only pixels.
+This is isolated X11 acceptance; actual Hearthstone/compositor and complete
+Options-enable → child streaming acceptance remain unverified. Do not use the
+operator's game or display to fill that gap without separate authorization.

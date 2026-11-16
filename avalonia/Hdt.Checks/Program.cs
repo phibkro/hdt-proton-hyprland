@@ -368,4 +368,46 @@ PumpUntil(() => File.Exists(latestOutput) && File.ReadAllText(latestOutput) == "
 latestPublisher.Dispose(); Wait(latestPublisher.Completion);
 Check(serialized == 2 && serializationThread != uiThread, "producer serializes off dispatcher and coalesces pending captures instead of growing an unbounded queue");
 
+var overlaySpec = Result(SnapshotFiles.InvokeJsonAsync<OverlaySpec>(["native-overlay", "info"], SnapshotFiles.StatusBytes));
+overlaySpec.Validate();
+var overlayObservation = NativeFrame("Arena", 20, frames[1]);
+var overlayRaster = OverlayRendering.Render(overlayObservation, new TrackerSettings(), overlaySpec, Path.Combine(evidence, "native-overlay-render.png"));
+Check(overlayRaster.Pixels.Length == overlaySpec.Width * overlaySpec.Height * 4
+    && Enumerable.Range(0, overlayRaster.Pixels.Length / 4).All(index => overlayRaster.Pixels[index * 4 + 3] == 255), "actual Avalonia renderer produces a complete opaque bounded raster for Rust-owned overlay");
+var alternateRaster = OverlayRendering.Render(NativeFrame("Arena", 21, frames[0]), new TrackerSettings(), overlaySpec);
+Check(!overlayRaster.Pixels.SequenceEqual(alternateRaster.Pixels), "native overlay pixels change when observed offers and picks replace each other");
+File.WriteAllText(Path.Combine(evidence, "native-overlay-frame.json"), System.Text.Json.JsonSerializer.Serialize(new
+{
+    kind = "frame",
+    schemaVersion = 1,
+    sourceSession = overlayRaster.SourceSession,
+    sequence = overlayRaster.Sequence,
+    observedMs = overlayRaster.ObservedMs,
+    width = overlaySpec.Width,
+    height = overlaySpec.Height,
+    pixelFormat = overlaySpec.PixelFormat,
+    pixels = Convert.ToBase64String(overlayRaster.Pixels)
+}));
+window = new MainWindow(new(fixture, Path.Combine(evidence, "overlay-fault-settings.json")));
+window.Show(); Wait(window.Initialization);
+var slowOverlay = Path.Combine(evidence, $"slow-overlay-{Guid.NewGuid():N}.sh");
+File.WriteAllText(slowOverlay, "#!/bin/sh\nprintf '%s' \"$$\" > \"$0.pid\"\nexec sleep 30\n");
+if (OperatingSystem.IsLinux()) File.SetUnixFileMode(slowOverlay, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+NativeOverlayActor? stalledOverlay = null;
+try
+{
+    Environment.SetEnvironmentVariable("HDT_HOST_BINARY", slowOverlay);
+    stalledOverlay = new(new(1, 1, "owned-supervision-fixture", 0, 0, 640, 720), _ => { });
+    PumpUntil(() => File.Exists(slowOverlay + ".pid"), "owned overlay helper starts");
+    Click(window.NextButton);
+    Check(!stalledOverlay.Ready.IsCompleted && window.PickedCount == 1, "native pointer navigation remains responsive while overlay preparation stalls");
+    try { Wait(stalledOverlay.Ready); throw new InvalidOperationException("Stalled overlay was accepted"); }
+    catch (IOException) { Check(true, "native overlay preparation has a bounded owned-child deadline"); }
+    Wait(stalledOverlay.Completion);
+    var ownedPid = int.Parse(File.ReadAllText(slowOverlay + ".pid"));
+    PumpUntil(() => { try { using var process = System.Diagnostics.Process.GetProcessById(ownedPid); return process.HasExited; } catch (ArgumentException) { return true; } }, "owned stalled overlay helper is reaped");
+    Check(true, "failed native overlay owner is killed and reaped before restart becomes available");
+}
+finally { stalledOverlay?.Stop(); if (stalledOverlay is not null) Wait(stalledOverlay.Completion); Environment.SetEnvironmentVariable("HDT_HOST_BINARY", realHost); window.Close(); }
+
 Console.WriteLine($"{checks} checks passed; renderer evidence: {evidence}");

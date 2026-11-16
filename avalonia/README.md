@@ -10,6 +10,7 @@ Native deck editor ────────Rust transactions─────▶ p
 MIT Proton status export ──read-only status──────▶ connection/status text
 Optional observation export ──validated v1───────▶ native game / Arena / history
                        (source-only; live installation not changed)
+Native rendered pixels ──bounded stream─────────▶ Rust-owned input-empty X11 panel
 ```
 
 ## Run
@@ -159,16 +160,16 @@ regular-file/fault acceptance.
 | Native Linux window and navigation | Native | Real Avalonia menu/tabs; Options, Stats and Help navigate |
 | New/import/export menus | Native | Pointer/keyboard journey through real Rust transactions; account menu remains unavailable |
 | Arena scores and deck-synergy toggles | Native, persisted | Pointer journey and nondefault window reconstruction |
-| Offered cards and picked deck | Native rendering, replay acquisition | Validated snapshot replacement, duplicate-pick grouping |
+| Offered cards and picked deck | Native rendering, replay or optional observation source | Validated snapshot replacement, duplicate-pick grouping; live producer acceptance pending |
 | Dynamic score preference / base fallback | Native | Derived from observed upstream behavior; nullable ratings stay unknown |
 | Synergy calculation | Native | Enabled relations plus picked enhancer multiplicity, excluding overlap |
-| Underground color / inactive transition | Native rendering, replay acquisition | Observed mode drives border; inactive has no offers |
-| Existing Proton acquisition state | Read-only bridge, status only | Existing MIT export fields; no live card/pick/score export exists |
+| Underground color / inactive transition | Native rendering, replay or optional observation source | Observed mode drives border; inactive has no offers |
+| Existing Proton acquisition state | Read-only bridge, status only | Existing MIT status export fields contain no card/pick/score observations |
 | Live card offers / picked deck / scores | Native consumer + optional source-only Proton producer | Real public-model reference compile and owned publication/polling journey; actual game acquisition remains unverified |
 | HSReplay login, entitlement and rating requests | Absent | No claim that upstream acquisition is a public/free API |
 | HearthMirror / game memory / log watcher | Retained Proton acquisition when optional producer is used | No native memory/log acquisition port; bridge reads public observed models only |
 | Hero/hero-power/package selection, redraft, related tooltips | Absent | Separate observation variants and views required |
-| In-game overlay placement/click-through | Absent | Separate compositor/window integration; ordinary window only |
+| Native overlay placement/input pass-through | Native X11 preview | Rust-owned opaque panel; private-display pixels/shape/focus/stale checks pass; real-game/compositor acceptance pending |
 | Deck editing / notes / archive / selection | Native | Real private library, revision conflicts, stable IDs, atomic persistence; no game write |
 | Hearthstone deckstring import / export | Native, structural validation | Golden version-1 bytes, comments, sideboards; no current catalog / legality check |
 | Match history / basic win-loss counts | Native storage/view + optional completed-observation ingestion | Stable source IDs deduplicate; native deck association only after observing match start; Windows database import absent |
@@ -293,3 +294,47 @@ The existing `base64`, `serde`, `uuid`, `chrono`, `nix` and already-locked
 `tempfile` dependencies are reused. A stale HearthDb NuGet package was evaluated
 and rejected as a current card catalog; no card definitions or copyrighted
 artwork are bundled.
+
+## Optional native X11 overlay
+
+With `--native-state FILE`, open **Options**, **Find Hearthstone windows**, choose
+an explicit window and enable **Show native tracking overlay**. The opt-in is
+session-only. A separate Rust child creates its own opaque 320×640 window with
+an empty input shape **before mapping**. It reads the selected game's window
+identity, position, size and active-window state; it never changes the game's
+window, input shape or focus. The panel follows its right edge and hides when
+the game is inactive, too small, not mapped, observations are unavailable, or
+its last frame is older than five seconds. Closing the native client kills and
+reaps only its owned child. The Rust child also exits on parent death or stdin
+closure. A failed owner must be reaped before another can start.
+
+Avalonia supplies the actual card/score/synergy rendering through a bounded,
+latest-only raster channel. The Rust boundary validates explicit version,
+dimensions, opaque BGRA pixels, session, monotonic sequence and observation time.
+No game discovery or external process IO runs on the UI dispatcher. The child
+has bounded status/diagnostic pipes and preparation/write deadlines.
+
+This first panel is opaque, X11/XWayland-only, fixed scale, and shows up to three
+Arena offers or 22 tracked deck/board entries. It has no artwork, tooltips,
+combat odds, full Battlegrounds advice, native Wayland layer integration or
+transparent compositor style. Window discovery requires the expected public
+Hearthstone title/class/PID and same-user process. Other window naming and
+compositor behavior require separate validation. Real-game overlay acceptance
+has **not** been run; no installed plugin or game was changed.
+
+After the normal rendered acceptance, run from the repository root:
+
+```sh
+nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json'
+```
+
+This uses the actual Avalonia-produced raster on a private Bubblewrap/Xvfb
+fake-game window. It compares every displayed RGB pixel, verifies the empty
+input shape before mapping and after moves, checks focus/stale/backward/hide
+transitions and recovery, and observes exact-child exit/window destruction.
+Evidence includes `native-overlay.ppm`. Without `--native-frame`, the same Rust
+route explicitly reports protocol-only solid pixels; that is not managed-renderer
+acceptance. The managed driver separately proves changing rendered offers and a
+stalled helper's deadline/reaping while pointer navigation remains responsive.
+The complete Options-enable → streaming-child flow is not yet an automated
+rendered end-to-end route.

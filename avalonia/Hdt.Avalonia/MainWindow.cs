@@ -37,6 +37,7 @@ public sealed class MainWindow : Window
     private readonly global::Avalonia.Threading.DispatcherTimer? _protonTimer;
     public ClientLibrary Library { get; }
     public LibraryView DeckLibrary { get; }
+    public NativeOverlayControls NativeOverlay { get; }
     public Button NextButton { get; } = new() { Content = "Next observation", IsEnabled = false };
     public Button ResetButton { get; } = new() { Content = "Rewind", IsEnabled = false };
     public CheckBox ScoresToggle { get; } = new() { Content = "Show Arenasmith scores" };
@@ -56,6 +57,7 @@ public sealed class MainWindow : Window
         _store = new(options.Settings);
         Library = new(options.ClientData ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.Settings))!, "library.json"), _lifetime.Token);
         DeckLibrary = new(Library);
+        NativeOverlay = new(options.NativeState is not null, _lifetime.Token);
         ScoresToggle.IsEnabled = SynergiesToggle.IsEnabled = false;
         ScoresToggle.IsCheckedChanged += (_, _) => StartPreferencesSave();
         SynergiesToggle.IsCheckedChanged += (_, _) => StartPreferencesSave();
@@ -82,7 +84,7 @@ public sealed class MainWindow : Window
             Children = {
             Text("Options › Overlay › Arena", 24), ScoresToggle, SynergiesToggle, _preferencesStatus,
             Text("These preferences affect the native draft view and are saved locally.", 15),
-            Text("Hero selection, related-card tooltips and redraft-discard suggestions are not migrated yet.", 15) }
+            Text("Hero selection, related-card tooltips and redraft-discard suggestions are not migrated yet.", 15), NativeOverlay }
         };
         _tabs = new TabControl
         {
@@ -90,11 +92,11 @@ public sealed class MainWindow : Window
             new() { Header = "My Decks", Content = DeckLibrary },
             new() { Header = "Arena Draft", Content = content },
             new() { Header = "Stats", Content = new HistoryView(Library) },
-            new() { Header = "Options", Content = optionsPane },
-            new() { Header = "Help", Content = Notice("Migration preview", "Native deck library and Arena rendering. Optional read-only Proton observations provide known cards and supplied history; native acquisition, account login, combat odds and overlays are not implemented. No actions are sent to Hearthstone.") },
+            new() { Header = "Options", Content = new ScrollViewer { Content = optionsPane } },
+            new() { Header = "Help", Content = Notice("Migration preview", "Native deck library and Arena rendering. Optional read-only Proton observations provide known cards and supplied history; native acquisition, account login and combat odds are not implemented. Native X11 overlays require explicit opt-in. No actions are sent to Hearthstone.") },
             new() { Header = "Live Game", Content = GameView }
         },
-            SelectedIndex = 1
+            SelectedIndex = options.Replay is null ? 0 : 1
         };
         var menu = new Menu
         {
@@ -129,7 +131,7 @@ public sealed class MainWindow : Window
             };
             _tabs.SelectedIndex = 5;
         }
-        Closed += (_, _) => { _lifetime.Cancel(); _protonTimer?.Stop(); _nativeTimer?.Stop(); };
+        Closed += (_, _) => { _lifetime.Cancel(); _protonTimer?.Stop(); _nativeTimer?.Stop(); NativeOverlay.Stop(); };
         Initialization = InitializeAsync(options);
     }
     private async Task InitializeAsync(LaunchOptions options)
@@ -182,6 +184,7 @@ public sealed class MainWindow : Window
             if (_lifetime.IsCancellationRequested) return;
             _nativeObservedAt = observation.ObservedAt;
             GameView.Apply(observation);
+            NativeOverlay.Publish(observation, _settings);
             _frames = [observation.Arena!]; _index = 0; Render();
             _status.Text = $"Game observation file • {observation.Mode} • updated {observation.ObservedAt.ToLocalTime():T}";
             if (observation.MatchId is not null && !observation.InMenu && observation.IsRunning
@@ -215,6 +218,7 @@ public sealed class MainWindow : Window
 
     private void ClearNativeFacts(string reason)
     {
+        NativeOverlay.Publish(null, _settings);
         GameView.Unavailable(reason); _frames = []; _index = 0; Render();
         _summary.Text = "Arena observations unavailable"; _observation.Text = "Previous offers and picks cleared.";
         _status.Text = $"Native observation/history unavailable: {reason}";
@@ -274,6 +278,7 @@ public sealed class MainWindow : Window
             await _store.SaveAsync(updated);
             if (_lifetime.IsCancellationRequested) return;
             _settings = updated; _preferencesStatus.Text = "Local preferences saved."; Render();
+            NativeOverlay.UpdateSettings(_settings);
         }
         catch (Exception error) when (InputFailure(error))
         {
@@ -297,10 +302,7 @@ public sealed class MainWindow : Window
         NextButton.IsEnabled = _index + 1 < _frames.Count; ResetButton.IsEnabled = _index > 0;
         foreach (var offer in frame.Offers)
         {
-            var lines = new StackPanel { Spacing = 6, Children = { Text($"{offer.Card.Mana} mana   {offer.Card.Name}", 21), Text(offer.Card.Id, 12) } };
-            if (_settings.ShowArenasmithScore) lines.Children.Add(Text($"Arenasmith {offer.DisplayScore} • plaque {offer.Plaque}", 18));
-            if (_settings.ShowArenaDeckSynergies) lines.Children.Add(Text($"Deck synergies: {offer.SynergyCount(frame.PickedDeck)}", 14));
-            _offers.Children.Add(new Border { Padding = new(16), CornerRadius = new(6), BorderThickness = new(2), BorderBrush = new SolidColorBrush(Color.Parse(frame.Underground ? "#932020" : "#067F93")), Child = lines });
+            _offers.Children.Add(ArenaPresentation.Offer(offer, frame.PickedDeck, _settings, frame.Underground, 21));
         }
         foreach (var group in frame.PickedDeck.GroupBy(card => card.Id).OrderBy(g => g.First().Mana).ThenBy(g => g.First().Name))
             _deck.Children.Add(Text($"{group.First().Mana}   {group.First().Name} ×{group.Count()}", 16));
