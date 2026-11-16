@@ -107,3 +107,16 @@ Microsoft runtime binaries.
   tests/FlightRecorderChecks.cs with zero build warnings/errors.
 - Lua's discovery symlinks resolve correctly with StyLua and Selene.
 - ShellCheck and shfmt pass for all owned shell entry points.
+
+### Committed revision b422f54
+
+The real staged pre-commit hook passed. On the clean committed source, the source
+check passed 47 tests/156 assertions, shell lint/format, bundles/native helpers,
+Oxfmt, and TS7. Repeating the watcher fixture three times passed 30 tests/84
+assertions. The reorganized Nix package/tests/native-quality checks passed.
+Full Roslyn analysis against the local original HDT assemblies passed with zero
+warnings/errors. The actual isolated WPF replay passed with the compatibility
+plugin, particle suppression, Battlegrounds tabs, and diagnostic checks. Its
+manifest recorded the exact commit and a clean source tree. This replay used
+the existing private stable-Proton seed; it does not establish live game or
+Experimental behavior. Full strict TypeScript lint remains failed as above.
