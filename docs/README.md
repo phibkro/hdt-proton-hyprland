@@ -17,3 +17,6 @@ For a freeze, follow [evidence capture](guides/freeze-capture.md). For account-f
 UI checks, use the [isolated replay guide](guides/ui-replay.md). Contributors
 should start with the [development guide](development/README.md) and
 [test strategy](development/testing-strategy.md).
+
+The [HDT view trees](reference/wpf-view-map.md) map the original windows,
+settings categories and migration process boundaries to reference capture.

@@ -2,7 +2,7 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 lab=$root/local/replay
-usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles] [--battlegrounds-tabs] [--diagnostics] [--canonical-events] [--desktop-input]'; }
+usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles] [--battlegrounds-tabs] [--diagnostics] [--canonical-events] [--desktop-input] [--reference-views]'; }
 fail() {
     echo "HDT replay: $*" >&2
     exit 1
@@ -96,6 +96,7 @@ battlegrounds_tabs=false
 diagnostics=false
 canonical_events=false
 desktop_input=false
+reference_views=false
 while (($#)); do
     case "$1" in
         --inject-failure) expected=true ;;
@@ -104,6 +105,7 @@ while (($#)); do
         --diagnostics) diagnostics=true ;;
         --canonical-events) canonical_events=true ;;
         --desktop-input) desktop_input=true ;;
+        --reference-views) reference_views=true ;;
         --without-particles) particles=false ;;
         --plaque-level)
             (($# >= 2)) && [[ "$2" =~ ^[0-5]$ ]] || fail 'Plaque level must be 0..5.'
@@ -121,6 +123,8 @@ done
 [[ "$canonical_events" == false || "$diagnostics" == false ]] || fail '--canonical-events and --diagnostics require separate replay runs.'
 [[ "$desktop_input" == false || "$plugin" == true ]] || fail '--desktop-input requires --with-plugin.'
 [[ "$desktop_input" == false || "$canonical_events" == false ]] || fail '--desktop-input and --canonical-events require separate replay runs.'
+[[ "$reference_views" == false || ("$canonical_events" == false && "$desktop_input" == false && "$diagnostics" == false && "$expected" == false && "$battlegrounds_tabs" == false) ]] || fail '--reference-views requires its own replay run.'
+[[ "$reference_views" == false || "$particles" == false ]] || fail '--reference-views requires --without-particles to keep the known renderer failure out of reference capture.'
 [[ -f "$manifest" ]] || fail 'Run prepare first.'
 jq -e --arg root "$root" '.schema==2 and .kind=="hdt-ui-replay" and .project==$root' "$manifest" >/dev/null || fail 'Invalid environment ownership.'
 proton=$(jq -er .proton "$manifest")
@@ -161,12 +165,12 @@ timeout --kill-after=5s 120 bwrap --die-with-parent --unshare-net --unshare-pid 
     --setenv PATH "$PATH" --setenv HDT_REPLAY_TOOLS_PATH "$PATH" \
     --setenv HOME "$run/home" --setenv USER steamuser --setenv LANG C.UTF-8 \
     --setenv PRESSURE_VESSEL_VARIABLE_DIR "$run/pv-var" \
-    steam-run "$lab/runtime/run" -- bash "$run/source/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" "$battlegrounds_tabs" "$diagnostics" "$canonical_events" "$desktop_input" \
+    steam-run "$lab/runtime/run" -- bash "$run/source/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" "$battlegrounds_tabs" "$diagnostics" "$canonical_events" "$desktop_input" "$reference_views" \
     >"$run/supervisor.log" 2>&1
 status=$?
 set -e
 jq -n --argjson status "$status" --argjson negative "$expected" --arg run "$run" \
-    --arg revision "$revision" --arg snapshot "$snapshot_hash" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" --argjson bgs "$battlegrounds_tabs" --argjson diagnostics "$diagnostics" --argjson canonical "$canonical_events" --argjson desktop "$desktop_input" \
-    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,battlegroundsTabs:$bgs,diagnostics:$diagnostics,canonicalEvents:$canonical,desktopInput:$desktop,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty,sourceManifestSHA256:$snapshot}' >"$run/result.json"
+    --arg revision "$revision" --arg snapshot "$snapshot_hash" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" --argjson bgs "$battlegrounds_tabs" --argjson diagnostics "$diagnostics" --argjson canonical "$canonical_events" --argjson desktop "$desktop_input" --argjson reference "$reference_views" \
+    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,battlegroundsTabs:$bgs,diagnostics:$diagnostics,canonicalEvents:$canonical,desktopInput:$desktop,referenceViews:$reference,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty,sourceManifestSHA256:$snapshot}' >"$run/result.json"
 echo "Replay exit status: $status. Evidence: $run"
 exit "$status"
