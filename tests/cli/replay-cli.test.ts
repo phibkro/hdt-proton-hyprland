@@ -8,6 +8,8 @@ import {
   readFile,
   readdir,
   rm,
+  symlink,
+  realpath,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
@@ -268,6 +270,137 @@ test("canonical replay cannot silently bypass requested diagnostics", async () =
     expect(await readdir(nodePath.join(temp, "local/replay"))).toEqual([
       ".lock",
     ]);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("preparation canonicalizes aliases and preserves ownership on broken paths", async () => {
+  const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-prefix-alias-"));
+
+  try {
+    const prefix = nodePath.join(temp, "source prefix");
+    const alias = nodePath.join(temp, "steam-prefix");
+    const app = nodePath.join(temp, "app");
+    const proton = nodePath.join(temp, "proton");
+    const runtime = nodePath.join(temp, "runtime");
+    const clr = "drive_c/windows/Microsoft.NET/Framework64/v4.0.30319/clr.dll";
+
+    for (const dir of [
+      "scripts",
+      "app",
+      "proton/files/bin",
+      "runtime/steamrt_test",
+      "runtime/pressure-vessel",
+      `source prefix/${nodePath.dirname(clr)}`,
+    ]) {
+      await mkdir(nodePath.join(temp, dir), { recursive: true });
+    }
+
+    await copyFile(
+      nodePath.join(root, "scripts/replay.sh"),
+      nodePath.join(temp, "scripts/replay.sh")
+    );
+
+    const sourceFiles = new Map([
+      [nodePath.join(prefix, clr), "synthetic CLR fixture\n"],
+      [nodePath.join(prefix, "system.reg"), "WINE REGISTRY Version 2\n"],
+      [nodePath.join(prefix, "userdef.reg"), "WINE REGISTRY Version 2\n"],
+      [nodePath.join(prefix, "user.reg"), "WINE REGISTRY Version 2\n"],
+      [nodePath.join(prefix, ".update-timestamp"), "fixture\n"],
+      [
+        nodePath.join(app, "HearthstoneDeckTracker.exe"),
+        "synthetic application fixture\n",
+      ],
+      [nodePath.join(app, "companion.dll"), "companion fixture\n"],
+    ]);
+
+    for (const [path, contents] of sourceFiles) {
+      await Bun.write(path, contents);
+    }
+
+    await symlink(prefix, alias);
+    await Bun.write(
+      nodePath.join(temp, "scripts/native-host.sh"),
+      `printf '%s\\n' "$TEST_REPLAY_CONFIG"\n`
+    );
+    await Bun.write(
+      nodePath.join(proton, "files/bin/wine"),
+      "#!/bin/sh\nexit 99\n"
+    );
+    await Bun.write(
+      nodePath.join(runtime, "run"),
+      "#!/bin/sh\ndir=steamrt_test\nexit 99\n"
+    );
+    await chmod(nodePath.join(proton, "files/bin/wine"), 0o700);
+    await chmod(nodePath.join(runtime, "run"), 0o700);
+
+    const prepare = async (reuse: boolean) => {
+      const child = Bun.spawn(
+        [
+          "bash",
+          nodePath.join(temp, "scripts/replay.sh"),
+          "prepare",
+          "--proton",
+          proton,
+          "--runtime",
+          runtime,
+          ...(reuse ? ["--reuse"] : []),
+        ],
+        {
+          env: {
+            ...process.env,
+            TEST_REPLAY_CONFIG: JSON.stringify({
+              prefix: alias,
+              appDirectory: app,
+            }),
+          },
+          stdout: "pipe",
+          stderr: "pipe",
+        }
+      );
+
+      const [stdout, stderr, status] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+
+      return { stdout, stderr, status };
+    };
+
+    const prepared = await prepare(false);
+    expect(prepared).toMatchObject({ status: 0, stderr: "" });
+    const manifestPath = nodePath.join(temp, "local/replay/ownership.json");
+    const manifest = await readFile(manifestPath, "utf-8");
+    expect(JSON.parse(manifest)).toMatchObject({
+      sourcePrefix: await realpath(prefix),
+    });
+    expect(
+      await readFile(
+        nodePath.join(temp, "local/replay/seed/prefix", clr),
+        "utf-8"
+      )
+    ).toBe("synthetic CLR fixture\n");
+    expect(
+      await readFile(
+        nodePath.join(temp, "local/replay/seed/app/companion.dll"),
+        "utf-8"
+      )
+    ).toBe("companion fixture\n");
+
+    for (const target of [nodePath.join(temp, "missing-prefix"), alias]) {
+      await rm(alias);
+      await symlink(target, alias);
+      const rejected = await prepare(true);
+      expect(rejected.status).not.toBe(0);
+      expect(rejected.stderr).toContain("realpath:");
+      expect(await readFile(manifestPath, "utf-8")).toBe(manifest);
+    }
+
+    for (const [path, contents] of sourceFiles) {
+      expect(await readFile(path, "utf-8")).toBe(contents);
+    }
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
