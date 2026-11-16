@@ -72,6 +72,8 @@ jobs:
           case "$bwrap_path" in /nix/store/*/bin/bwrap) ;; *) exit 1 ;; esac
           printf 'abi <abi/4.0>,\ninclude <tunables/global>\nprofile hdt-avalonia-ci %s flags=(unconfined) {\n  userns,\n}\n' "$bwrap_path" > "$RUNNER_TEMP/hdt-avalonia-ci.profile"
           sudo apparmor_parser --replace "$RUNNER_TEMP/hdt-avalonia-ci.profile"
+      - name: Verify real F# edit and development restart in isolated X11
+        run: nix-shell avalonia/shell.nix --run 'bash avalonia/check-watch.sh'
       - name: Verify rendered pixels and input-empty overlay in isolated X11
         run: nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json --native-ui'
       - name: Verify independent real UI process lifetimes and pixels
