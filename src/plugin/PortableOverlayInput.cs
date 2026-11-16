@@ -104,6 +104,11 @@ sealed class PortableOverlayInput
                 focusOwned = false;
             }
             else if (!ack.active) focusOwned = false;
+            // Native focus/input shaping can change beneath a stationary pointer.
+            // Refresh WPF's own hit testing without injecting native input.
+            if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl &&
+                Hearthstone_Deck_Tracker.User32.GetForegroundWindow() == hwnd)
+                Mouse.Synchronize();
         }
         catch (Exception error)
         {
