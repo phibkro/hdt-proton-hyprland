@@ -65,9 +65,7 @@ trap cleanup EXIT
 "$host" x11-desktop windows steam_app_1234567890 >"$run/portable-windows.json"
 game=$(jq -er '.[]|select(.title=="Hearthstone")|.address' "$run/portable-windows.json")
 overlay=$(jq -er '.[]|select(.title=="HearthstoneOverlay")|.address' "$run/portable-windows.json")
-read -r -a observer_flags <<<"$(pkg-config --cflags --libs x11)"
-cc -std=c11 -Wall -Wextra -Werror "$run/source/tests/replay/pointer-observer.c" -o "$run/pointer-observer" "${observer_flags[@]}"
-HDT_REPLAY_OBSERVER=1 timeout 30 "$run/pointer-observer" "$overlay" >"$run/x11-pointer-events.jsonl" 2>"$run/x11-pointer-events.stderr" &
+HDT_REPLAY_OBSERVER=1 timeout 30 "$run/source/pointer-observer" "$overlay" >"$run/x11-pointer-events.jsonl" 2>"$run/x11-pointer-events.stderr" &
 observer=$!
 wait_for 'X11 pointer observer ready' 'select(has("ready")) | .ready==true' "$run/x11-pointer-events.jsonl"
 # Retain property types/terminators when Wine's native identity differs.
