@@ -155,6 +155,13 @@ x86-64 ABI after attachment: Wine's mixed architecture reporting caused a
 symbolic prologue breakpoint to truncate its address in the observed session.
 The exact-entry hardware breakpoint avoids that prologue selection.
 
+Before installing breakpoints, the wrapper compares the stopped process with
+its saved PID/start time, executable identity and name. A mismatch detaches and
+fails. GDB uses a numeric PID, so this cannot exclude a brief attach to a reused
+PID before verification. The guard observes a nonzero tracer; it does not
+independently authenticate that tracer's PID. See the
+[capture result contract](../specs/xinput-device-race.md#capture-result-contract).
+
 Routine Wine/CLR signals pass through to their existing handlers. At Xlib's
 default fatal-error handler, the capture saves three numeric error fields,
 register addresses, up to 24 current-thread stack frames without arguments,
@@ -163,6 +170,8 @@ the explicit deadline it terminates the debugger; the private lifetime test
 verified that an attached target remains running and untraced after this path.
 The exit status and incomplete-capture message distinguish a deadline or
 unexpected stop from a recorded fatal-error stack.
+Deadline status is 124. Success requires debugger status zero and the completion
+marker emitted after detach; partial stacks and debugger failures are nonzero.
 
 This is a one-shot Linux x86-64 Xlib capture, not general managed exception,
 segmentation-fault or freeze diagnosis. Some Wine/managed frames may lack

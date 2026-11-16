@@ -9,6 +9,14 @@ evidence remains private on every outcome. The private regression must exercise
 the actual wrapper, including an owned target that remains alive and untraced
 after the deadline. Protocol failure controls do not establish Wine behavior.
 
+The wrapper snapshots Linux PID/start time, executable path/device/inode and
+process name, then compares them again while the attached inferior is stopped,
+before sourcing breakpoint commands or continuing. A mismatch detaches and
+fails loudly. Numeric-PID GDB attachment cannot exclude a brief attach to a
+reused PID before this check; this is a documented residual attach/detach race,
+not a race-free process handle. No live acceptance gate is replaced by the
+owned synthetic lifetime fixture.
+
 Repeated observed HDT exits on Proton Experimental ended with `XI_BadDevice`,
 request `X_GetDeviceButtonMapping`, and process status 1. The in-process recorder
 stopped without a managed exception. These exits are distinct from UI freezes.
