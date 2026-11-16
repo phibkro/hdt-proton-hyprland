@@ -98,7 +98,7 @@ public sealed class NativeGameView : UserControl
     public int CardCount => _remaining.ItemCount + _hand.ItemCount + _player.ItemCount + _opponent.ItemCount;
     public NativeGameView()
     {
-        _deck = Panel("Remaining tracked deck", _remaining);
+        _deck = Panel("Observed remaining deck", _remaining);
         var columns = new Grid { ColumnDefinitions = new("*,*,*"), ColumnSpacing = 16 };
         columns.Children.Add(_deck);
         columns.Children.Add(new StackPanel { Spacing = 12, Children = { Panel("Your known hand", _hand), Panel("Your public board", _player) }, [Grid.ColumnProperty] = 1 });

@@ -226,6 +226,8 @@ Click(editor.ImportButton); Wait(editor.PendingAction);
 Check(window.Library.State.Decks.Length == 2 && editor.NameBox.Text == "Imported native fixture", "native import creates and selects a second persisted deck");
 Click(editor.UseButton); Wait(editor.PendingAction);
 Check(window.Library.State.SelectedDeckId == window.Library.State.Decks[1].Id, "native tracking selection changes only client-owned library state");
+Check(editor.UseButton.Content?.ToString() == "Use for game history" && editor.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "Game history deck: Imported native fixture"),
+    "native deck choice visibly labels history instead of claiming it controls observed live counts");
 Fill(editor.NotesBox, "Edited persistent notes");
 Click(editor.SaveButton); Wait(editor.PendingAction);
 Check(window.Library.State.Decks[1].Notes == "Edited persistent notes", "native deck edit preserves stable identity and updates notes");

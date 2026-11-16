@@ -49,7 +49,7 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
       - name: Build and check native IO and client transactions
-        run: nix-shell avalonia/shell.nix --run 'cargo build --locked -j2 && cargo test --locked -j2 --test rust-snapshot --test rust-client --test rust-launcher'
+        run: nix-shell avalonia/shell.nix --run 'cargo build --locked -j2 && cargo test --locked -j2 --lib --test rust-snapshot --test rust-client --test rust-launcher'
       - name: Restore exact dependency graph
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet restore Hdt.Checks/Hdt.Checks.csproj --locked-mode'
       - name: Build native application and acceptance driver

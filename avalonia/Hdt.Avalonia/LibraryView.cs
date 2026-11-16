@@ -13,6 +13,7 @@ public sealed class LibraryView : UserControl
     private bool _working, _creating, _updatingDeckList;
     private ulong _shownRevision = ulong.MaxValue;
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _historyDeck = new() { TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 2 };
     public ListBox Decks { get; } = new() { MinHeight = 120, MaxHeight = 400 };
     public TextBox NameBox { get; } = new() { MaxLength = 256, PlaceholderText = "Deck name" };
     public TextBox ClassBox { get; } = new() { MaxLength = 64, PlaceholderText = "Class label (optional)" };
@@ -26,7 +27,7 @@ public sealed class LibraryView : UserControl
     public Button SaveButton { get; } = new() { Content = "Save deck" };
     public Button ImportButton { get; } = new() { Content = "Import code" };
     public Button ExportButton { get; } = new() { Content = "Export code" };
-    public Button UseButton { get; } = new() { Content = "Use for tracking" };
+    public Button UseButton { get; } = new() { Content = "Use for game history" };
     public Button ArchiveButton { get; } = new() { Content = "Archive" };
     public CheckBox ShowArchived { get; } = new() { Content = "Show archived decks" };
     public Button ReloadButton { get; } = new() { Content = "Reload library" };
@@ -100,7 +101,7 @@ public sealed class LibraryView : UserControl
         Decks.SelectionChanged += (_, _) => { if (!_updatingDeckList && Decks.SelectedItem is DeckEntry deck) Edit(deck); };
         _library.Changed += Refresh;
         var columns = new Grid { ColumnDefinitions = new("300,*"), Margin = new(16) };
-        var list = new StackPanel { Spacing = 12, Children = { Label("MY DECKS"), NewButton, ReloadButton, ShowArchived, Decks, _status } };
+        var list = new StackPanel { Spacing = 12, Children = { Label("MY DECKS"), NewButton, ReloadButton, ShowArchived, _historyDeck, Decks, _status } };
         columns.Children.Add(list);
         var editor = new StackPanel
         {
@@ -111,7 +112,7 @@ public sealed class LibraryView : UserControl
             new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { SaveButton, UseButton, ArchiveButton } },
             Label("Hearthstone import / export"), CodeBox,
             new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { ImportButton, ExportButton, CopyButton } },
-            new TextBlock { Text = "Numeric DBF IDs are exact card identifiers. Optional local catalog search adds cards by name. Structural deckcode validation does not prove game legality. Tracking selection stays inside this native client.", TextWrapping = TextWrapping.Wrap }
+            new TextBlock { Text = "Choose a deck here to label new game history. Live card counts come from the observation source. Optional catalog search adds cards by name; deckcode validation checks structure, not game legality.", TextWrapping = TextWrapping.Wrap }
         }
         };
         columns.Children.Add(new ScrollViewer { Content = editor, [Grid.ColumnProperty] = 1 });
@@ -162,6 +163,9 @@ public sealed class LibraryView : UserControl
     private void Refresh()
     {
         _status.Text = _library.Status;
+        var historyDeck = _library.State.Decks.FirstOrDefault(deck => deck.Id == _library.State.SelectedDeckId)?.Name;
+        _historyDeck.Text = $"Game history deck: {historyDeck ?? "none selected"}";
+        ToolTip.SetTip(_historyDeck, _historyDeck.Text);
         if (_shownRevision != _library.State.Revision && _library.Ready)
         {
             _shownRevision = _library.State.Revision;

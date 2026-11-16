@@ -59,6 +59,10 @@ Sideboards are preserved. Archiving retains the deck and notes in the library;
 identity and historical associations without silently changing tracking selection.
 Archived entries cannot be saved or selected for tracking. Tracking selection affects
 only this native client; it does not select a deck inside the game or Windows HDT.
+**Use for game history** labels new games observed after that native selection.
+The live remaining-deck list comes from the observation source's tracker;
+native selection does not recalculate its counts. Independent native draw/origin
+tracking is not implemented, and no subtraction is guessed from a hand snapshot.
 
 `--client-data` selects a separate native JSON library; by default it is
 `library.json` beside native settings. The existing Rust host owns versioned,

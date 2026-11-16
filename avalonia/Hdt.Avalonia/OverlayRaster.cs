@@ -38,7 +38,7 @@ public static class OverlayRendering
         {
             content.Children.Add(Text($"Your health {value.PlayerHealth?.ToString() ?? "unknown"} • hand {value.PlayerHandCount?.ToString() ?? "unknown"}", 14));
             var cards = value.Mode == NativeMode.Battlegrounds ? value.PlayerBoard! : value.RemainingDeck!;
-            content.Children.Add(Text(value.Mode == NativeMode.Battlegrounds ? "Your observed board" : "Tracked deck", 16));
+            content.Children.Add(Text(value.Mode == NativeMode.Battlegrounds ? "Your observed board" : "Observed remaining deck", 16));
             foreach (var card in cards.Take(22))
                 content.Children.Add(new TextBlock
                 {
