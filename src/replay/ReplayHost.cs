@@ -193,6 +193,11 @@ class ReplayHost {
         if(id<=commandId) return;
         string op=(string)command["op"];
         switch(op) {
+            case "managed-lock-stall":
+                ManagedSnapshotFixture.Start(directory);
+                commandId=id;Snapshot();
+                Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background,new Action(ManagedSnapshotFixture.EnterContendedMonitor));
+                return;
             case "canonical-start":
                 if(canonical!=null) throw new InvalidOperationException("Canonical replay already initialized");
                 canonical=new CanonicalReplay(hdt,directory);break;
@@ -266,6 +271,13 @@ class ReplayHost {
             var point=button.PointToScreen(new Point(button.ActualWidth/2,button.ActualHeight/2));
             bounds=new {x=(int)point.X,y=(int)point.Y};
         }
+        var options=(FrameworkElement)main.FindName("FlyoutOptions");
+        var back=Children<Button>(options).FirstOrDefault(b=>b.IsVisible && b.Name=="PART_BackButton");
+        object backBounds=null;
+        if(back!=null) {
+            var point=back.PointToScreen(new Point(back.ActualWidth/2,back.ActualHeight/2));
+            backBounds=new {x=(int)point.X,y=(int)point.Y};
+        }
         var view=overlay.FindName("ArenaPickHelper") as FrameworkElement;
         var cards=Get(arena,"CardStats") as IEnumerable;
         var ids=new List<string>();
@@ -275,13 +287,13 @@ class ReplayHost {
             plaqueLevels.Add((int)Get(Get(card,"PlaqueViewModel"),"Level"));
         }
         var bgsContent=(FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent");
-        var data=new {observedUTC=DateTime.UtcNow.ToString("o"),commandId,scene,mouseDowns,pluginUpdates,
+        var data=new {observedUTC=DateTime.UtcNow.ToString("o"),windowsProcessId=System.Diagnostics.Process.GetCurrentProcess().Id,commandId,scene,mouseDowns,pluginUpdates,
             battlegroundsContent=new {visible=bgsContent.IsVisible,width=bgsContent.ActualWidth,height=bgsContent.ActualHeight,
                 minionViews=Children<FrameworkElement>(bgsContent).Count(e=>e.IsVisible && e.GetType().Name=="BattlegroundsMinions"),
                 groupViews=Children<FrameworkElement>(bgsContent).Count(e=>e.IsVisible && e.GetType().Name=="BattlegroundsCardsGroup")},
             battlegroundsActiveTab=Get(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel")==null?null:Get(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel").GetType().Name,
             mainWin32Handle=new WindowInteropHelper(main).Handle.ToInt64(),mainWidth=main.ActualWidth,mainHeight=main.ActualHeight,
-            settingsButton=bounds,settingsOpen=(bool)Get(main.FindName("FlyoutOptions"),"IsOpen"),
+            settingsButton=bounds,settingsBackButton=backBounds,settingsButtons=Children<Button>(options).Where(b=>b.IsVisible).Select(b=>b.Name).ToArray(),settingsOpen=(bool)Get(main.FindName("FlyoutOptions"),"IsOpen"),
             arenaVisibility=view.Visibility.ToString(),arenaOpacity=view.Opacity,cards=ids,plaqueLevels,
             renderingTier=RenderCapability.Tier,
             visibleEmitters=Children<FrameworkElement>(overlay).Count(e=>e.IsVisible && e.GetType().Name=="ParticleEmitter"),

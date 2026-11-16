@@ -54,6 +54,9 @@ Inspect `trackerRuntime`, `controlInput`, the window positions, the log timestam
 
 Keep raw HDT logs and account data out of commits. `hdt-status` filters its output to selected diagnostic fields. It does not print the inherited process environment, account names, or card choices.
 
+For intermittent slowdowns, use [Measure HDT performance](PERFORMANCE.md) to
+compare process and thread activity with the flight recorder.
+
 For repeatable tests without account activity, use [Replay HDT UI transitions in isolation](UI-REPLAY.md). That procedure tests real WPF controls with synthetic state. It does not exercise live HearthMirror or ArenaSmith requests.
 
 ## Inspect window geometry

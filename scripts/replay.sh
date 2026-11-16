@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Parse the supervisor before it starts waiting. Later source edits cannot
+# change unread commands in an already-running Bash process.
+main() {
+umask 077
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 lab=$root/local/replay
-usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles] [--battlegrounds-tabs] [--diagnostics] [--canonical-events]'; }
+usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles] [--battlegrounds-tabs] [--diagnostics] [--canonical-events] [--managed-snapshot|--managed-debug-lease]'; }
 fail() { echo "HDT replay: $*" >&2; exit 1; }
 action=${1:-help}
 if (( $# )); then shift; fi
@@ -79,6 +83,10 @@ particles=true
 battlegrounds_tabs=false
 diagnostics=false
 canonical_events=false
+managed_snapshot=false
+managed_debug_lease=false
+settings_cycles=0
+proton_override='' seed_override=''
 while (( $# )); do
     case "$1" in
         --inject-failure) expected=true ;;
@@ -86,6 +94,13 @@ while (( $# )); do
         --battlegrounds-tabs) battlegrounds_tabs=true ;;
         --diagnostics) diagnostics=true ;;
         --canonical-events) canonical_events=true ;;
+        --managed-snapshot) managed_snapshot=true ;;
+        --managed-debug-lease) managed_debug_lease=true ;;
+        --settings-cycles) (( $# >= 2 )) && [[ "$2" =~ ^([1-9]|10)$ ]] || fail 'Settings cycles must be 1..10.'; settings_cycles=$2;shift ;;
+        --proton|--seed)
+            (( $# >= 2 )) || fail 'Missing comparison directory.'
+            if [[ "$1" == --proton ]]; then proton_override=$(realpath -e -- "$2"); else seed_override=$(realpath -e -- "$2"); fi
+            shift ;;
         --without-particles) particles=false ;;
         --plaque-level) (( $# >= 2 )) && [[ "$2" =~ ^[0-5]$ ]] || fail 'Plaque level must be 0..5.'; level=$2; shift ;;
         *) usage; exit 2 ;;
@@ -93,9 +108,22 @@ while (( $# )); do
     shift
 done
 [[ "$diagnostics" == false || "$plugin" == true ]] || fail '--diagnostics requires --with-plugin.'
+[[ "$managed_snapshot" == false || ( "$diagnostics" == true && "$canonical_events" == false ) ]] || fail '--managed-snapshot requires --diagnostics --with-plugin and excludes --canonical-events.'
+[[ "$managed_debug_lease" == false || ( "$diagnostics" == true && "$canonical_events" == false && "$managed_snapshot" == false ) ]] || fail '--managed-debug-lease requires --diagnostics --with-plugin and excludes other managed/canonical scenarios.'
+[[ "$settings_cycles" == 0 || ( "$plugin" == true && "$diagnostics" == false && "$canonical_events" == false && "$managed_snapshot" == false && "$managed_debug_lease" == false ) ]] || fail 'Settings comparison requires only --with-plugin.'
+[[ ( -z "$proton_override" && -z "$seed_override" ) || ( -n "$proton_override" && -n "$seed_override" && "$settings_cycles" != 0 ) ]] || fail 'Comparison --proton and --seed must be specified together.'
+[[ ( "$managed_snapshot" == false && "$managed_debug_lease" == false ) || -f "$root/local/managed-inspector/build/HdtManagedInspector.exe" ]] || fail 'Build the managed inspector first.'
 [[ -f "$manifest" ]] || fail 'Run prepare first.'
 jq -e --arg root "$root" '.schema==2 and .kind=="hdt-ui-replay" and .project==$root' "$manifest" >/dev/null || fail 'Invalid environment ownership.'
 proton=$(jq -er .proton "$manifest")
+seed=$lab/seed
+if [[ -n "$proton_override" ]]; then
+    [[ "$seed_override" == "$lab/seed" || "$seed_override" == "$lab/seed-experimental-retained" ]] || fail 'Select a retained project-owned seed.'
+    [[ -x "$proton_override/files/bin/wine" ]] || fail 'Selected Proton is not installed.'
+    proton=$proton_override seed=$seed_override
+fi
+cmp "$proton/files/lib/wine/x86_64-windows/ntdll.dll" "$seed/prefix/drive_c/windows/system32/ntdll.dll" || fail 'Seed and selected Proton ntdll differ.'
+[[ $(sha256sum "$seed/app/HearthstoneDeckTracker.exe" | cut -d ' ' -f 1) == "$(jq -er .hdtSHA256 "$manifest")" ]] || fail 'Seed HDT identity differs.'
 source_prefix=$(jq -er .sourcePrefix "$manifest")
 revision=$(git -C "$root" rev-parse HEAD)
 source_dirty=false
@@ -110,31 +138,34 @@ cp -R "$root/src" "$root/tests" "$root/scripts" "$run/source/"
 ) >"$run/source-sha256.txt"
 snapshot_hash=$(sha256sum "$run/source-sha256.txt"); snapshot_hash=${snapshot_hash%% *}
 chmod 700 "$run" "$run/runtime"
-for part in prefix app; do cp -a --reflink=auto "$lab/seed/$part" "$run/$part"; done
+for part in prefix app; do cp -a --reflink=auto "$seed/$part" "$run/$part"; done
+if [[ "$managed_snapshot" == true || "$managed_debug_lease" == true ]]; then cp -a "$root/local/managed-inspector/build" "$run/inspector"; fi
 [[ $(realpath "$run/prefix") == "$run/prefix" && "$run/prefix" != "$source_prefix" ]] || fail 'Unsafe replay prefix.'
 jq -n --arg run "$run" --arg root "$root" '{kind:"hdt-ui-replay-run",run:$run,project:$root}' >"$run/ownership.json"
 # The namespace owns all test descendants. Host desktop sockets and user files
 # are masked; the only Windows prefix available to the test is its own copy.
 set +e
-timeout 120 bwrap --die-with-parent --unshare-net --unshare-pid \
+timeout --kill-after=5s 120 bwrap --die-with-parent --unshare-net --unshare-pid \
     --ro-bind /nix/store /nix/store --ro-bind /etc /etc \
     --ro-bind /bin /bin --ro-bind /usr /usr --ro-bind /lib64 /lib64 \
     --ro-bind /sys /sys --ro-bind /run/current-system /run/current-system \
     --ro-bind /run/opengl-driver /run/opengl-driver --ro-bind "$root" "$root" \
     --proc /proc --dev /dev --tmpfs /dev/shm --dev-bind /dev/dri /dev/dri \
-    --bind "$lab" "$lab" --ro-bind "$lab/seed" "$lab/seed" \
+    --bind "$lab" "$lab" --ro-bind "$seed" "$seed" \
     --ro-bind "$run/source" "$run/source" \
     --tmpfs "$HOME" --ro-bind "$proton" "$proton" --tmpfs "$source_prefix" \
     --tmpfs /run/user --tmpfs /tmp --clearenv \
     --setenv PATH "$PATH" --setenv HDT_REPLAY_TOOLS_PATH "$PATH" \
     --setenv HOME "$run/home" --setenv USER steamuser --setenv LANG C.UTF-8 \
     --setenv PRESSURE_VESSEL_VARIABLE_DIR "$run/pv-var" \
-    steam-run "$lab/runtime/run" -- bash "$run/source/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" "$battlegrounds_tabs" "$diagnostics" "$canonical_events" \
+    steam-run "$lab/runtime/run" -- bash "$run/source/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" "$battlegrounds_tabs" "$diagnostics" "$canonical_events" "$managed_snapshot" "$managed_debug_lease" "$settings_cycles" \
     >"$run/supervisor.log" 2>&1
 status=$?
 set -e
 jq -n --argjson status "$status" --argjson negative "$expected" --arg run "$run" \
-    --arg revision "$revision" --arg snapshot "$snapshot_hash" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" --argjson bgs "$battlegrounds_tabs" --argjson diagnostics "$diagnostics" --argjson canonical "$canonical_events" \
-    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,battlegroundsTabs:$bgs,diagnostics:$diagnostics,canonicalEvents:$canonical,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty,sourceManifestSHA256:$snapshot}' >"$run/result.json"
+    --arg revision "$revision" --arg snapshot "$snapshot_hash" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" --argjson bgs "$battlegrounds_tabs" --argjson diagnostics "$diagnostics" --argjson canonical "$canonical_events" --argjson managed "$managed_snapshot" --argjson lease "$managed_debug_lease" --argjson cycles "$settings_cycles" --arg proton "$proton" --arg version "$(cat "$proton/version")" \
+    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,battlegroundsTabs:$bgs,diagnostics:$diagnostics,canonicalEvents:$canonical,managedSnapshot:$managed,managedDebugLease:$lease,settingsCycles:$cycles,proton:$proton,protonVersion:$version,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty,sourceManifestSHA256:$snapshot}' >"$run/result.json"
 echo "Replay exit status: $status. Evidence: $run"
 exit "$status"
+}
+main "$@"

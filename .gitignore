@@ -99,3 +99,13 @@
 !/src/replay/CanonicalReplay.cs
 !/tests/input-journal.test.ts
 !/docs/CAPTURE-FREEZE.md
+!/src/diagnostics/managed/
+/src/diagnostics/managed/*
+!/src/diagnostics/managed/ManagedInspector.csproj
+!/src/diagnostics/managed/NuGet.Config
+!/src/diagnostics/managed/packages.lock.json
+!/src/diagnostics/managed/Program.cs
+!/src/diagnostics/managed/DebugLease.cs
+!/src/replay/ManagedSnapshotFixture.cs
+!/docs/specs/managed-thread-snapshot.md
+!/docs/PERFORMANCE.md

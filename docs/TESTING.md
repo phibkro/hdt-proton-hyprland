@@ -112,7 +112,9 @@ To test the manual-close behavior, close HDT normally while the game remains ope
 
 ## Test stable Proton
 
-Stable Proton has not passed this project's desktop tests. The tested version remains Experimental. Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.
+See the [stable Proton result](COMPATIBILITY.md) for the current verified scope.
+One saved Standard match does not establish Arena, draft, or Battlegrounds compatibility.
+Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.
 
 1. Finish play.
 2. Close HDT, Hearthstone, and Battle.net normally.

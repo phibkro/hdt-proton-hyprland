@@ -11,11 +11,11 @@ This record describes the desktop tests from 2026-11-15. It distinguishes user o
 | Display | One 3440 × 1440 monitor at scale 1 |
 | Window system | XWayland |
 | Game launcher | Battle.net through a non-store Steam shortcut |
-| Compatibility tool | Proton Experimental with Wine 11.0 |
+| Compatibility tool | Proton Experimental with Wine 11.0 for the original tests. The stable Proton row below records the later comparison |
 | HDT | Release 1.60.1, assembly version 1.60.1.9028 |
 | .NET | Native Microsoft .NET Framework 4.8 |
 
-Native Wayland, fractional scaling, mixed DPI, multiple monitors, other compositors, and stable Proton remain untested.
+Native Wayland, fractional scaling, mixed DPI, multiple monitors, and other compositors remain untested.
 
 ## Tracking results
 
@@ -63,7 +63,7 @@ The rendering and input mechanisms are described in [HDT compatibility design](E
 | Setup command order and failure handling | Verified in subprocess tests | Tests covered build, plugin installation, configuration order, and stopping after a failed step |
 | Plugin build in the real prefix | Verified | The native .NET compiler built the moved plugin against the installed HDT assemblies |
 | Setup applied to the live tracker | Untested | `hdt-setup` has not closed and reconfigured the accepted live tracker |
-| Stable Proton | Untested | Only Experimental was installed during the inspection. No version selection or prefix copy was changed |
+| Stable Proton | Verified for startup, desktop overlay, and one Standard match | Proton Stable 11.0-2. Both game and tracker loaded this runtime. The operator verified Settings, window movement and resize, Alt-Tab, transparency, overlay controls, and click-through. HDT saved one seven-turn Ranked Standard win and resumed menu updates. Arena and Battlegrounds matches, live draft updates, and ratings remain untested on stable |
 
 The source checks at commit `6bddf1e` passed from a clean worktree. They covered 10 tests with 33 assertions, shellcheck, seven TypeScript entry bundles, and both native helper builds. The checks are defined by `scripts/check.sh` and exposed as `hdt-check`.
 
