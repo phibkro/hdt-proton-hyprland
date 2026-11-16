@@ -135,8 +135,8 @@ internal sealed class NativeArenaEventBridge : IDisposable
         {
             if (!inArena)
             {
-                if (contextKnown || choices != null) Clear("Arena left; awaiting new watcher context.");
-                contextKnown = false; drafting = false;
+                if (contextKnown || choices != null || package || redraft) Clear("Arena left; awaiting new watcher context.");
+                contextKnown = false; drafting = false; package = false; redraft = false; underground = false;
                 return new Frame(new { phase = "Inactive" }, null, false, false, false);
             }
             if (disposed) return Unavailable("Unknown", "Event bridge detached.");

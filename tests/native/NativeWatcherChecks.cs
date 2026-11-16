@@ -156,6 +156,17 @@ internal static class NativeWatcherChecks
             Until(() => window.OfferCount == 0 && source.Latest!.Arena!.ChoiceEvidence is null, "real watcher hero-context event invalidates choices without a replacement choices event");
             source.Change(["FIXTURE_CARD_A", "FIXTURE_CARD_B", "FIXTURE_CARD_C"]);
             Until(() => window.OfferCount == 3, "real watcher choices event restores facts after explicit context invalidation");
+            source.PackageContextChange();
+            Until(() => source.Latest!.Arena!.ViewSelection is ArenaUnavailable { Kind: ArenaUnavailableKind.Package } && window.OfferCount == 0,
+                "real watcher package event clears supported advice");
+            source.ObserveModeOnly(menu: true);
+            Until(() => window.GameView.ModeText.StartsWith("Menu"), "separate observed mode leaves Arena before another watcher event");
+            source.ObserveModeOnly(menu: false);
+            Until(() => source.Latest!.Mode == NativeMode.Arena && source.Latest.Arena!.ViewSelection is ArenaUnavailable { Kind: ArenaUnavailableKind.Unknown },
+                "observed leave resets package context instead of retaining a sticky unsupported variant");
+            Check(window.OfferCount == 0, "reentry without fresh watcher context remains unavailable and cannot resurrect old choices");
+            source.Menu(); source.Change(["FIXTURE_CARD_A", "FIXTURE_CARD_B", "FIXTURE_CARD_C"]);
+            Until(() => window.OfferCount == 3, "fresh actual watcher context recovers after package and mode transitions");
             source.Pause();
             var frozen = File.GetLastWriteTimeUtc(file);
             source.Change(["FIXTURE_HERO_A", "FIXTURE_HERO_B", "FIXTURE_HERO_C"]);
@@ -259,6 +270,13 @@ internal static class NativeWatcherChecks
             _state!.ChosenHero = "FIXTURE_HERO_B";
             Task.Run(() => _watcher!.Update()).GetAwaiter().GetResult();
         }
+        public void PackageContextChange()
+        {
+            _state!.IsPackageSelectOpen = true;
+            Task.Run(() => _watcher!.Update()).GetAwaiter().GetResult();
+        }
+        // The optional producer also observes a separate public game mode, not only watcher events.
+        public void ObserveModeOnly(bool menu) { _menu = menu; }
         public void Pause()
         {
             _pause = true;
