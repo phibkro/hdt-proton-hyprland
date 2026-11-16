@@ -44,6 +44,10 @@ if [[ $native_ui == true ]]; then
         echo 'Build the selected native checks variant first.' >&2
         exit 2
     }
+    if [[ $watcher_events == false ]] && rg --files --hidden --no-ignore "$managed" | rg -q '/(HearthWatcher|HearthMirror)\.dll$'; then
+        echo 'Ordinary native checks contain optional vendor assemblies; refusing to bundle them.' >&2
+        exit 2
+    fi
     cp -R "$managed" "$run/managed"
     cp -- "$(dirname -- "$frame")/native-overlay-observation.json" "$run/ui-observation.json"
     native_env+=(--setenv HDT_TEST_NATIVE_UI_DLL /capture/managed/Hdt.Checks.dll
