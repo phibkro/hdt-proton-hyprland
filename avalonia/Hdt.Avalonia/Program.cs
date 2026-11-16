@@ -17,7 +17,7 @@ internal static class Program
         catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
     }
 }
-public sealed record LaunchOptions(string? Replay, string Settings, string? ProtonState = null)
+public sealed record LaunchOptions(string? Replay, string Settings, string? ProtonState = null, string? ClientData = null)
 {
     public static LaunchOptions Current { get; set; } = new(null, DefaultSettings);
     private static string DefaultSettings => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hdt-avalonia", "settings.json");
@@ -25,15 +25,17 @@ public sealed record LaunchOptions(string? Replay, string Settings, string? Prot
     {
         string? replay = null;
         string? protonState = null;
+        string? clientData = null;
         var settings = DefaultSettings;
         for (var i = 0; i < args.Length; i++)
         {
             if (args[i] == "--replay" && i + 1 < args.Length) replay = args[++i];
             else if (args[i] == "--settings" && i + 1 < args.Length) settings = args[++i];
             else if (args[i] == "--proton-state" && i + 1 < args.Length) protonState = args[++i];
-            else throw new ArgumentException("Usage: Hdt.Avalonia [--replay FILE] [--settings FILE] [--proton-state FILE]");
+            else if (args[i] == "--client-data" && i + 1 < args.Length) clientData = args[++i];
+            else throw new ArgumentException("Usage: Hdt.Avalonia [--replay FILE] [--settings FILE] [--proton-state FILE] [--client-data FILE]");
         }
-        return new(replay, settings, protonState);
+        return new(replay, settings, protonState, clientData);
     }
 }
 public sealed class App : Application

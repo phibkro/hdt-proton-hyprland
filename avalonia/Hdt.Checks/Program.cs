@@ -57,6 +57,7 @@ Check(window.OfferCount == 2 && window.PickedCount == 1 && window.Scores[0] == "
 var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
 void Click(Control control)
 {
+    control.BringIntoView();
     Dispatcher.UIThread.RunJobs();
     window.CaptureRenderedFrame();
     var position = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)
@@ -192,5 +193,53 @@ File.Delete(blocker); Directory.CreateDirectory(blocker);
 Click(window.ScoresToggle); Wait(window.PendingPreferences);
 Check(window.ScoresToggle.IsChecked == false && window.PreferencesStatus.Contains("saved"), "preference controls recover after storage becomes available");
 Check(!Result(new SettingsStore(Path.Combine(blocker, "settings.json")).LoadAsync()).ShowArenasmithScore, "recovered preference write is durable at real IO boundary");
+window.Close();
+
+window = new MainWindow(new(fixture, Path.Combine(evidence, "client-settings.json"), ClientData: Path.Combine(evidence, $"library-{Guid.NewGuid():N}.json")));
+window.Show(); Wait(window.Initialization);
+var clientTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+Click((TabItem)clientTabs.Items[0]!);
+var editor = window.DeckLibrary;
+void Fill(TextBox box, string text)
+{
+    Click(box);
+    window.KeyPress(Key.A, RawInputModifiers.Control, PhysicalKey.A, "a");
+    window.KeyRelease(Key.A, RawInputModifiers.Control, PhysicalKey.A, "a");
+    window.KeyTextInput(text);
+    Dispatcher.UIThread.RunJobs();
+}
+Click(editor.NewButton);
+Fill(editor.NameBox, "Native fixture deck");
+Fill(editor.ClassBox, "Mage");
+Fill(editor.HeroBox, "637");
+Fill(editor.CardsBox, "77 1\n100 2");
+Fill(editor.NotesBox, "Native pointer and keyboard acceptance");
+Click(editor.SaveButton); Wait(editor.PendingAction);
+Check(window.Library.State.Decks.Length == 1 && window.Library.State.Decks[0].Name == "Native fixture deck", "native deck editor saves through real Rust transaction boundary");
+Click(editor.ExportButton); Wait(editor.PendingAction);
+Check(editor.CodeBox.Text?.Contains("AAECAf0EAU0BZAAA") == true, "native export produces independently specified Hearthstone deckstring");
+Fill(editor.NameBox, "Imported native fixture");
+Click(editor.ImportButton); Wait(editor.PendingAction);
+Check(window.Library.State.Decks.Length == 2 && editor.NameBox.Text == "Imported native fixture", "native import creates and selects a second persisted deck");
+Click(editor.UseButton); Wait(editor.PendingAction);
+Check(window.Library.State.SelectedDeckId == window.Library.State.Decks[1].Id, "native tracking selection changes only client-owned library state");
+Fill(editor.NotesBox, "Edited persistent notes");
+Click(editor.SaveButton); Wait(editor.PendingAction);
+Check(window.Library.State.Decks[1].Notes == "Edited persistent notes", "native deck edit preserves stable identity and updates notes");
+window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-library.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+var record = new MatchRecord(Guid.NewGuid().ToString(), window.Library.State.Decks[1].Id, DateTimeOffset.UtcNow.ToString("o"), "Manual acceptance fixture", "Win", "Mage", "Warrior", 8, null, "Anonymous test data");
+Wait(window.Library.RecordAsync(record));
+Click((TabItem)clientTabs.Items[2]!);
+Check(window.GetVisualDescendants().OfType<ListBox>().Any(list => list.Items.OfType<MatchRecord>().Any(match => match.Id == record.Id)), "native history displays a persisted supplied match record");
+window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-history.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+Click((TabItem)clientTabs.Items[0]!);
+Click(editor.ArchiveButton); Wait(editor.PendingAction);
+Check(window.Library.State.Decks[1].Archived && window.Library.State.Decks[1].Notes == "Edited persistent notes", "native archive preserves deck content and notes");
+var savedLibrary = window.Library.State;
+Fill(editor.CodeBox, "invalid deck code");
+Click(editor.ImportButton); Wait(editor.PendingAction);
+Check(!window.Library.Ready && window.Library.State.Revision == savedLibrary.Revision && !editor.SaveButton.IsEnabled, "invalid native import leaves the saved library intact and requires explicit reload");
+Click(editor.ReloadButton); Wait(editor.PendingAction);
+Check(window.Library.Ready && window.Library.State.Decks.Length == savedLibrary.Decks.Length && window.Library.State.Matches.Length == 1, "native library recovers from failed import by verifying the actual persisted state");
 window.Close();
 Console.WriteLine($"{checks} checks passed; renderer evidence: {evidence}");

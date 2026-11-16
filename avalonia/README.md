@@ -1,11 +1,12 @@
-# Native Avalonia migration — first executable slice
+# Native Avalonia migration — executable client preview
 
 An independently authored .NET/Avalonia application with a Linux-first Rust IO boundary. This is a migration preview,
-not a replacement for HDT. It opens a native window with a working Arena replay
-view and local Arena preferences. It never reads game memory or sends game input.
+not a replacement for HDT. It opens a native window with deck management, deckstring import/export, a persisted
+match-history view, an Arena replay view and local Arena preferences. It never reads game memory or sends game input.
 
 ```
 Arena observation replay ──validated v1 contract──▶ native draft view
+Native deck editor ────────Rust transactions─────▶ private native library
 MIT Proton plugin export ──read-only status──────▶ connection/status text
                                                     (no cards in export)
 ```
@@ -17,7 +18,7 @@ From the repository root:
 ```sh
 nix-shell avalonia/shell.nix
 cargo build --locked -j2
-cargo test --locked -j2 --test rust-snapshot
+cargo test --locked -j2 --test rust-snapshot --test rust-client
 cd avalonia
 dotnet restore Hdt.Checks/Hdt.Checks.csproj --locked-mode
 dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilation=false
@@ -35,7 +36,8 @@ Optional arguments:
 dotnet run --no-build --project Hdt.Avalonia -- \
   --replay /absolute/path/observations.json \
   --settings /absolute/path/native-settings.json \
-  --proton-state /absolute/path/input-regions.json
+  --proton-state /absolute/path/input-regions.json \
+  --client-data /absolute/path/native-library.json
 ```
 
 `--proton-state` reads the existing `HDT_INPUT_REGION_FILE` export once per second.
@@ -44,6 +46,23 @@ It accepts only the timestamp and `state` projection defined in
 (>5 seconds) and stale (>5 seconds) status is visibly unavailable. It never
 converts visibility flags into offers, picks or ratings. The reader owns no writer
 and does not modify the file, Windows configuration or installed plugin.
+
+**My Decks** supports new decks, edits and notes, commented deckstring import,
+export/copy, native tracking selection and archiving. The editor currently uses
+numeric DBF IDs because no current card catalog or artwork is bundled. A decoded
+code is structurally checked, not certified legal for a Hearthstone format.
+Sideboards are preserved. Archiving retains the deck and notes in the library;
+this preview has no restore/archive-browser UI yet. Tracking selection affects
+only this native client; it does not select a deck inside the game or Windows HDT.
+
+`--client-data` selects a separate native JSON library; by default it is
+`library.json` beside native settings. The existing Rust host owns versioned,
+revision-checked transactions under a regular-file lock, atomic same-directory
+replacement, file/directory synchronization and private newly created files.
+Requests travel through bounded stdin rather than process arguments. A conflict
+or uncertain failure disables mutations until **Reload library** verifies disk.
+**Stats** displays persisted supplied match records; automatic match acquisition
+is pending the observation producer. It does not invent game history.
 
 Settings default to the platform's LocalApplicationData `hdt-avalonia/settings.json`.
 They are separate from Windows HDT settings and use an atomic same-directory
@@ -67,6 +86,15 @@ After the build:
 ```sh
 dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalonia-evidence
 ```
+
+The native-library rendered journey additionally uses pointer and keyboard input
+to create a deck, export a known deckstring, import it as another deck, select it,
+edit notes and archive it. It verifies the Rust-backed persisted history view,
+invalid-import failure and reload recovery. `native-library.png` and
+`native-history.png` retain rendered evidence. Rust CLI tests separately assert
+revision conflict leaves exact stored bytes unchanged, private file permissions,
+history identity deduplication and sideboard codec roundtrip. A supplied anonymous
+match proves the storage/view seam only, not automatic game acquisition.
 
 The first assertions exercise JSON loading, unknown/base/dynamic scores,
 formatting, and synergy multiplicity. They are model tests, not game validation.
@@ -127,7 +155,7 @@ regular-file/fault acceptance.
 | Capability | This slice | Evidence / remaining work |
 |---|---|---|
 | Native Linux window and navigation | Native | Real Avalonia menu/tabs; Options, Stats and Help navigate |
-| New/import/export/account menus | Absent, disabled | No false successful commands; deck manager not migrated |
+| New/import/export menus | Native | Pointer/keyboard journey through real Rust transactions; account menu remains unavailable |
 | Arena scores and deck-synergy toggles | Native, persisted | Pointer journey and nondefault window reconstruction |
 | Offered cards and picked deck | Native rendering, replay acquisition | Validated snapshot replacement, duplicate-pick grouping |
 | Dynamic score preference / base fallback | Native | Derived from observed upstream behavior; nullable ratings stay unknown |
@@ -139,7 +167,9 @@ regular-file/fault acceptance.
 | HearthMirror / game memory / log watcher | Absent | Separate future acquisition adapter, no native port yet |
 | Hero/hero-power/package selection, redraft, related tooltips | Absent | Separate observation variants and views required |
 | In-game overlay placement/click-through | Absent | Separate compositor/window integration; ordinary window only |
-| Deck editing/import/history/statistics | Absent | Data adapters and workflows not implemented |
+| Deck editing / notes / archive / selection | Native | Real private library, revision conflicts, stable IDs, atomic persistence; no game write |
+| Hearthstone deckstring import / export | Native, structural validation | Golden version-1 bytes, comments, sideboards; no current catalog / legality check |
+| Match history / basic win-loss counts | Native view and storage; supplied acquisition | Deduplicated records; automatic game import and richer analysis pending |
 | Upstream assets, localization, exact styling | Absent | No licensed artwork or fonts copied; native Fluent controls |
 
 ## Observation boundary
@@ -191,3 +221,16 @@ A separate template engine install and MVVM framework were unnecessary for this
 bounded control/view slice. Existing repository Nix dependency pin and MIT plugin
 status format were reused. Proprietary current upstream source was rejected as a
 copying source because its notice supplies no redistribution license.
+
+
+Deckstring prior art: [HearthSim/HearthDb DeckSerializer.cs](https://github.com/HearthSim/HearthDb/blob/4f91601ac3a47fa06eede3eac5c4cf84db52545e/HearthDb/Deckstrings/DeckSerializer.cs),
+commit **4f91601ac3a47fa06eede3eac5c4cf84db52545e**, MIT copyright 2016 HearthSim.
+The independently authored Rust codec follows the version-1 serializer's wire
+layout, including sideboard owner/count order. The reference's multi-copy
+sideboard deserializer uses a different order; this codec follows the serializer
+and rejects trailing or unsupported data. The original copyright/permission
+notice is retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The existing `base64`, `serde`, `uuid`, `chrono`, `nix` and already-locked
+`tempfile` dependencies are reused. A stale HearthDb NuGet package was evaluated
+and rejected as a current card catalog; no card definitions or copyrighted
+artwork are bundled.

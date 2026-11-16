@@ -1,5 +1,7 @@
+pub mod client;
 pub mod config;
 pub mod control;
+pub mod deckcode;
 pub mod desktop;
 pub mod journal;
 pub mod launch;

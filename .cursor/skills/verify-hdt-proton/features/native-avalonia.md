@@ -1,7 +1,8 @@
 # Native Avalonia migration preview
 
 Feature IDs: `native-window`, `native-draft-replay`, `native-preferences`,
-`bounded-snapshot-io`, `proton-status-bridge`. These are preview routes; passing
+`bounded-snapshot-io`, `proton-status-bridge`, `native-deck-library`,
+`native-deckstring`, `native-history`. These are preview routes; passing
 them establishes no live game offer/rating/overlay parity.
 
 ## Preconditions and doctor
@@ -13,7 +14,7 @@ evidence directory. Linux is currently required for native snapshot IO.
 ```sh
 nix-shell avalonia/shell.nix
 cargo build --locked -j2
-cargo test --locked -j2 --test rust-snapshot
+cargo test --locked -j2 --test rust-snapshot --test rust-client
 cd avalonia
 dotnet restore Hdt.Checks/Hdt.Checks.csproj --locked-mode
 dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilation=false
@@ -21,7 +22,7 @@ dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilat
 
 Before driving, record clean/dirty source, `git rev-parse HEAD`,
 `sha256sum "$HDT_HOST_BINARY"`, and `"$HDT_HOST_BINARY" --help`. The help must
-include `read-snapshot`; a host built from an older revision is not ready.
+include `read-snapshot` and `client`; a host built from an older revision is not ready.
 Retain the .NET SDK version and lockfiles alongside the source identity.
 
 ## Rendered native journey and faults
@@ -31,7 +32,8 @@ dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json "$HDT_VERIFY_R
 ```
 
 Require zero exit and all checks passing. Inspect `arena.png`, `options.png`,
-`status-stale.png`, `status-recovered.png` and `settings-failure.png`. The driver
+`status-stale.png`, `status-recovered.png`, `settings-failure.png`,
+`native-library.png` and `native-history.png`. The driver
 uses actual headless Skia controls and pointer input. It loads a real replay
 file, steps observed offers/picks, navigates Options, persists a nondefault
 preference, reconstructs a window, removes scores, leaves draft and rewinds.
@@ -72,3 +74,15 @@ snapshot children, FIFO and fault files; timeout termination must target only th
 child it started. Confirm no owned slow-reader child remains. The Rust/native UI
 runs never write the external input file. Remote CI and live game paths remain
 unverified unless separately observed.
+
+
+## Native library workflow
+
+The rendered driver must create/edit a deck using real pointer/keyboard input,
+export the golden code, import as a second stable identity, change tracking
+selection, preserve notes on archive, and show a persisted supplied match.
+Invalid import must leave stored state intact, visibly disable mutations and
+recover after explicit reload. The Rust CLI journey additionally verifies
+revision conflict, exact unchanged stored bytes, sideboard codec behavior and
+new file mode 0600. No card catalog, legality certification, automatic Windows
+history import or write into Hearthstone is implied by these routes.

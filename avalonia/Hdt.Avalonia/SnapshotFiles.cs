@@ -15,14 +15,17 @@ public static class SnapshotFiles
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(2);
 
     public static Task<T> ReadJsonAsync<T>(string path, int maximum, CancellationToken cancellation = default)
+        => InvokeJsonAsync<T>(["read-snapshot", maximum.ToString(System.Globalization.CultureInfo.InvariantCulture), Path.GetFullPath(path)], maximum, cancellation);
+
+    public static Task<T> InvokeJsonAsync<T>(IReadOnlyList<string> arguments, int maximum, CancellationToken cancellation = default, string? standardInput = null)
         => Task.Run(async () =>
         {
-            var bytes = await ReadAsync(path, maximum, cancellation).ConfigureAwait(false);
+            var bytes = await ExecuteAsync(arguments, maximum, cancellation, standardInput).ConfigureAwait(false);
             return JsonSerializer.Deserialize<T>(bytes, ReplaySource.JsonOptions)
-                ?? throw new InvalidDataException("JSON snapshot must not be null.");
+                ?? throw new InvalidDataException("Native response must not be null.");
         }, cancellation);
 
-    private static async Task<byte[]> ReadAsync(string path, int maximum, CancellationToken cancellation)
+    private static async Task<byte[]> ExecuteAsync(IReadOnlyList<string> arguments, int maximum, CancellationToken cancellation, string? standardInput)
     {
         if (maximum is < 1 or > ReplayBytes) throw new ArgumentOutOfRangeException(nameof(maximum));
         var host = Environment.GetEnvironmentVariable("HDT_HOST_BINARY");
@@ -36,14 +39,13 @@ public static class SnapshotFiles
         {
             await Slot.WaitAsync(deadline.Token).ConfigureAwait(false);
             acquired = true;
-            var start = new ProcessStartInfo(host) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
-            start.ArgumentList.Add("read-snapshot");
-            start.ArgumentList.Add(maximum.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            start.ArgumentList.Add(Path.GetFullPath(path));
+            var start = new ProcessStartInfo(host) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = standardInput is not null, CreateNoWindow = true };
+            foreach (var argument in arguments) start.ArgumentList.Add(argument);
             child = Process.Start(start) ?? throw new IOException("Snapshot reader could not start.");
             var output = ReadPipeAsync(child.StandardOutput.BaseStream, maximum, deadline.Token);
             var error = ReadPipeAsync(child.StandardError.BaseStream, 4096, deadline.Token);
-            await Task.WhenAll(output, error, child.WaitForExitAsync(deadline.Token)).ConfigureAwait(false);
+            var input = standardInput is null ? Task.CompletedTask : WriteInputAsync(child, standardInput, deadline.Token);
+            await Task.WhenAll(output, error, input, child.WaitForExitAsync(deadline.Token)).ConfigureAwait(false);
             if (child.ExitCode == 2) throw new FileNotFoundException("Snapshot file does not exist.");
             if (child.ExitCode != 0)
                 throw new IOException($"Snapshot reader rejected input: {Encoding.UTF8.GetString(await error.ConfigureAwait(false)).Trim()}");
@@ -70,6 +72,12 @@ public static class SnapshotFiles
             }
             if (acquired) Slot.Release();
         }
+    }
+    private static async Task WriteInputAsync(Process child, string input, CancellationToken cancellation)
+    {
+        if (Encoding.UTF8.GetByteCount(input) > 65536) throw new IOException("Native request exceeds its 64 KiB bound.");
+        await child.StandardInput.WriteAsync(input.AsMemory(), cancellation).ConfigureAwait(false);
+        child.StandardInput.Close();
     }
     private static async Task ReapAsync(Process child)
     {

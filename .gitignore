@@ -247,3 +247,6 @@
 !/avalonia/fixtures/draft.json
 !/.github/workflows/avalonia.yml
 !/tests/rust-snapshot.rs
+!/tests/rust-client.rs
+
+!/avalonia/THIRD_PARTY_NOTICES.md

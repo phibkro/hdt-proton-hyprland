@@ -6,6 +6,10 @@ fn run() -> Result<i32> {
     let command = args.next().unwrap_or_else(|| "help".into());
     let args: Vec<_> = args.collect();
     match command.to_str().context("Command must be UTF-8")? {
+        "client" => {
+            hdt_host::client::run(&args)?;
+            Ok(0)
+        }
         "read-snapshot" => hdt_host::snapshot::run(&args),
         "observe" => {
             hdt_host::journal::run(&args)?;
@@ -88,7 +92,7 @@ fn run() -> Result<i32> {
         }
         "help" | "--help" | "-h" => {
             println!(
-                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export|read-snapshot"
+                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export|read-snapshot|client"
             );
             Ok(0)
         }

@@ -29,6 +29,8 @@ public sealed class MainWindow : Window
     private readonly TextBlock _observation = Text("No observations", 14);
     private readonly TabControl _tabs;
     private readonly global::Avalonia.Threading.DispatcherTimer? _protonTimer;
+    public ClientLibrary Library { get; }
+    public LibraryView DeckLibrary { get; }
     public Button NextButton { get; } = new() { Content = "Next observation", IsEnabled = false };
     public Button ResetButton { get; } = new() { Content = "Rewind", IsEnabled = false };
     public CheckBox ScoresToggle { get; } = new() { Content = "Show Arenasmith scores" };
@@ -46,6 +48,8 @@ public sealed class MainWindow : Window
         Title = "Hearthstone Deck Tracker • Avalonia migration preview";
         Width = 1120; Height = 760; MinWidth = 800; MinHeight = 540;
         _store = new(options.Settings);
+        Library = new(options.ClientData ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.Settings))!, "library.json"), _lifetime.Token);
+        DeckLibrary = new(Library);
         ScoresToggle.IsEnabled = SynergiesToggle.IsEnabled = false;
         ScoresToggle.IsCheckedChanged += (_, _) => StartPreferencesSave();
         SynergiesToggle.IsCheckedChanged += (_, _) => StartPreferencesSave();
@@ -77,9 +81,9 @@ public sealed class MainWindow : Window
         _tabs = new TabControl
         {
             ItemsSource = new TabItem[] {
-            new() { Header = "My Decks", Content = Notice("My Decks", "Deck storage, editing and import are not migrated. Your Windows HDT database is never opened.") },
+            new() { Header = "My Decks", Content = DeckLibrary },
             new() { Header = "Arena Draft", Content = content },
-            new() { Header = "Stats", Content = Notice("Statistics", "Arena runs and constructed statistics require a history adapter; no history source is attached.") },
+            new() { Header = "Stats", Content = new HistoryView(Library) },
             new() { Header = "Options", Content = optionsPane },
             new() { Header = "Help", Content = Notice("Migration preview", "Arena observations → native model → Avalonia controls. Replay only; game memory, login, HSReplay acquisition and overlays are absent. No actions are sent to Hearthstone.") }
         },
@@ -88,8 +92,9 @@ public sealed class MainWindow : Window
         var menu = new Menu
         {
             ItemsSource = new MenuItem[] {
-            Missing("New", "Deck creation is not migrated."), Missing("Import", "Deck importing is not migrated."),
-            Missing("Export", "Deck exporting is not migrated."), Navigate("Stats", 2),
+            LibraryAction("New", () => { _tabs.SelectedIndex = 0; DeckLibrary.NewDeck(); }),
+            LibraryAction("Import", () => { _tabs.SelectedIndex = 0; DeckLibrary.FocusImport(); }),
+            LibraryAction("Export", () => { _tabs.SelectedIndex = 0; DeckLibrary.ExportSelected(); }), Navigate("Stats", 2),
             Missing("HSReplay.net", "Account login and authenticated acquisition are not migrated."), Navigate("Options", 3), Navigate("Help", 4)
         }
         };
@@ -120,6 +125,9 @@ public sealed class MainWindow : Window
         if (_lifetime.IsCancellationRequested) return;
         RestoreToggles();
         ScoresToggle.IsEnabled = SynergiesToggle.IsEnabled = _openButton.IsEnabled = true;
+        try { await Library.ReloadAsync(); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
+        catch (Exception error) when (InputFailure(error)) { /* The library exposes its explicit failure and reload action. */ }
         if (options.Replay is not null) await TryLoadAsync(options.Replay);
         if (_lifetime.IsCancellationRequested) return;
         await RefreshProtonAsync();
@@ -142,6 +150,10 @@ public sealed class MainWindow : Window
         finally { _refreshingProton = false; }
     }
 
+    private static MenuItem LibraryAction(string label, Action action)
+    {
+        var item = new MenuItem { Header = label }; item.Click += (_, _) => action(); return item;
+    }
     private MenuItem Navigate(string label, int page)
     {
         var item = new MenuItem { Header = label }; item.Click += (_, _) => _tabs.SelectedIndex = page; return item;
