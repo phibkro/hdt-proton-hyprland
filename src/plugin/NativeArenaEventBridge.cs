@@ -31,7 +31,7 @@ internal sealed class NativeArenaEventBridge : IDisposable
         { Selection = selection; Evidence = evidence; Drafting = drafting; Heroes = heroes; Underground = underground; }
         public object Observation(string session, int sequence, DateTime now, object[] picked)
         {
-            if (!Drafting || Heroes) picked = new object[0];
+            if (!Drafting || Heroes) picked = Array.Empty<object>();
             return new
             {
                 schemaVersion = 3,
@@ -43,9 +43,9 @@ internal sealed class NativeArenaEventBridge : IDisposable
                 selectedCardId = (string)null,
                 hero = "Draft hero not correlated",
                 underground = Underground,
-                pickedDeck = new object[0],
+                pickedDeck = Array.Empty<object>(),
                 cachedDeck = new { origin = "HdtPublicTileModel", cards = picked },
-                offers = new object[0],
+                offers = Array.Empty<object>(),
                 selection = Selection,
                 choiceEvidence = Evidence,
                 description = "Choices: last delivered HDT watcher event; memory freshness unknown. Ratings and synergies unavailable; last selected card unavailable."
@@ -62,7 +62,8 @@ internal sealed class NativeArenaEventBridge : IDisposable
     string reason = "Awaiting a delivered watcher context and choices event.";
     public NativeArenaEventBridge(ArenaStateWatcher source, Func<string, Metadata> metadata)
     {
-        if (source == null || metadata == null) throw new ArgumentNullException();
+        if (source == null) throw new ArgumentNullException("source");
+        if (metadata == null) throw new ArgumentNullException("metadata");
         watcher = source; resolve = metadata;
         watcher.OnClientStateChanged += State;
         watcher.OnChoicesChanged += Choices;
@@ -158,8 +159,8 @@ internal sealed class NativeArenaEventBridge : IDisposable
                     card = new { id = card.Id, name = card.Name, mana = card.Mana },
                     baseRating = (object)null,
                     dynamicRating = (object)null,
-                    enabled = new { direct = new string[0], indirect = new string[0] },
-                    enhancedBy = new { direct = new string[0], indirect = new string[0] }
+                    enabled = new { direct = Array.Empty<string>(), indirect = Array.Empty<string>() },
+                    enhancedBy = new { direct = Array.Empty<string>(), indirect = Array.Empty<string>() }
                 });
             }
             return new Frame(heroes ? (object)new { phase = "HeroSelection", choices = exported.ToArray() }
