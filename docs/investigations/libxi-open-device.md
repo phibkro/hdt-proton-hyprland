@@ -84,7 +84,7 @@ so existing runtime dependencies determine library resolution.
 
 Successful startup prints the selected path. Verify the actual tracker's
 `/proc/PID/maps` contains that path; setting a variable alone is not proof of
-loading. The [private replay](../guides/ui-replay.md#test-an-hdt-only-libxi-runtime)
+loading. The [private replay](../guides/ui-replay.md#optional-libxi-runtime-test)
 also records the selected library's mappings and hash.
 
 Rollback: remove `HDT_LIBXI_LIBRARY` from the HDT-only launch environment and
