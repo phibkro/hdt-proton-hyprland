@@ -53,6 +53,8 @@ jobs:
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet restore Hdt.Checks/Hdt.Checks.csproj --locked-mode'
       - name: Build native application and acceptance driver
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilation=false'
+      - name: Check F# source and test formatting
+        run: nix-shell avalonia/shell.nix --run 'dotnet tool restore --tool-manifest avalonia/dotnet-tools.json && bash scripts/check-fsharp.sh'
       - name: Check native C# formatting
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet format whitespace Hdt.Avalonia/Hdt.Avalonia.csproj --no-restore --verify-no-changes && dotnet format whitespace Hdt.Checks/Hdt.Checks.csproj --no-restore --verify-no-changes'
       - name: Verify managed assertion failure and owned cleanup

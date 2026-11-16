@@ -221,6 +221,15 @@
 /avalonia/*
 !/avalonia/Directory.Build.props
 !/avalonia/Hdt.Avalonia/
+!/avalonia/Hdt.Views/
+/avalonia/Hdt.Views/*
+!/avalonia/Hdt.Views/Hdt.Views.fsproj
+!/avalonia/Hdt.Views/TrackerLayout.fs
+!/avalonia/Hdt.Views/SettingsView.fs
+!/avalonia/Hdt.Views/packages.lock.json
+!/avalonia/dotnet-tools.json
+!/scripts/check-fsharp.sh
+!/docs/specs/native-fsharp-options.md
 /avalonia/Hdt.Avalonia/*
 !/avalonia/Hdt.Avalonia/Arena.cs
 !/avalonia/Hdt.Avalonia/ClientLibrary.cs
@@ -267,8 +276,6 @@
 !/avalonia/Hdt.Checks/OverlayDesktopAcceptance.cs
 
 !/docs/specs/native-layout.md
-!/avalonia/Hdt.Avalonia/TrackerLayout.cs
-!/avalonia/Hdt.Avalonia/SettingsView.cs
 !/scripts/check-native-failure.sh
 
 !/docs/specs/native-ui-isolation.md

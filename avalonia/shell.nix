@@ -7,7 +7,7 @@ let
     nixpkgs-src = builtins.fetchTree lock.nodes.nixpkgs-src.locked;
   };
   pkgs = sets.legacyPackages.x86_64-linux;
-  libraries = with pkgs; [ fontconfig freetype libGL libice libsm libx11 libxcursor libxrandr libxi zlib ];
+  libraries = with pkgs; [ fontconfig freetype icu libGL libice libsm libx11 libxcursor libxrandr libxi zlib ];
 in pkgs.mkShell {
   packages = with pkgs; [ dotnet-sdk_10 cargo rustc rustfmt clippy xorg-server xwininfo imagemagick coreutils
     bash jq ripgrep bubblewrap gcc pkg-config libx11 libxcomposite libxrender xdotool ];
@@ -15,6 +15,7 @@ in pkgs.mkShell {
   DOTNET_CLI_TELEMETRY_OPTOUT = "1";
   DOTNET_NOLOGO = "1";
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1";
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = "0";
   DOTNET_PROCESSOR_COUNT = "2";
   shellHook = ''
     export CARGO_TARGET_DIR="$PWD/local/avalonia-rust-target"

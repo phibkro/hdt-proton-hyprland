@@ -74,6 +74,7 @@ try
     var settings = Path.Combine(evidence, "settings.json");
     if (File.Exists(settings)) File.Delete(settings);
     var window = CreateWindow(new(fixture, settings));
+    Console.WriteLine($"OPTIONS VIEW IMPLEMENTATION {window.SettingsPanel.GetType().Assembly.FullName}");
     window.Show(); Wait(window.Initialization); Dispatcher.UIThread.RunJobs();
     if (negativeControl)
     {
@@ -316,6 +317,10 @@ try
         var pathLabel = window.SettingsPanel.DetailPanel.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text?.Contains(new string('p', 140)) == true);
         Check(pathLabel.Bounds.Width <= window.SettingsPanel.DetailPanel.Bounds.Width, $"{size.Width}: long configured path wraps within its section");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-local-files-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Click(window.SettingsPanel.ArenaCategory);
+        Click(window.SettingsPanel.OverlayCategory);
+        Check(window.SettingsPanel.DetailPanel.GetVisualDescendants().Contains(window.NativeOverlay),
+            $"{size.Width}: F# settings navigation retains the real native overlay controls");
         Click(window.SettingsPanel.ArenaCategory);
         Click((TabItem)clientTabs.Items[1]!);
         var arenaColumns = (Grid)((TabItem)clientTabs.Items[1]!).Content!;
