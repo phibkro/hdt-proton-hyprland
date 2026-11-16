@@ -169,3 +169,7 @@ segmentation-fault or freeze diagnosis. Some Wine/managed frames may lack
 symbols or unwind information. It records no locals or complete memory dump,
 but paths and stack information remain private. After HDT restarts, select
 its new PID and use a new output directory.
+
+A debugger can change scheduling and make a race harder to reproduce. Keep the
+independent device capture alongside it; lack of a failure while debugging is
+not evidence that the bug is fixed.
