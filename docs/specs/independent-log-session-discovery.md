@@ -94,3 +94,13 @@ selection allowlist is grounded in the pinned
 That reserved implementation is reference evidence only; no code/assets/binaries
 are copied. Session-name/path policy here is our explicit acquisition contract,
 not a claim that every Hearthstone release uses exactly this layout.
+
+## Revisions
+
+- 2026-11-16: Startup discovery initializes each selected `--from end` cursor
+  through the production source-open path before `start` returns. Existing files
+  retain their observed end offset and descriptor; absent files record that
+  absence immediately. A file appearing between startup discovery and the first
+  regular poll is late input and begins at zero. This closes a startup interval
+  that could otherwise discard its bytes; explicit-source initialization is
+  unchanged.

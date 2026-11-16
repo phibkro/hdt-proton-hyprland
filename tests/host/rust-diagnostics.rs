@@ -952,6 +952,73 @@ fn game_log_selection_is_explicit_and_closed_and_end_policy_preserves_late_input
 }
 
 #[test]
+fn startup_end_boundary_captures_pre_poll_arrivals_and_replacement_recovery() {
+    for transition in ["append", "replace", "disappear"] {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("logs");
+        let session = root.join("session");
+        fs::create_dir_all(&session).unwrap();
+        let power = session.join("Power.log");
+        let arena = session.join("Arena.log");
+        fs::write(&power, b"history").unwrap();
+        let output = temp.path().join("output");
+        let mut collector = InputJournal::new(
+            output.clone(),
+            vec![],
+            From::End,
+            1_048_576,
+            vec![DiscoveryRoot::GameLogs {
+                root,
+                logs: vec![GameLog::Power, GameLog::Arena],
+            }],
+        )
+        .unwrap();
+        collector.start().unwrap();
+        // No regular poll occurs before this late file appears.
+        fs::write(&arena, b"late before first poll").unwrap();
+        match transition {
+            "append" => append(&power, b"tail"),
+            "replace" => {
+                fs::rename(&power, session.join("retired")).unwrap();
+                fs::write(&power, b"replacement").unwrap();
+            }
+            "disappear" => fs::remove_file(&power).unwrap(),
+            _ => unreachable!(),
+        }
+        collector.poll().unwrap();
+        if transition == "disappear" {
+            fs::write(&power, b"replacement").unwrap();
+            collector.poll().unwrap();
+        }
+        collector.close("test").unwrap();
+        let records = rows(&output);
+        let power_source = game_source(&records, "session", "Power.log");
+        let arena_source = game_source(&records, "session", "Arena.log");
+        assert_eq!(
+            bytes(&records, &arena_source, Some(0)),
+            b"late before first poll"
+        );
+        assert_eq!(
+            bytes(&records, &power_source, None),
+            if transition == "append" {
+                b"tail".as_slice()
+            } else {
+                b"replacement".as_slice()
+            },
+            "{transition}: existing history must stay skipped and new input retained"
+        );
+        if transition != "append" {
+            assert!(bytes(&records, &power_source, Some(0)).is_empty());
+            assert_eq!(bytes(&records, &power_source, Some(1)), b"replacement");
+        }
+        assert_eq!(fs::read(&arena).unwrap(), b"late before first poll");
+        if transition == "replace" {
+            assert_eq!(fs::read(session.join("retired")).unwrap(), b"history");
+        }
+    }
+}
+
+#[test]
 fn recorder_and_game_roots_share_capture_and_reject_an_ancestor_replaced_by_a_link() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("logs");

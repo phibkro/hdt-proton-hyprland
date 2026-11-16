@@ -428,7 +428,13 @@ impl InputJournal {
                     json!({"session":name,"name":source.name,"path":source.path,"from":from}),
                     true,
                 )?;
-                self.cursors.push(Cursor::new(source, from));
+                let mut cursor = Cursor::new(source, from);
+                if initial && from == From::End {
+                    // Pin the startup end/absence boundary before returning:
+                    // first-poll arrivals must never become skipped history.
+                    self.poll_source(&mut cursor)?;
+                }
+                self.cursors.push(cursor);
             }
             discovery.sessions.insert(name);
         }
