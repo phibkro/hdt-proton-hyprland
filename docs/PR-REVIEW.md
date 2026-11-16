@@ -54,8 +54,20 @@ proof of its corrected paths; a blocked pass does not authorize a merge.
 
 ## Required checks
 
-Pre-commit runs fast staged checks. GitHub's aggregate `check` job requires the
-source-quality, rust-quality and nix-check jobs; each must complete successfully.
+Pre-commit runs fast staged checks. GitHub classifies the complete base-to-head
+change using [ci-scope.sh](../scripts/ci-scope.sh), which owns the documentation
+allowlist. Documentation-only changes skip builds and source analysis. Every
+other change requires successful source-quality, rust-quality and nix-check jobs.
+Manual runs and changes without a comparable base run all checks. An unreadable
+comparison fails the gate; it never grants a documentation exemption.
+
+The aggregate `check` job always runs. It requires successful classification and
+either all three successful check jobs or an explicit documentation-only result
+with all three jobs skipped. A documentation commit at the tip of a code PR does
+not make that PR documentation-only. Rename detection is disabled so a move from
+production code into documentation still includes the deleted production path.
+This uses [job conditions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions)
+rather than workflow path filters, which can leave required checks pending.
 See [tooling](TOOLING.md) for the maintained command definitions. Check the
 statuses for the current PR head, not a previous successful revision.
 

@@ -63,7 +63,7 @@
           touch "$out"
         '';
         tests = pkgs.runCommand "hdt-proton-tests" {
-          nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.shellcheck pkgs.actionlint pkgs.jq pkgs.coreutils pkgs.util-linux pkgs.ripgrep ];
+          nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.git pkgs.shellcheck pkgs.actionlint pkgs.jq pkgs.coreutils pkgs.util-linux pkgs.ripgrep ];
         } ''
           mkdir source
           cp -R ${./src} source/src

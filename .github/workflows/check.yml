@@ -16,7 +16,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      docs-only: ${{ steps.scope.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Classify the complete change
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          docs_only=$(bash scripts/ci-scope.sh "$BASE_SHA" "$HEAD_SHA")
+          echo "docs-only=$docs_only" >> "$GITHUB_OUTPUT"
+
   source-quality:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs-only == 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -44,6 +65,8 @@ jobs:
         run: nix develop --command bun scripts/quality.ts check csharp-core
 
   rust-quality:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs-only == 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -60,6 +83,8 @@ jobs:
         run: nix develop --command bun scripts/quality.ts check rust
 
   nix-check:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs-only == 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -75,12 +100,21 @@ jobs:
 
   check:
     if: ${{ always() }}
-    needs: [source-quality, rust-quality, nix-check]
+    needs: [scope, source-quality, rust-quality, nix-check]
     runs-on: ubuntu-24.04
     steps:
       - name: Require all complete check jobs
         env:
+          SCOPE: ${{ needs.scope.result }}
+          DOCS_ONLY: ${{ needs.scope.outputs.docs-only }}
           SOURCE_QUALITY: ${{ needs.source-quality.result }}
           RUST_QUALITY: ${{ needs.rust-quality.result }}
           NIX_CHECK: ${{ needs.nix-check.result }}
-        run: test "$SOURCE_QUALITY" = success && test "$RUST_QUALITY" = success && test "$NIX_CHECK" = success
+        run: |
+          test "$SCOPE" = success
+          if test "$DOCS_ONLY" = true; then
+            test "$SOURCE_QUALITY" = skipped && test "$RUST_QUALITY" = skipped && test "$NIX_CHECK" = skipped
+          else
+            test "$DOCS_ONLY" = false
+            test "$SOURCE_QUALITY" = success && test "$RUST_QUALITY" = success && test "$NIX_CHECK" = success
+          fi

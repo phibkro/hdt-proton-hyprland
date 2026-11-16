@@ -64,7 +64,8 @@ This test changes the launcher and Linux helpers; HDT remains the Windows WPF ap
 | ArenaSmith ratings | Verified | The operator confirmed ratings on the paused offer and updates after another pick |
 | Overlay alignment and input | Verified | The operator confirmed movement, resizing, Alt-Tab, preview clearing, transparent click-through, and working overlay controls |
 | Main-window menus | Verified | The operator confirmed Settings and other menus responded. Settings reportedly slid smoothly without jitter; this is an observation, not a performance benchmark |
-| Ordinary Arena and other match tracking | Untested in this acceptance session | Earlier saved-match results below remain separate evidence; the draft checks do not establish match recording with this package |
+| Ordinary Arena match recording | Verified | A later match increased the saved match count by one, with Arena mode and a completed result. The operator confirmed HDT stayed responsive after the match; the independent collector stopped cleanly afterward |
+| Standard and Battlegrounds match tracking | Untested with this package | Earlier saved-match results below remain separate evidence |
 | Long-session reliability | Untested | A later tracker restart was manual, as confirmed by the operator; these checks do not establish crash-free operation |
 
 The runtime override is temporary. Building or merging the package does not
