@@ -44,7 +44,8 @@ sealed class ReplayHost
     {
         if (desktopControl != null && pointerMessages < 512 &&
             (message == 0x200 || message == 0x201 || message == 0x202 || message == 0x2a3 ||
-             message == 0x20 || message == 0x21 || message == 0x84 || message == 7 || message == 8))
+             message == 0x20 || message == 0x21 || message == 0x84 || message == 7 || message == 8 ||
+             (message == 0x7d && wParam.ToInt64() == -20)))
         {
             pointerMessages++;
             NativePoint cursor;
@@ -54,6 +55,8 @@ sealed class ReplayHost
                 observedUTC = DateTime.UtcNow.ToString("o"),
                 hwnd = hwnd.ToInt64(),
                 message,
+                oldStyle = message == 0x7d ? (int?)Marshal.ReadInt32(lParam, 0) : null,
+                newStyle = message == 0x7d ? (int?)Marshal.ReadInt32(lParam, 4) : null,
                 wParam = wParam.ToInt64(),
                 lParam = lParam.ToInt64(),
                 screenX = cursor.X,
