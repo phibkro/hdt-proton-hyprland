@@ -669,12 +669,13 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .unwrap()
             .as_millis() as i64;
         std::fs::write(
-            &region,
+            region.with_extension("next"),
             serde_json::to_vec(&json!({"session":session,"observedMS":now-age,
             "overlayHwnd":123,"controllerGeneration":std::fs::read(&ack).ok().and_then(|bytes|serde_json::from_slice::<serde_json::Value>(&bytes).ok()).and_then(|v|v["controllerGeneration"].as_str().map(str::to_owned)),"win32Input":win32_input,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
             .unwrap(),
         )
         .unwrap();
+        std::fs::rename(region.with_extension("next"), &region).unwrap();
     };
     let active = conn
         .intern_atom(false, b"_NET_ACTIVE_WINDOW")
@@ -721,7 +722,8 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             }
             assert!(
                 Instant::now() < deadline,
-                "controller acknowledgement timeout"
+                "controller acknowledgement timeout: {:?}",
+                std::fs::read_to_string(&ack)
             );
             std::thread::sleep(Duration::from_millis(10));
         }
@@ -786,6 +788,9 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .rectangles
             .is_empty()
     );
+    // After a fault, reacquire the new owner before echoing its preparation.
+    publish("owned", 0, "Unprepared");
+    wait_ack(&|v| v["nativeReady"] == true);
     for (session, age) in [("other", 0), ("owned", 5000), ("owned", -5000)] {
         publish("owned", 0, "Prepared");
         wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
