@@ -94,3 +94,4 @@
 !/tests/trace-export.test.ts
 !/docs/DIAGNOSTICS.md
 !/docs/specs/local-flight-recorder.md
+!/docs/specs/arena-tier5-rendering.md
