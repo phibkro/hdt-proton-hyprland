@@ -179,6 +179,7 @@
 !/tests/cli/autostart.test.ts
 !/tests/cli/ci-scope.test.ts
 !/tests/cli/desktop.test.ts
+!/tests/cli/native-error.test.ts
 !/tests/cli/replay-cli.test.ts
 !/tests/cli/steam-launch.test.ts
 !/tests/host/
