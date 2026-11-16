@@ -7,6 +7,12 @@ battlegrounds_tabs=${8:-false}
 diagnostics=${9:-false}
 canonical_events=${10:-false}
 desktop_input=${11:-false}
+libxi_library=${12:-}
+wine_environment=()
+if [[ -n "$libxi_library" ]]; then
+    libxi_library=$("$snapshot/hdt-host" libxi-check "$libxi_library")
+    wine_environment=(env "LD_PRELOAD=$libxi_library")
+fi
 export PATH=$HDT_REPLAY_TOOLS_PATH
 [[ "$run" == "$root/local/replay/runs/"* ]]
 jq -e --arg run "$run" '.kind=="hdt-ui-replay-run" and .run==$run' "$run/ownership.json" >/dev/null
@@ -78,7 +84,7 @@ if [[ "$desktop_input" == true ]]; then
         /nologo /target:winexe /platform:x64 /out:Hearthstone.exe "$(winpath "$snapshot/src/replay/GameWindow.cs")" >"$run/game-compile.log" 2>&1
     timeout 70 "$proton/files/bin/wine" "$run/app/Hearthstone.exe" "$(winpath "$run/game-fixture.json")" >"$run/game-fixture.log" 2>&1 &
 fi
-timeout 70 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" "$plugin" "$level" "$particles" >"$run/wine.log" 2>&1 &
+timeout 70 "${wine_environment[@]}" "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" "$plugin" "$level" "$particles" >"$run/wine.log" 2>&1 &
 host_pid=$!
 for ((i = 0; i < 200; i++)); do
     [[ -s "$run/state.json" ]] && break
@@ -89,6 +95,19 @@ xwininfo -root -tree >"$run/windows.txt"
 magick import -window root "$run/startup.png"
 [[ -s "$run/state.json" ]]
 jq -e '.settingsButton!=null and .commandId==0' "$run/state.json" >/dev/null
+if [[ -n "$libxi_library" ]]; then
+    tracker_pids=()
+    for comm in /proc/[0-9]*/comm; do
+        if [[ $(cat "$comm" 2>/dev/null || true) == ReplayHost.exe ]]; then
+            tracker_pids+=("${comm%/comm}")
+        fi
+    done
+    ((${#tracker_pids[@]} == 1))
+    cat "${tracker_pids[0]}/maps" >"$run/tracker-native-maps.txt"
+    grep -F "$libxi_library" "$run/tracker-native-maps.txt" >"$run/selected-libxi-maps.txt"
+    sha256sum "$libxi_library" >"$run/selected-libxi-sha256.txt"
+fi
+
 id=0
 send() {
     id=$((id + 1))
@@ -157,7 +176,7 @@ if [[ "$canonical_events" == true ]]; then
     mv "$run/canonical.jsonl" "$run/canonical-session1.jsonl"
     rm "$run/command.json" "$run/state.json"
     id=0
-    timeout 30 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host-second.log")" "$plugin" "$level" "$particles" >"$run/wine-second.log" 2>&1 &
+    timeout 30 "${wine_environment[@]}" "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host-second.log")" "$plugin" "$level" "$particles" >"$run/wine-second.log" 2>&1 &
     host_pid=$!
     for ((i = 0; i < 100; i++)); do
         [[ -s "$run/state.json" ]] && break

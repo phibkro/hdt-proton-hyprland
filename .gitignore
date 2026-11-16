@@ -228,3 +228,5 @@
 !/tests/native/libxi-open-device.c
 !/tests/native/libxi-open-device.sh
 !/docs/investigations/libxi-open-device.md
+
+!/nix/libxi.nix

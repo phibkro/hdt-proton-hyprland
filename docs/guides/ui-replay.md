@@ -108,3 +108,28 @@ after Arena battles. Live HearthMirror and remote ratings are outside the test.
 `--canonical-events`. It drives the native Rust controller and actual WPF button
 through private X11 mouse input. See [portable X11 input](portable-x11.md) for the
 journey, failure behavior and desktop-acceptance limits.
+
+
+## Optional libXi runtime test
+
+Build the optional library bundle from this checkout, then select it only for
+ReplayHost's Wine process:
+
+```sh
+nix build .#libxi-steam-runtime --out-link local/libxi-runtime-package
+devenv shell -- hdt-replay run --with-plugin --without-particles \
+  --libxi-library "$(readlink -f local/libxi-runtime-package)/lib/libXi.so.6"
+```
+
+The bundle retains the upstream device-ID fix and removes Nix runtime search
+paths so Steam supplies its own dependency libraries. The native host checks
+the selected file's x86-64 shared-library header; Wine's loader performs actual
+linking. The replay requires its real process maps to contain that exact file
+before driving controls and retains those maps plus the library hash. A failed
+load or absent map fails the replay. This proves private Wine/WPF loading and
+UI behavior, not live Hearthstone acceptance or compatibility with every runtime.
+
+For a launcher built from this checkout, `HDT_LIBXI_LIBRARY` selects the same
+bundle for HDT and its descendants. Unset means the existing library selection.
+Do not set it globally or replace files in Steam's Proton installation. The
+live desktop test must separately confirm the loaded file and game detection.
