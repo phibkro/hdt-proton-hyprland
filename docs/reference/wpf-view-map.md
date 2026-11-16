@@ -101,6 +101,13 @@ That child separates display operations, not the UI failure domain. Independent
 overlay rendering, supervision, command routing and recovery require separate
 implementation and fault-injection acceptance.
 
+UI isolation also differs from acquisition isolation. The optional native-client
+bridge currently captures cached HDT models on HDT's UI dispatcher before its
+separate writer publishes them. A frozen original HDT dispatcher can therefore
+stop fresh observations even if both native UI processes remain healthy.
+Independent acquisition is a separate migration step; the immediate UI contract
+is responsiveness, stale-data clearing and an honest source status.
+
 ## Capture coverage
 
 Run [the reference capture route](../guides/ui-replay.md#capture-original-views)
