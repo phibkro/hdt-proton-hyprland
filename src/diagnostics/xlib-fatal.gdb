@@ -34,3 +34,15 @@ disable $hdt_query_breakpoint
 end
 continue
 end
+set $hdt_open_queries = 0
+hbreak *XOpenDevice
+set $hdt_open_breakpoint = $bpnum
+commands
+silent
+set $hdt_open_queries = $hdt_open_queries + 1
+printf "HDT_DEVICE_OPEN count=%u thread=%u display=0x%llx requested=%llu\n", $hdt_open_queries, $_thread, (unsigned long long)$rdi, (unsigned long long)$rsi
+if $hdt_open_queries >= 1000
+disable $hdt_open_breakpoint
+end
+continue
+end

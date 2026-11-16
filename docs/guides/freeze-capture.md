@@ -193,3 +193,8 @@ queries it disables that query breakpoint; the fatal-handler breakpoint stays
 armed. No button values are recorded. This is more intrusive than the independent
 observer, so it is bounded diagnostic instrumentation rather than a default
 launcher setting.
+
+The bounded native trace also records requested IDs at `XOpenDevice` entry.
+Compare these with the subsequent mapping-query IDs on the same thread/display
+to detect a changed libXi return value. Each trace point disables after 1,000
+entries; the fatal-error breakpoint stays armed. No button values are recorded.
