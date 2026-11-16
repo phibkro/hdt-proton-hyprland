@@ -92,6 +92,12 @@ restart HDT with the previous launcher. If using a temporary service override,
 remove only that owned override and reload the user service definitions first.
 Neither applying nor reverting this setting requires restarting Hearthstone.
 
+On 16 November 2026, an HDT-only desktop trial loaded the corrected library as
+the sole mapped libXi. Its X11/glibc dependencies matched the previous HDT
+process. Hearthstone retained its process identity and the same relevant
+library mappings. The packaged launcher build and private WPF replay passed;
+long-session crash prevention remains unverified.
+
 ## Upstream submission draft
 
 Target: [libXi merge requests](https://gitlab.freedesktop.org/xorg/lib/libXi/-/merge_requests),
