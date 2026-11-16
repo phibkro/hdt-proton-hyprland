@@ -285,3 +285,5 @@
 !/tests/native/NativeWatcherChecks.cs
 
 !docs/specs/shared-plugin-compiler.md
+
+!tests/cli/plugin-compiler.test.ts
