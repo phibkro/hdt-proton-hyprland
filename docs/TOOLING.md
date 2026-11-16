@@ -1,5 +1,9 @@
 # Format and analyze source
 
+The migration branch now includes a native Rust host. See [Rust tooling and
+execution boundaries](RUST.md) for the Cargo, Clippy, nextest, dependency, and
+isolated X11 checks. The tables below also describe retained differential sources.
+
 Use the pinned development environment. These commands do not start HDT or
 Hearthstone, install a plugin, or change the game prefix.
 
@@ -7,6 +11,7 @@ Hearthstone, install a plugin, or change the game prefix.
 
 | Source | Formatting | Analysis |
 | --- | --- | --- |
+| Rust | rustfmt | Clippy/compiler, nextest/doctests, cargo-deny and cargo-machete |
 | TypeScript | Oxfmt with Ultracite | Oxlint with Ultracite core, all anti-slop rules, and type-aware rules; TypeScript 7 checked separately |
 | C# | SDK `dotnet format whitespace` and EditorConfig | SDK Roslyn recommended analyzers against .NET Framework 4.7.2 references |
 | C | ClangFormat | Clang-Tidy analyzer, bug-prone and selected CERT checks; compiler warnings are errors |
@@ -43,12 +48,11 @@ devenv shell -- bun run check
 The check exits nonzero on a finding. It searches the owned source directories,
 not private HDT installations, logs, backups, or downloaded reference source.
 
-**Strict application TypeScript lint currently reports existing debt.** Test lint
-now passes after boundary validation fixes. Formatting and
-compiler checks passing do not establish a clean lint result. The new checks
-remain enabled; there is no baseline that hides those findings. This branch is
-not ready to merge until its full checks pass. Follow the
-[tooling contract](specs/ecosystem-tooling.md) for the recorded verification.
+The replaced TypeScript runtime was retired after its regression coverage moved
+to Rust. The remaining TypeScript test and check drivers pass strict lint,
+formatting, and type checking. Historical findings remain recorded in the
+[tooling contract](specs/ecosystem-tooling.md); the
+[Rust migration contract](specs/rust-host.md) records the replacement coverage.
 
 Run one category when working through a finding:
 
@@ -111,7 +115,7 @@ An additional compiler comparison is available:
 devenv shell -- bun scripts/quality.ts check zig
 ```
 
-This builds the native helpers with `zig cc`, the same explicit warning policy,
+This builds the retained C reference and protocol fixtures with `zig cc`, the same explicit warning policy,
 and the Nix X11 libraries. It does not change the shipped Nix compiler or prove
 desktop behavior. Zig compilation passed locally; adopting it for release builds
 would require the native runtime checks as well.
@@ -138,11 +142,11 @@ The hook checks without rewriting files or downloading dependencies.
 
 | Boundary | Checks |
 | --- | --- |
-| Pre-commit | Changed-file formatting/lint, TypeScript types when TS changes, C syntax/warnings, Lua lint, C# whitespace, ShellCheck/shfmt, actionlint |
-| PR and merge queue | Frozen dependency restore; all owned TS format/lint/types; portable C# analysis; Nix package, unit tests, native C analysis/input parsing, Lua, C# formatting, ShellCheck/shfmt, workflow lint |
+| Pre-commit | Rust format/Clippy for changed Rust targets; changed-file formatting/lint, TypeScript types when TS changes, C syntax/warnings, Lua lint, C# whitespace, ShellCheck/shfmt, actionlint |
+| PR and merge queue | Frozen dependency restore; Rust format/Clippy, nextest, doctests, dependency policy and unused dependencies; all owned TS format/lint/types; portable C# analysis; Nix package, unit tests, native C analysis/input parsing, Lua, C# formatting, ShellCheck/shfmt, workflow lint |
 | Local pre-merge evidence | Full C# semantic analysis with original HDT; isolated native/WPF replay for affected runtime boundaries |
 
-The workflow's aggregate `check` job fails if either full job fails or is
+The workflow's aggregate `check` job fails if any of its three full jobs fails or is
 cancelled/skipped. GitHub `main` protection was verified to require a pull request
 and the up-to-date Actions `check` status, including for admins. This branch
 expands that existing status into the aggregate; until it is merged, the default
@@ -160,6 +164,7 @@ checkout. It does not watch for Hearthstone or replace the HDT user service.
 
 ```text
 tooling/
+  rust/    rustfmt.toml, clippy.toml, nextest.toml, deny.toml
   ts/      lint.ts, format.ts, tsconfig.json
   net/     HdtAnalysis.csproj, packages.lock.json
   c/       .clang-format, .clang-tidy
@@ -178,8 +183,7 @@ include tests/; Clang-Tidy includes tests/xinput-race.c; both Roslyn scopes
 include tests/*.cs. No test directory is excluded to make checks pass. Runtime
 tests and static analysis are separate commands and evidence.
 
-Bash implementations remain Bash. The application still uses Bun for existing
-TypeScript components, tests, and development check drivers. [ShellCheck](https://github.com/koalaman/shellcheck)
+Bash implementations remain Bash. Bun runs the retained TypeScript tests and development check drivers; the installed host uses Rust. [ShellCheck](https://github.com/koalaman/shellcheck)
 analyzes shell scripts; [shfmt](https://github.com/mvdan/sh) formats them using
 root EditorConfig. Both run in staged hooks and the full native CI check.
 
@@ -193,7 +197,7 @@ devenv shell -- bun run lint:tests
 
 ClangFormat, Clang-Tidy, Clang compiler warnings, and clangd are installed through
 the pinned Clang toolchain. [Meson/Ninja compilation databases](https://github.com/mesonbuild/meson/blob/master/mesonbuild/backend/ninjabackend.py)
-could make production builds, clangd, and Clang-Tidy share actual compiler flags.
+could make C fixture builds, clangd, and Clang-Tidy share actual compiler flags.
 A Meson migration must replace the current manual native build definitions, not
 add a competing build path. Meson and Ninja are not installed here yet.
 [Meson sanitizer options](https://mesonbuild.com/Builtin-options.html) can support

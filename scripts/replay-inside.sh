@@ -105,7 +105,7 @@ if [[ "$canonical_events" == true ]]; then
     # The native journal is independently owned by this supervisor. Its sources
     # are the synthetic fixture and actual HDT publishers, not interpreted markers.
     touch "$run/canonical-input.json"
-    bun "$snapshot/src/diagnostics/input-journal.ts" --output "$run/journal" --from start --max-bytes 8388608 \
+    "$snapshot/hdt-host" observe --output "$run/journal" --from start --max-bytes 8388608 \
         --source "input=$run/canonical-input.json" --source "hdt=$run/canonical.jsonl" >"$run/journal.log" 2>&1 &
     journal_pid=$!
     send canonical-start
@@ -249,7 +249,7 @@ if [[ "$diagnostics" == true ]]; then
     if [[ "$battlegrounds_tabs" == true ]]; then
         jq -se '([.[]|select(.name=="battlegrounds.tab.changed")]|length)==6 and ([.[]|select(.name=="battlegrounds.minions.pointer.down")]|length)==6' "${recorder_files[0]}" >/dev/null
     fi
-    bun "$snapshot/src/diagnostics/trace-export.ts" "$run/trace.json" "${recorder_files[0]}"
+    "$snapshot/hdt-host" trace-export "$run/trace.json" "${recorder_files[0]}"
 fi
 if rg -q '^(dispatcher|command|startup) ' "$run/host.log"; then
     echo 'The fixture host recorded an exception.' >&2

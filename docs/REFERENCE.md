@@ -7,14 +7,14 @@
 | Command | Behavior |
 |---|---|
 | `hdt-setup` | Builds the plugin, closes an identified HDT normally if open, installs the plugin, and changes the overlay settings |
-| `hdt-overlay-launch` | Builds the X11 helper, applies runtime Hyprland rules, and starts HDT with the compatibility defaults |
+| `hdt-overlay-launch` | Applies runtime Hyprland rules, and starts HDT with the compatibility defaults |
 | `hdt-launch` | Starts HDT in the running Steam server's namespace without the overlay defaults |
 | `hdt-launch --build-plugin` | Compiles `src/plugin/ProtonCompatibility.cs` against the installed HDT assemblies and native .NET compiler |
 | `hdt-launch --window-probe` | Compiles and runs the read-only Win32 window probe |
 | `hdt-status` | Reports selected window, rendering, log, and saved-match fields |
 | `hdt-steam-options` | Prints a quoted Steam Launch Options line for this checkout |
-| `hdt-check` | Runs the selected tests, shellcheck, TypeScript bundles, and native helper builds |
-| `hdt-build-surface-probe` | Builds the read-only XComposite probe |
+| `hdt-check` | Builds Rust and checks its formatting/Clippy, retained subprocess tests, shell, TypeScript, and the XInput fixture |
+| `hdt-build-surface-probe` | Checks or creates the read-only Rust XComposite probe entry point |
 | `rea` | Runs the pinned REA investigation tool. HDT does not require REA at runtime |
 
 `hdt-setup` takes no arguments. A build failure prevents installation. An HDT close timeout prevents installation and configuration changes. Configuration failure stops setup after the preceding plugin installation step. Setup reports the failure and retains its backups.
@@ -36,13 +36,13 @@ The Nix package provides `hdt-proton`. Its subcommands reuse the same scripts as
 | `raw-launch` | Starts the namespace launcher with its supplied arguments |
 | `steam-options` | Prints the installed Steam Launch Options line |
 | `steam-run` | Starts the service and executes Steam's original arguments |
-| `build-surface-probe` | Checks the prebuilt probe in a package, or compiles it in a checkout |
+| `build-surface-probe` | Checks the prebuilt probe in a package, or creates its Rust wrapper in a checkout |
 
 The desktop entry and Home Manager module use `nix/desktop-entry.desktop.in` as their shared definition. The desktop entry has the ID `io.github.phibkro.hdt-proton` and a `Restart tracker` action.
 
 ## Configuration
 
-`src/runtime/config.ts` reads `hdt.local.json` from the mutable data directory. In a checkout, the default is the checkout root. The installed wrapper defaults to `${XDG_DATA_HOME:-$HOME/.local/share}/hdt-proton`. Git ignores the local file.
+`src/host/config.rs` reads `hdt.local.json` from the mutable data directory. In a checkout, the default is the checkout root. The installed wrapper defaults to `${XDG_DATA_HOME:-$HOME/.local/share}/hdt-proton`. Git ignores the local file.
 
 | Key or environment variable | Meaning and precedence |
 |---|---|
@@ -131,10 +131,10 @@ Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service decl
 
 | Location | Responsibility |
 |---|---|
-| `src/runtime/` | Configuration, launch, plugin installation, HDT settings, and status |
+| `src/host/` | Rust configuration, launch, setup/status, input bridge, X11 helpers, journal and trace export |
 | `src/plugin/` | The HDT C# compatibility plugin |
-| `src/hyprland/` | Lua rules, the input bridge, and the X11 window helper |
-| `src/diagnostics/` | Read-only Win32 and XComposite probes |
+| `src/hyprland/` | Hyprland Lua rules |
+| `src/diagnostics/` | Read-only C# Win32 probe |
 | `scripts/` | Setup, Steam integration, the watcher, and checks |
 | `tests/` | Tests selected by `scripts/check.sh` |
 | `nix/` | The package, Home Manager module, and shared desktop entry |

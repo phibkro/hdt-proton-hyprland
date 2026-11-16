@@ -2,7 +2,7 @@
 set -euo pipefail
 # Run inside the project devenv. Config remains authoritative for the Steam ID.
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
-window_class=$(bun -e 'import {windowClass} from "./src/runtime/config"; console.log(windowClass)')
+window_class=$(bash scripts/native-host.sh config windowClass)
 : "${XDG_RUNTIME_DIR:?A graphical login is required}"
 exec 9>"$XDG_RUNTIME_DIR/hdt-proton-${window_class}.lock"
 lock_status=0

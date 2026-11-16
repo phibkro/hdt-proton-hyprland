@@ -7,7 +7,7 @@ if (($#)); then
 fi
 # Compile first: a missing CLR or assembly must not close the working tracker.
 hdt-launch --build-plugin
-bun src/runtime/install-plugin.ts
-bun src/runtime/configure-overlay.ts
+bash scripts/native-host.sh install-plugin
+bash scripts/native-host.sh configure-overlay
 printf '%s\n' 'Compatibility setup complete. Start HDT with: devenv shell -- hdt-overlay-launch' \
     'For automatic startup through your existing desktop service, run: devenv shell -- hdt-steam-options'

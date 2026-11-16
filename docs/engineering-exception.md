@@ -1,4 +1,4 @@
-# Bun runtime exception
+# Language and runtime decision record
 
 ## Scope and owner
 
@@ -113,3 +113,13 @@ The experimental Bun migration was reverted before publication of this tooling
 branch. ShellCheck and shfmt check the retained scripts. The bounded Bun quality
 and hook drivers remain development tooling; no new application supervisor is
 introduced. Existing Bun application and diagnostic code keeps the scopes above.
+
+## Rust host migration — 2026-11-16
+
+The Rust host replaces the production Bun configuration, launcher, input bridge,
+setup/status, journal and trace exporter, plus the C X11 helpers. Their earlier
+exception scopes above are historical. Bash retains watcher/service boundaries;
+Bun remains for development checks and test drivers. C# remains required inside
+HDT. See [the migration contract](specs/rust-host.md) for differential comparisons,
+replacement tests, and the separate live Steam/Hyprland acceptance still needed.
+This source migration does not activate a new package or modify a live prefix.

@@ -77,12 +77,15 @@ fn identity(conn: &RustConnection, window: u32, pid_atom: u32, pid: u32, title: 
 }
 
 fn run(display: &str, args: &[String], success: bool) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_hdt-host"))
-        .args(args)
-        .env("DISPLAY", display)
-        .env_remove("XAUTHORITY")
-        .output()
-        .unwrap();
+    let output = Command::new(
+        std::env::var_os("HDT_TEST_HOST_BINARY")
+            .unwrap_or_else(|| env!("CARGO_BIN_EXE_hdt-host").into()),
+    )
+    .args(args)
+    .env("DISPLAY", display)
+    .env_remove("XAUTHORITY")
+    .output()
+    .unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert_eq!(output.status.success(), success, "{args:?}: {stderr}");
     if success {
@@ -110,6 +113,14 @@ fn isolated_x11_relationship_and_argb_pixels() {
         std::env::var("HDT_TEST_X11_ISOLATED").as_deref(),
         Ok("1"),
         "parent must attest private namespaces and /tmp"
+    );
+    std::fs::create_dir_all("/tmp/.X11-unix").expect("Private X socket directory");
+    assert!(
+        std::fs::read_dir("/tmp/.X11-unix")
+            .unwrap()
+            .next()
+            .is_none(),
+        "Private socket directory must start empty"
     );
     let executable = std::env::var_os("HDT_TEST_XVFB").expect("HDT_TEST_XVFB required");
     let mut server = Server(

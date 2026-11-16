@@ -12,12 +12,14 @@
         nixpkgs-src = builtins.fetchTree lock.nodes.nixpkgs-src.locked;
       };
       pkgs = packageSets.legacyPackages.${system};
-      package = pkgs.callPackage ./nix/package.nix { };
+      host = pkgs.callPackage ./nix/host.nix { };
+      package = pkgs.callPackage ./nix/package.nix { inherit host; };
     in
     {
       packages.${system} = {
         default = package;
         hdt-proton = package;
+        hdt-host = host;
       };
       apps.${system}.default = {
         type = "app";
@@ -31,7 +33,7 @@
         DOTNET_NOLOGO = "1";
       };
       checks.${system} = {
-        inherit package;
+        inherit package host;
         native-quality = pkgs.runCommand "hdt-native-source-quality" {
           nativeBuildInputs = import ./nix/tooling.nix { inherit pkgs; };
         } ''
@@ -77,6 +79,7 @@
           cd source
           export HOME="$TMPDIR/home" HS_APP_ID=1234567890
           mkdir -p "$HOME"
+          export HDT_HOST_BINARY="${host}/bin/hdt-host"
           bash scripts/test-unit.sh
           shellcheck scripts/*.sh
           actionlint .github/workflows/check.yml

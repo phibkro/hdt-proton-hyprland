@@ -58,3 +58,63 @@ uuid, chrono, x11rb, sha2, quick-xml; remove unused dependencies at integration.
   Cargo's native scaffold and Nix buildRustPackage are the initial build tools;
   Vite+/Meson would duplicate orchestration for a Rust host and are not adopted.
   Full Linux desktop/runtime verification remains separate from migration checks.
+
+## Integration observations, 2026-11-16
+
+The normal package command routing now uses Rust for config, setup/status,
+launch/input control, journal/export and X11 helpers. Nix runtime dependencies
+remove Bun and C/Xlib executables. The shell watcher/desktop/Steam wrappers remain
+as tested orchestration; their config reads now use the Rust host. Legacy TS
+application sources remain differential references, not installed application
+code, and their lint backlog is not waived by this migration.
+
+Initial integration: 28 Rust tests and 47 process/file tests (156 assertions)
+pass. The new X11 Bubblewrap/Xvfb test passes real transient identity/refusal/
+restore cases and exact four-pixel ARGB/hash comparison against the C reference.
+Diagnostics matched 23 normalized journal records and 21 trace cases against
+legacy TS. JSON field order/timestamps/error wording differ; invalid overflowed
+JSON numbers are rejected rather than JS nonfinite coercion.
+
+Dependency policy found two quick-xml advisories in the initial 0.38 selection;
+it was upgraded to 0.42 and adapted, rather than ignoring the advisories. The
+unused sha2 dependency was removed. cargo-deny advisories/licenses/bans/sources
+then passed; transitive duplicate-version/unused-allowlist warnings are distinct
+from advisory failures. Offline package and final committed checks follow.
+
+## Retirement revision, 2026-11-16
+
+After differential and isolated acceptance, retire the superseded runtime TS
+modules and C overlay-link helper. Keep the original C surface probe only under
+tests/reference for pixel comparison and the minimal XInput C reproducer.
+No production TypeScript is retained. Bash keeps the already-tested service/Steam
+watcher boundaries; those scripts contain no Bun runtime calls.
+
+Regression coverage mapping before retiring the four legacy TS suites:
+
+| Previous suite | Native coverage |
+| --- | --- |
+| config.test.ts | config::tests plus rust-config mutable/source/CLI rejection fixtures |
+| tracker-environment.test.ts | rust-launcher exact preload preservation/absence/similar-name tests |
+| input-journal.test.ts | journal::tests stat/open replacement/FIFO races; rust-diagnostics byte/rotation/rewrite/capacity/discovery/producer lifecycle fixtures |
+| trace-export.test.ts | rust-diagnostics duration/session/duplicate/malformed/private-output/overwrite fixtures |
+
+The retained TS watcher, desktop, Steam-wrapper and replay-boundary suites still
+exercise real Bash/native process boundaries. Test counts change because the
+port groups parameter cases differently; passing counts alone are not coverage
+equivalence. Original sources remain in Git history for future comparisons.
+The old 601 runtime TS lint findings disappear with retired implementations; no
+preset or lint exclusion is changed to hide them. Final source checks must pass.
+
+## Final migration gates
+
+The retired-source configuration passes 31 Rust tests and 22 retained Bash/process
+fixtures (69 assertions), strict TypeScript lint/types/format, Rust format/Clippy,
+C analysis, Lua analysis and C# whitespace checks. The isolated X11 acceptance
+also passes after the C reference move. Nix package, native-source, subprocess
+and Rust release tests passed with Cargo build phases offline.
+
+The byte-journal and trace comparisons above are semantic comparisons, not
+byte-identical JSON serialization. The isolated X11 test is skipped by ordinary
+Cargo discovery and was executed separately; its result is not inferred from the
+31 default tests. Live Steam namespace joining and Hyprland input remain untested
+for the migrated host. No installed service has been switched to this build.

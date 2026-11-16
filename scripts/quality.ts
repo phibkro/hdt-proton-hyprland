@@ -7,7 +7,7 @@ const [mode = "check", language = "all"] = process.argv.slice(2);
 
 if (!new Set(["check", "fix"]).has(mode)) {
   throw new Error(
-    "Usage: bun scripts/quality.ts [check|fix] [all|ts|types|c|lua|csharp|csharp-core|csharp-analysis|shell|zig]"
+    "Usage: bun scripts/quality.ts [check|fix] [all|ts|types|c|lua|csharp|csharp-core|csharp-analysis|shell|rust|rust-fast|zig]"
   );
 }
 
@@ -23,6 +23,7 @@ const run = (command: string[]) => {
       DOTNET_CLI_HOME: path.resolve("cache/dotnet"),
       DOTNET_CLI_TELEMETRY_OPTOUT: "1",
       DOTNET_NOLOGO: "1",
+      CARGO_BUILD_JOBS: "2",
       ZIG_GLOBAL_CACHE_DIR: path.resolve("cache/zig"),
       ZIG_LOCAL_CACHE_DIR: path.resolve("local/analysis/zig"),
     },
@@ -82,6 +83,7 @@ switch (language) {
       "csharp",
       "csharp-core",
       "shell",
+      "rust",
     ]) {
       run([process.execPath, import.meta.filename, mode, item]);
     }
@@ -145,7 +147,7 @@ switch (language) {
     }
 
     mkdirSync("local/analysis", { recursive: true });
-    const probe = "src/diagnostics/x-surface-probe.c";
+    const probe = "tests/reference/x-surface-probe.c";
     const probePath = path.resolve("local/analysis/surface-probe");
     run([
       "clang",
@@ -215,6 +217,46 @@ switch (language) {
       `-p:ErrorLog=${path.resolve("local/analysis/csharp.sarif")}`,
       "-warnaserror",
     ]);
+
+    break;
+  }
+
+  case "rust-fast": {
+    run([
+      "cargo",
+      "fmt",
+      "--all",
+      ...(mode === "check" ? ["--", "--check"] : []),
+    ]);
+    run([
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings",
+    ]);
+
+    break;
+  }
+
+  case "rust": {
+    run([process.execPath, import.meta.filename, mode, "rust-fast"]);
+    run([
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "--config-file",
+      "tooling/rust/nextest.toml",
+      "--test-threads",
+      "2",
+    ]);
+    run(["cargo", "test", "--locked", "--doc"]);
+    run(["cargo", "deny", "--config", "tooling/rust/deny.toml", "check"]);
+    run(["cargo", "machete"]);
 
     break;
   }

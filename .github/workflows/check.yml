@@ -43,6 +43,22 @@ jobs:
         if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: nix develop --command bun scripts/quality.ts check csharp-core
 
+  rust-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Fetch locked Rust dependencies
+        run: nix develop --command cargo fetch --locked
+      - name: Check native Rust host
+        run: nix develop --command bun scripts/quality.ts check rust
+
   nix-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -59,11 +75,12 @@ jobs:
 
   check:
     if: ${{ always() }}
-    needs: [source-quality, nix-check]
+    needs: [source-quality, rust-quality, nix-check]
     runs-on: ubuntu-24.04
     steps:
-      - name: Require both complete check jobs
+      - name: Require all complete check jobs
         env:
           SOURCE_QUALITY: ${{ needs.source-quality.result }}
+          RUST_QUALITY: ${{ needs.rust-quality.result }}
           NIX_CHECK: ${{ needs.nix-check.result }}
-        run: test "$SOURCE_QUALITY" = success && test "$NIX_CHECK" = success
+        run: test "$SOURCE_QUALITY" = success && test "$RUST_QUALITY" = success && test "$NIX_CHECK" = success

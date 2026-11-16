@@ -50,16 +50,21 @@ if (c.length > 0) {
     .split(/\s+/u)
     .filter(Boolean);
 
-  run([
-    "clang",
-    "-std=c11",
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-fsyntax-only",
-    ...flags,
-    ...c,
-  ]);
+  // Compile-only mode also tells Nix compiler wrappers to omit linker flags.
+  for (const file of c) {
+    run([
+      "clang",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-c",
+      file,
+      "-o",
+      "/dev/null",
+      ...flags,
+    ]);
+  }
 }
 
 if (lua.length > 0) {
@@ -102,4 +107,15 @@ for (const directory of ["src", "tests"]) {
       ...csharp.map((file) => path.resolve(file)),
     ]);
   }
+}
+
+if (
+  files.some(
+    (file) =>
+      file.endsWith(".rs") ||
+      ["Cargo.toml", "Cargo.lock"].includes(file) ||
+      file.startsWith("tooling/rust/")
+  )
+) {
+  run([process.execPath, "scripts/quality.ts", "check", "rust-fast"]);
 }

@@ -142,3 +142,11 @@ replace overlapping mechanisms and retain staged isolation, per-worktree hook
 ownership, private-data exclusions, pinned tools, and offline Nix checks.
 Current C tools include ClangFormat, Clang-Tidy, clangd, compiler warnings, and an
 optional Zig compile check. Lua remains StyLua/Selene for its single template.
+
+## Rust replacement revision, 2026-11-16
+
+The historical TypeScript application findings above apply to the implementation
+that preceded the Rust host. Its runtime sources and four superseded test suites
+were retired after differential and replacement coverage, documented in the
+[Rust migration contract](rust-host.md). Remaining TypeScript check/test drivers
+now pass strict lint, formatting and types. The policy presets remain enabled.

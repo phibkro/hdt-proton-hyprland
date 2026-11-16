@@ -117,14 +117,14 @@ for (const failingStep of ["none", "build", "install"]) {
     try {
       const log = nodePath.join(temp, "calls");
 
-      for (const tool of ["hdt-launch", "bun"]) {
+      for (const tool of ["hdt-launch", "hdt-native"]) {
         const path = nodePath.join(temp, tool);
         await Bun.write(
           path,
           `#!/bin/sh
 printf '%s %s\\n' '${tool}' "$*" >> "$TEST_CALLS"
 case "$TEST_FAIL:$1" in
-  build:--build-plugin|install:src/runtime/install-plugin.ts) exit 31 ;;
+  build:--build-plugin|install:install-plugin) exit 31 ;;
 esac
 `
         );
@@ -137,6 +137,7 @@ esac
           ...process.env,
           PATH: `${temp}:${process.env.PATH}`,
           TEST_CALLS: log,
+          HDT_HOST_BINARY: nodePath.join(temp, "hdt-native"),
           TEST_FAIL: failingStep,
         },
         stdout: "pipe",
@@ -148,12 +149,8 @@ esac
       const calls = contents.trim().split("\n");
       expect(calls).toEqual([
         "hdt-launch --build-plugin",
-        ...(failingStep === "build"
-          ? []
-          : ["bun src/runtime/install-plugin.ts"]),
-        ...(failingStep === "none"
-          ? ["bun src/runtime/configure-overlay.ts"]
-          : []),
+        ...(failingStep === "build" ? [] : ["hdt-native install-plugin"]),
+        ...(failingStep === "none" ? ["hdt-native configure-overlay"] : []),
       ]);
     } finally {
       await rm(temp, { recursive: true, force: true });

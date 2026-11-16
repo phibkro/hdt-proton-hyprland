@@ -108,7 +108,7 @@ The plugin calls HDT's own geometry update when the game rectangle changes. Hypr
 
 The first stacking workaround raised the overlay every 100 milliseconds. That restored visibility after clicks but caused flicker. Removing the timer left the overlay behind Hearthstone again.
 
-The pinned [Hyprland WindowState implementation](https://github.com/hyprwm/Hyprland/blob/efb50993780079460b0cbed1363e2166a2de1d9f/src/desktop/state/WindowState.cpp) raises X11 transient children with their parent. `src/hyprland/overlay-link.c` uses that behavior by setting the overlay's `WM_TRANSIENT_FOR` to the game window.
+The pinned [Hyprland WindowState implementation](https://github.com/hyprwm/Hyprland/blob/efb50993780079460b0cbed1363e2166a2de1d9f/src/desktop/state/WindowState.cpp) raises X11 transient children with their parent. `src/host/x11.rs` uses that behavior by setting the overlay's `WM_TRANSIENT_FOR` to the game window.
 
 The helper checks both windows' titles, classes, and process IDs before the change. It changes only the overlay property and verifies the result. The input bridge then disables repeated raising. The focus-change handler remains for Alt-Tab.
 
@@ -140,7 +140,7 @@ That ownership avoids a second watcher implementation. It also means that stoppi
 
 ## Language choices and prior art
 
-HDT's public plugin interface requires C#. The Xlib helpers use C. Bash composes host commands, and the existing launcher uses Bun. The [engineering exception](engineering-exception.md) records why the current implementation retains Bun instead of migrating to Effect during a working desktop session.
+HDT's public plugin interface requires C#. Rust now owns the Linux host, X11 protocol helpers, journal, and trace export. Bash retains service and Steam command boundaries; Hyprland executes Lua. Bun remains a development/test dependency. See [the Rust host](RUST.md) for tooling, migrated coverage, and the outstanding live acceptance boundary. The [engineering record](engineering-exception.md) preserves earlier language decisions.
 
 The investigation evaluated these sources:
 
@@ -156,6 +156,6 @@ No third-party implementation was copied into this repository. The inspected ups
 
 The Nix package stores source and native helpers in the Nix store. The launcher keeps the configuration, HDT installation, backups, and evidence in a separate mutable directory. The checkout workflow keeps its original directory defaults.
 
-Nix builds the X11 helpers before installation. Plugin compilation still uses the actual HDT assemblies and native .NET in the game prefix. The package therefore contains no HDT or Microsoft binaries.
+Nix builds the Rust host and its X11 helpers before installation. Plugin compilation still uses the actual HDT assemblies and native .NET in the game prefix. The package therefore contains no HDT or Microsoft binaries.
 
 The package and Home Manager module derive their application entry from one template. The service still owns the tracker lifecycle. The desktop Open action focuses the exact HDT window instead of matching the Steam class shared by Battle.net and Hearthstone.

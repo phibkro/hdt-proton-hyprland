@@ -3,8 +3,7 @@
 Run these procedures from the repository checkout. For command behavior and options, see the [command reference](REFERENCE.md).
 
 For formatters, static analysis, and fast commit versus full PR checks, see
-[Source tooling](TOOLING.md). Strict TypeScript lint findings are recorded there;
-the existing runtime/source checks do not replace that lint gate.
+[Source tooling](TOOLING.md). Rust and retained test drivers have separate analysis and runtime checks.
 
 ## Run the source checks
 
@@ -14,7 +13,7 @@ Run the selected checks:
 devenv shell -- hdt-check
 ```
 
-Confirm that the command exits with status zero. The command runs `scripts/check.sh`: selected tests, ShellCheck/shfmt, TypeScript bundles, and native helper builds.
+Confirm that the command exits with status zero. The command runs `scripts/check.sh`: a Rust build and format/Clippy checks, selected subprocess tests, ShellCheck/shfmt, TypeScript lint/format/types, and the native XInput fixture build. Run the full Rust checks from [Rust tooling](RUST.md) as well.
 
 Do not run unbounded test discovery in a checkout that contains private prefix backups. Those backups can contain unrelated test files.
 
@@ -92,7 +91,7 @@ Finish the current tracking test before you restart HDT with diagnostics.
 6. While the preview state is fresh, sample its last rectangle:
 
    ```sh
-   devenv shell -- bun src/diagnostics/surface-check.ts
+   devenv shell -- bash scripts/hdt.sh surface-check
    ```
 
 7. Inspect `evidence/surface-check.json` alongside `evidence/hover-state.json`.
@@ -130,7 +129,7 @@ This cleanup path has source review coverage. It was not part of the accepted de
 3. Remove the runtime rules:
 
    ```sh
-   devenv shell -- bun src/hyprland/overlay-rule.ts --disable
+   devenv shell -- bash scripts/hdt.sh overlay-rule --disable
    ```
 
 The runtime rules do not edit a host configuration file.

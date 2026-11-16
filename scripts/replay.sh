@@ -39,7 +39,7 @@ if [[ "$action" == prepare ]]; then
     done
     [[ -x "$proton/files/bin/wine" && -x "$runtime/run" ]] || fail 'Select an installed Proton directory and Steam runtime directory.'
     cd "$root"
-    paths=$(bun -e 'import {prefix,appDirectory} from "./src/runtime/config"; console.log(JSON.stringify({prefix,appDirectory}))')
+    paths=$(bash scripts/native-host.sh config)
     source_prefix=$(jq -er .prefix <<<"$paths")
     source_app=$(realpath -e -- "$(jq -er .appDirectory <<<"$paths")")
     clr=drive_c/windows/Microsoft.NET/Framework64/v4.0.30319/clr.dll
@@ -127,6 +127,9 @@ run=$lab/runs/$(date -u +%Y%m%dT%H%M%S)-$$
 mkdir -p "$run/home" "$run/runtime"
 mkdir "$run/source"
 cp -R "$root/src" "$root/tests" "$root/scripts" "$run/source/"
+host=${HDT_HOST_BINARY:-${CARGO_TARGET_DIR:-$root/target}/debug/hdt-host}
+[[ -x "$host" ]] || fail 'Build the native host before replay.'
+cp "$host" "$run/source/hdt-host"
 (
     cd "$run/source"
     rg --files --hidden --no-ignore -0 | sort -z | xargs -0 sha256sum
@@ -140,7 +143,7 @@ jq -n --arg run "$run" --arg root "$root" '{kind:"hdt-ui-replay-run",run:$run,pr
 # The namespace owns all test descendants. Host desktop sockets and user files
 # are masked; the only Windows prefix available to the test is its own copy.
 set +e
-timeout 120 bwrap --die-with-parent --unshare-net --unshare-pid \
+timeout --kill-after=5s 120 bwrap --die-with-parent --unshare-net --unshare-pid \
     --ro-bind /nix/store /nix/store --ro-bind /etc /etc \
     --ro-bind /bin /bin --ro-bind /usr /usr --ro-bind /lib64 /lib64 \
     --ro-bind /sys /sys --ro-bind /run/current-system /run/current-system \

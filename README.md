@@ -8,6 +8,8 @@ Plugin 0.5.0 prevents Arena score particles from triggering the reproduced WPF r
 
 Plugin 0.5.1 adds local UI-stall recordings and trace export. It does not establish a fix for the reported Battlegrounds freeze. See [freeze diagnostics](docs/DIAGNOSTICS.md).
 
+The Linux host is now a native Rust executable. The C# plugin still runs inside HDT through Proton. See [Rust build and verification](docs/RUST.md); live desktop acceptance of the migrated launcher remains outstanding.
+
 ## Documentation
 
 | Task or question | Document |

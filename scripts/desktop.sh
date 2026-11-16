@@ -17,7 +17,7 @@ if (($# > 1)) || [[ "$action" != open && "$action" != restart ]]; then
     echo 'Usage: desktop.sh [open|restart]' >&2
     exit 2
 fi
-window_class=$(bun -e 'import {windowClass} from "./src/runtime/config"; console.log(windowClass)')
+window_class=$(bash scripts/native-host.sh config windowClass)
 clients=$(hyprctl -j clients)
 trackers=$(jq -c --arg class "$window_class" '[.[] | select(.class==$class and .title=="Hearthstone Deck Tracker")]' <<<"$clients")
 count=$(jq length <<<"$trackers")

@@ -169,3 +169,17 @@
 !/tooling/rust/
 /tooling/rust/*
 !/tooling/rust/*.toml
+!/rustfmt.toml
+!/clippy.toml
+!/tests/rust-diagnostics.rs
+!/tests/rust-launcher.rs
+!/tests/rust-x11.rs
+!/tests/rust-config.rs
+!/scripts/native-host.sh
+!/nix/host.nix
+!/tests/rust-x11-isolated.rs
+!/scripts/check-rust-x11.sh
+!/docs/RUST.md
+!/tests/reference/
+/tests/reference/*
+!/tests/reference/x-surface-probe.c

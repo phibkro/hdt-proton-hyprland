@@ -54,3 +54,41 @@ fn invalid_renderer_and_dll_overrides_fail_loudly() {
         .is_err()
     );
 }
+
+#[test]
+fn exact_preload_filter_preserves_similar_names_and_absent_loader_variable() {
+    let original = environment(&[
+        ("WINEPREFIX", "/game/prefix"),
+        (
+            "LD_PRELOAD",
+            "/steam/steamrt32/gameoverlayrenderer.so:/tools/libMangoHud.so /steam/steamrt64/gameoverlayrenderer.so\t/tools/custom.so",
+        ),
+        ("EXTRA", "unchanged"),
+    ]);
+    let result = tracker_environment(original.clone());
+    assert_eq!(
+        result.get(std::ffi::OsStr::new("LD_PRELOAD")),
+        Some(&OsString::from("/tools/libMangoHud.so:/tools/custom.so"))
+    );
+    assert!(
+        original
+            .get(std::ffi::OsStr::new("LD_PRELOAD"))
+            .unwrap()
+            .to_string_lossy()
+            .contains("steamrt32")
+    );
+    assert_eq!(
+        result.get(std::ffi::OsStr::new("EXTRA")),
+        original.get(std::ffi::OsStr::new("EXTRA"))
+    );
+    assert_eq!(
+        tracker_environment(environment(&[("WINEPREFIX", "/prefix")])),
+        environment(&[("WINEPREFIX", "/prefix")])
+    );
+    let similar = "/tools/gameoverlayrenderer.so.backup:/tools/mygameoverlayrenderer.so";
+    assert_eq!(
+        tracker_environment(environment(&[("LD_PRELOAD", similar)]))
+            .get(std::ffi::OsStr::new("LD_PRELOAD")),
+        Some(&OsString::from(similar))
+    );
+}

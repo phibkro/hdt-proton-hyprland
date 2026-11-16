@@ -82,6 +82,12 @@ test("replay preserves namespace arguments and a failing supervisor result witho
           ...process.env,
           PATH: `${temp}/tools:${process.env.PATH}`,
           TEST_BUN: process.execPath,
+          HDT_HOST_BINARY:
+            process.env.HDT_HOST_BINARY ??
+            nodePath.join(
+              process.env.CARGO_TARGET_DIR ?? nodePath.join(root, "target"),
+              "debug/hdt-host"
+            ),
           TEST_CAPTURE: nodePath.join(temp, "capture.ts"),
           TEST_ARGV: argsFile,
         },
