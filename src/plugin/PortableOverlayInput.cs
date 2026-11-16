@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Web.Script.Serialization;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using Hearthstone_Deck_Tracker.Utility.Logging;
 
