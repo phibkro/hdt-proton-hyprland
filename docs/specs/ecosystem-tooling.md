@@ -120,3 +120,25 @@ plugin, particle suppression, Battlegrounds tabs, and diagnostic checks. Its
 manifest recorded the exact commit and a clean source tree. This replay used
 the existing private stable-Proton seed; it does not establish live game or
 Experimental behavior. Full strict TypeScript lint remains failed as above.
+
+## Test-analysis correction and orchestration evaluation, 2026-11-16
+
+The delegated correction e7949ba was independently reviewed and integrated as
+7a8f1a3. All four test files remain, with 47 tests and 156 assertions unchanged.
+Unknown JSON is validated before field access, journal bytes require canonical
+Base64, and rejection assertions await completion before teardown. Scoped rule
+exceptions document JSON I/O validation, POSIX masks, serialized fixture steps,
+and the private X-server startup timeout. No global rules or test exclusions
+were weakened. Integrated test lint, formatting, types, and real process/file
+tests pass. The separate six-case XInput runtime rerun is pending resource
+headroom: unrelated VS Code searches/indexing saturated CPU at the check.
+Application lint remains failed with 601 findings in the prior audit.
+
+The operator proposed Vite+ task/staged-hook orchestration, CSharpier plus Roslyn,
+Meson/Ninja/clangd/sanitizers, and Lux. Official docs were checked. Vite+ supports
+non-Vite task orchestration, so the earlier absence-of-Vite-app rationale was
+withdrawn. These remain evaluated proposals, not installed tools. Adoption must
+replace overlapping mechanisms and retain staged isolation, per-worktree hook
+ownership, private-data exclusions, pinned tools, and offline Nix checks.
+Current C tools include ClangFormat, Clang-Tidy, clangd, compiler warnings, and an
+optional Zig compile check. Lua remains StyLua/Selene for its single template.

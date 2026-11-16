@@ -19,9 +19,14 @@ the .NET SDK come from `devenv.lock`, shared by the development shell and flake.
 The project uses Bun 1.4.4. Use `devenv shell -- bun --version` to check it;
 the host's ambient Bun can be older.
 
-Vite+ was considered. This repository contains a Bun CLI and a Framework/WPF
-plugin, with no Vite application to build. Standalone Oxfmt and Oxlint supply the
-requested checks without adding a second application build system.
+Vite+ can orchestrate existing package scripts and staged checks without a Vite
+application. Its [task runner](https://www.viteplus.dev/guide/run) and
+[staged hooks](https://www.viteplus.dev/guide/commit-hooks) are viable consolidation
+options. This branch currently uses standalone Oxfmt/Oxlint and pre-commit;
+Vite+ has not been installed or tested here. An adoption must replace existing
+orchestration, preserve staged/unstaged isolation and per-worktree hook ownership,
+and retain the same native and .NET checks. The absence of a Vite application
+alone is not a reason to reject its task runner.
 
 The [Ultracite initializer](https://www.ultracite.ai/docs/setup) generated the
 Oxc configuration. Its [anti-slop preset](https://www.ultracite.ai/docs/presets)
@@ -38,7 +43,8 @@ devenv shell -- bun run check
 The check exits nonzero on a finding. It searches the owned source directories,
 not private HDT installations, logs, backups, or downloaded reference source.
 
-**Strict TypeScript lint currently reports existing debt.** Formatting and
+**Strict application TypeScript lint currently reports existing debt.** Test lint
+now passes after boundary validation fixes. Formatting and
 compiler checks passing do not establish a clean lint result. The new checks
 remain enabled; there is no baseline that hides those findings. This branch is
 not ready to merge until its full checks pass. Follow the
@@ -81,7 +87,11 @@ runtime test. It must accompany changes to HDT-dependent C# before merge.
 
 [Roslyn analyzers](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/overview)
 and [SDK formatting](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format)
-were chosen over an additional formatter or style-only analyzer dependency.
+are the current implementation. The operator proposed
+[CSharpier](https://csharpier.com/docs/Installation) for formatting while retaining
+Roslyn for semantic analysis. CSharpier is not installed in this branch yet;
+its adoption should replace SDK whitespace formatting rather than run two
+competing formatters, and must retain offline Nix checks and C# 5 compatibility.
 Global public type names remain stable because HDT/replay reflection uses them.
 The isolated replay process owns its canonical writer and static event
 subscriptions together. The corresponding exceptions are documented at their
@@ -178,3 +188,22 @@ devenv shell -- bun scripts/quality.ts check shell
 devenv shell -- bun scripts/quality.ts fix shell
 devenv shell -- bun run lint:tests
 ```
+
+## Evaluated native and Lua additions
+
+ClangFormat, Clang-Tidy, Clang compiler warnings, and clangd are installed through
+the pinned Clang toolchain. [Meson/Ninja compilation databases](https://github.com/mesonbuild/meson/blob/master/mesonbuild/backend/ninjabackend.py)
+could make production builds, clangd, and Clang-Tidy share actual compiler flags.
+A Meson migration must replace the current manual native build definitions, not
+add a competing build path. Meson and Ninja are not installed here yet.
+[Meson sanitizer options](https://mesonbuild.com/Builtin-options.html) can support
+separate address/undefined-behavior test builds. Sanitizers detect faults only
+in executed instrumented native code; they cannot diagnose uninstrumented HDT
+or Wine by themselves. Those runtime checks have not been implemented.
+
+[Lux](https://lux.lumen-labs.org/guides/formatting-linting/) supplies Lua project,
+dependency, format, lint, and type-check commands. Its documented Lua lint path
+uses luacheck; it would not preserve the current Selene host declarations without
+an explicit integration. The project currently has one dependency-free Lua
+template, so Lux dependency management adds no demonstrated capability yet.
+StyLua and Selene remain active; Lux adoption is untested.
