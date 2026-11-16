@@ -31,10 +31,9 @@ public static class OverlayRendering
         content.Children.Add(Text($"{value.Mode} • {value.MatchMode}", 13));
         if (value.Mode == NativeMode.Arena && value.Arena is { } arena)
         {
-            content.Children.Add(Text($"{arena.Hero} • {arena.PickIndex} picked", 14));
-            foreach (var offer in arena.Offers.Take(3))
-                content.Children.Add(ArenaPresentation.Offer(offer, arena.PickedDeck, settings, arena.Underground, 16));
-            if (arena.Offers.Length > 3) content.Children.Add(Text($"{arena.Offers.Length - 3} more offers in the native app."));
+            content.Children.Add(Text(ArenaPresentation.Heading(arena), 14));
+            foreach (var choice in ArenaPresentation.Choices(arena, settings, 16).Take(3)) content.Children.Add(choice);
+            if (arena.CardOffers.Length > 3) content.Children.Add(Text($"{arena.CardOffers.Length - 3} more offers in the native app."));
         }
         else
         {
@@ -114,6 +113,39 @@ public static class OverlayRendering
 public static class ArenaPresentation
 {
     private static TextBlock Text(string value, double size) => new() { Text = value, FontSize = size, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap };
+    public static string Heading(ArenaObservation frame)
+    {
+        var phase = frame.ViewSelection switch
+        {
+            ArenaHeroSelection => "Choose a hero",
+            ArenaCardDraft => $"Card draft • {frame.PickIndex} cards picked",
+            ArenaUnavailable => "Selection unavailable",
+            _ => "Arena menu • no active choices"
+        };
+        return $"{(frame.Underground ? "Underground Arena" : "Arena")} • {phase}{(frame.ViewSelection is ArenaHeroSelection ? "" : $" • {frame.Hero}")}";
+    }
+    public static IEnumerable<Control> Choices(ArenaObservation frame, TrackerSettings settings, double size)
+    {
+        switch (frame.ViewSelection)
+        {
+            case ArenaHeroSelection heroes:
+                foreach (var hero in heroes.Choices)
+                    yield return TrackerLayout.Section(hero.Name, new StackPanel
+                    {
+                        Spacing = 6,
+                        Children = {
+                        Text(hero.Class ?? "Class not observed", size - 3), Text(hero.Id, 12), Text("Hero statistics unavailable", 13) }
+                    });
+                if (heroes.UnavailableReason is not null) yield return Text(heroes.UnavailableReason, 14);
+                break;
+            case ArenaCardDraft cards:
+                foreach (var offer in cards.Choices) yield return Offer(offer, frame.PickedDeck, settings, frame.Underground, size);
+                break;
+            case ArenaUnavailable unavailable:
+                yield return Text($"{unavailable.Kind} choices unavailable • {unavailable.Reason}", 14);
+                break;
+        }
+    }
     public static Border Offer(ArenaOffer offer, ArenaCard[] deck, TrackerSettings settings, bool underground, double size)
     {
         var lines = new StackPanel { Spacing = 6, Children = { Text($"{offer.Card.Mana} mana   {offer.Card.Name}", size), Text(offer.Card.Id, 12) } };

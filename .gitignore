@@ -272,6 +272,7 @@
 !/scripts/check-native-failure.sh
 
 !/docs/specs/native-ui-isolation.md
+!/docs/specs/native-arena-phases.md
 !/src/host/native_session.rs
 !/avalonia/Hdt.Avalonia/SessionProtocol.cs
 !/avalonia/Hdt.Avalonia/IndependentOverlay.cs

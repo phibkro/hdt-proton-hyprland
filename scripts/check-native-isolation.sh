@@ -11,7 +11,7 @@ run=$(mktemp -d "$PWD/evidence/native-isolation-XXXXXXXX")
 chmod 700 "$run"
 git rev-parse HEAD >"$run/source-head.txt"
 git status --porcelain=v1 >"$run/source-status.txt"
-for name in native-overlay-observation.json native-overlay-alternate.json; do
+for name in native-overlay-observation.json native-overlay-alternate.json native-overlay-heroes.json native-overlay-cards.json native-overlay-menu.json; do
     cp -- "$fixtures/$name" "$run/$name"
 done
 cp -R avalonia/Hdt.Avalonia/bin/Debug/net10.0 "$run/app"

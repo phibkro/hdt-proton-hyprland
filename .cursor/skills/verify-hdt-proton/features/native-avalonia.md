@@ -1,6 +1,6 @@
 # Native Avalonia migration preview
 
-Feature IDs: `native-window`, `native-draft-replay`, `native-preferences`,
+Feature IDs: `native-window`, `native-draft-replay`, `native-arena-phases`, `native-preferences`,
 `bounded-snapshot-io`, `proton-status-bridge`, `native-deck-library`,
 `native-deckstring`, `native-history`, `native-observation-bridge`, `native-x11-overlay`. These are preview routes; passing
 them establishes no live game offer/rating/overlay parity.
@@ -37,6 +37,16 @@ Require zero exit and all checks passing. Inspect `arena.png`, `options.png`,
 uses actual headless Skia controls and pointer input. It loads a real replay
 file, steps observed offers/picks, navigates Options, persists a nondefault
 preference, reconstructs a window, removes scores, leaves draft and rewinds.
+
+The same driver creates a private illustrative schema 2 phase replay and uses actual
+pointer controls through hero → card draft → replacement → unsupported → menu at
+1120×760 and 800×600. Inspect `arena-hero-*`, `arena-cards-*`, `arena-menu-*` and
+`native-observed-heroes.png`. Hero controls must contain supplied identities and
+unknown statistics, with no card mana/synergy advice. Typed unsupported and menu
+transitions remove prior choices. Schema 1 remains explicitly card-only. The actual
+publisher/reader polling route must clear malformed/stale hero facts and recover
+only on valid fresh observations. This does not prove live hero acquisition: the
+optional public-model bridge lacks offered hero IDs and reports that gap.
 
 The IO journey invokes the real Rust child against regular/oversized/malformed
 files, a directory, a final symlink, a character device and an owned FIFO with no

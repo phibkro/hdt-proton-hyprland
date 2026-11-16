@@ -111,19 +111,33 @@ internal sealed class NativeClientExport : IDisposable
             var playing = game.IsRunning && !game.IsInMenu;
             var playerHero = playing ? game.Player.Hero : null;
             var opponentHero = playing ? game.Opponent.Hero : null;
+            // Phase derives only from explicit cached view-model collections, never card counts/names.
+            var drafting = mode == "Arena" && arena.IsDrafting;
+            object selection;
+            if (!drafting) selection = new { phase = "Inactive" };
+            else if (arena.IsPackageSelectOpen) selection = new { phase = "Unavailable", kind = "Package", reason = "Native package selection is unavailable." };
+            else if (arena.IsRedraft) selection = new { phase = "Unavailable", kind = "Redraft", reason = "Native redraft choices and discard suggestions are unavailable." };
+            else if (arena.DualClassHeroStats != null) selection = new { phase = "Unavailable", kind = "DualClass", reason = "Native dual-class selection is unavailable." };
+            else if (arena.HeroStats != null && arena.CardStats == null && arena.HeroPowerStats == null && arena.DualClassHeroStats == null)
+                selection = new { phase = "HeroSelection", choices = Array.Empty<object>(), unavailableReason = "The current public-model bridge does not expose offered hero identities. Hero statistics are unavailable." };
+            else if (arena.CardStats != null && arena.HeroStats == null && arena.HeroPowerStats == null && arena.DualClassHeroStats == null)
+                selection = new { phase = "CardDraft", choices = offers };
+            else selection = new { phase = "Unavailable", kind = "Unknown", reason = "No unambiguous supported cached choice model. Hero-power, dual-class, package and redraft views are unavailable." };
+            if (!drafting || arena.HeroStats != null) picks.Clear();
             var arenaObservation = new
             {
-                schemaVersion = 1,
+                schemaVersion = 2,
                 sessionId = session,
                 observedAt = now.ToString("o"),
                 sequence = serial,
-                mode = mode == "Arena" && arena.IsDrafting ? "Drafting" : "Inactive",
+                mode = drafting ? "Drafting" : "Inactive",
                 pickIndex = picks.Count,
                 selectedCardId = (string)null,
                 hero = playerHero == null ? "Hero not observed" : Text(playerHero.LocalizedName, 128),
                 underground = arena.IsUnderground,
                 pickedDeck = picks,
-                offers = offers,
+                offers = Array.Empty<object>(),
+                selection = selection,
                 description = "Already observed public tracker models; last selected card unavailable."
             };
             snapshot = new

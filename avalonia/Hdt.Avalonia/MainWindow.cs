@@ -43,12 +43,12 @@ public sealed class MainWindow : Window
     public Button ResetButton { get; } = new() { Content = "Rewind", IsEnabled = false };
     public CheckBox ScoresToggle { get; } = new() { Content = "Show Arenasmith scores" };
     public CheckBox SynergiesToggle { get; } = new() { Content = "Show deck synergies" };
-    public int OfferCount => _offers.Children.Count;
+    public int OfferCount => _offers.Children.OfType<Border>().Count();
     public int PickedCount => _frames.Count == 0 ? 0 : _frames[_index].PickedDeck.Length;
     public string Summary => _summary.Text ?? "";
     public string Status => _status.Text ?? "";
     public IReadOnlyList<string> Scores => _frames.Count == 0 || !_settings.ShowArenasmithScore
-        ? [] : _frames[_index].Offers.Select(o => o.DisplayScore).ToArray();
+        ? [] : _frames[_index].CardOffers.Select(o => o.DisplayScore).ToArray();
     public int SelectedPage => _tabs.SelectedIndex;
 
     public MainWindow(LaunchOptions options)
@@ -87,7 +87,7 @@ public sealed class MainWindow : Window
             Children = {
             Text("Arena draft assistance", 18), ScoresToggle, SynergiesToggle, _preferencesStatus,
             Text("These preferences affect the native draft view and are saved locally.", 15),
-            Text("Hero selection, related-card tooltips and redraft-discard suggestions are not migrated yet.", 13) }
+            Text("Hero identities require an explicit observation source. Hero statistics, related-card tooltips and redraft suggestions are unavailable.", 13) }
         };
         SettingsPanel = new(optionsPane, NativeOverlay, options);
         _tabs = new TabControl
@@ -310,13 +310,10 @@ public sealed class MainWindow : Window
         _offers.Children.Clear(); _deck.Children.Clear();
         if (_frames.Count == 0) { NextButton.IsEnabled = ResetButton.IsEnabled = false; return; }
         var frame = _frames[_index];
-        _summary.Text = $"{frame.Hero} • {(frame.Underground ? "Underground Arena" : "Arena")} • {frame.Mode} • {frame.PickedDeck.Length} cards picked";
+        _summary.Text = ArenaPresentation.Heading(frame);
         _observation.Text = $"Observation {_index + 1}/{_frames.Count} • {frame.Description}";
         NextButton.IsEnabled = _index + 1 < _frames.Count; ResetButton.IsEnabled = _index > 0;
-        foreach (var offer in frame.Offers)
-        {
-            _offers.Children.Add(ArenaPresentation.Offer(offer, frame.PickedDeck, _settings, frame.Underground, 21));
-        }
+        foreach (var choice in ArenaPresentation.Choices(frame, _settings, 21)) _offers.Children.Add(choice);
         foreach (var group in frame.PickedDeck.GroupBy(card => card.Id).OrderBy(g => g.First().Mana).ThenBy(g => g.First().Name))
             _deck.Children.Add(Text($"{group.First().Mana}   {group.First().Name} ×{group.Count()}", 16));
         if (frame.PickedDeck.Length == 0) _deck.Children.Add(Text("No picks observed yet.", 15));

@@ -21,8 +21,16 @@ public static class SnapshotFiles
         => Task.Run(async () =>
         {
             var bytes = await ExecuteAsync(arguments, maximum, cancellation, standardInput).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<T>(bytes, ReplaySource.JsonOptions)
-                ?? throw new InvalidDataException("Native response must not be null.");
+            try
+            {
+                return JsonSerializer.Deserialize<T>(bytes, ReplaySource.JsonOptions)
+                    ?? throw new InvalidDataException("Native response must not be null.");
+            }
+            catch (NotSupportedException error)
+            {
+                // Missing polymorphic tags are unsupported input, not an unhandled UI failure.
+                throw new InvalidDataException("Native response has an unsupported or missing observation shape.", error);
+            }
         }, cancellation);
 
     internal static string HostBinary()
