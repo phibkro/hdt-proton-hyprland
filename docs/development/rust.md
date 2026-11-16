@@ -32,9 +32,9 @@ devenv shell -- cargo fetch --locked
 devenv shell -- cargo build --locked
 devenv shell -- cargo fmt --all -- --check
 devenv shell -- cargo clippy --locked --offline --all-targets -- -D warnings
-devenv shell -- cargo nextest run --locked --config-file tooling/rust/nextest.toml --test-threads 2
+devenv shell -- cargo nextest run --locked --config-file nextest.toml --test-threads 2
 devenv shell -- cargo test --locked --doc
-devenv shell -- cargo deny --config tooling/rust/deny.toml check
+devenv shell -- cargo deny --config deny.toml check
 devenv shell -- cargo machete
 ```
 
@@ -50,8 +50,8 @@ These are checks with different scopes, not interchangeable proofs of safety.
 The central quality driver exposes `rust-fast` for staged format/Clippy checks
 and `rust` for the full sequence. Pre-commit retains staged/unstaged isolation;
 there is no second hook installer. CI adds an independent Rust job to the
-required aggregate. Configurations live in `tooling/rust/`; root rustfmt/Clippy
-links preserve editor/tool discovery. Rust and Cargo come from `devenv.lock`,
+required aggregate. Configurations are ordinary root files: `rustfmt.toml`, `clippy.toml`,
+`nextest.toml` and `deny.toml`. Rust and Cargo come from `devenv.lock`,
 crate versions from `Cargo.lock`; rustup does not choose a separate toolchain.
 
 Build jobs are capped at two by these check drivers. Resource-heavy checks still

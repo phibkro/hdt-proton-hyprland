@@ -19,11 +19,13 @@ The Linux host is now a native Rust executable. The C# plugin still runs inside 
 | `src/hyprland/` | Compositor-specific rules |
 | `src/replay/`, `tests/` | Account-free WPF replay and grouped boundary tests |
 | `scripts/` | Stable command entry points and developer check drivers |
-| `nix/`, `tooling/` | Packaging and language-specific development configuration |
+| `nix/`, `tooling/` | Packaging, analyzer support projects and reviewed fuzz seeds |
 | `benches/`, `fuzz/` | Performance baselines and coverage-guided targets |
 | `docs/` | Guides, reference, development workflow and investigations |
 
-Private installations, account state, captures and local worktrees remain ignored.
+Tool-discovered configuration files live directly at the root. They are ordinary
+files, without symlinks or forwarding configuration. Private installations,
+account state, captures and local worktrees remain ignored.
 The separate `feat/avalonia-ui` branch contains the native client migration; it is
 not part of the installed compatibility package.
 

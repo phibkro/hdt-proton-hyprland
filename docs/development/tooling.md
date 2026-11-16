@@ -123,7 +123,7 @@ would require the native runtime checks as well.
 [StyLua](https://github.com/JohnnyMorganz/StyLua) and
 [Selene](https://kampfkarren.github.io/selene/usage/std.html) check the Lua template.
 The template uses a Lua 5.3 standard-library subset plus the explicit compositor
-declarations in `tooling/lua/hdt-hyprland.yml`. Those declarations are not a complete model
+declarations in `hdt-hyprland.yml`. Those declarations are not a complete model
 of Hyprland's runtime objects. Lua lint does not verify live stacking or input.
 
 ## Fast commit checks and full PR checks
@@ -162,21 +162,18 @@ checkout. It does not watch for Hearthstone or replace the HDT user service.
 
 ## Configuration layout and test coverage
 
-```text
-tooling/
-  rust/    rustfmt.toml, clippy.toml, nextest.toml, deny.toml
-  ts/      lint.ts, format.ts, tsconfig.json
-  net/     HdtAnalysis.csproj, packages.lock.json
-  c/       .clang-format, .clang-tidy
-  lua/     stylua.toml, selene.toml, hdt-hyprland.yml
-  shell/   shellcheckrc
-```
+Root-discovered configurations are ordinary files at the repository root:
+`.clang-format`, `.clang-tidy`, `.shellcheckrc`, `rustfmt.toml`, `clippy.toml`,
+`stylua.toml`, `selene.toml`, `hdt-hyprland.yml`, `oxlint.config.ts`,
+`oxfmt.config.ts` and `tsconfig.json`. Nextest and cargo-deny use root
+`nextest.toml` and `deny.toml` through the central check driver. There are no
+configuration symlinks or forwarding imports.
 
-Root Oxc imports, TypeScript extends, and native-tool symlinks preserve editor
-and CLI discovery while keeping each configuration authoritative in tooling/.
-EditorConfig, package metadata, the pre-commit entry point, and .envrc remain at
-the root where their tools expect them. Nix copies native configurations from
-their authoritative paths so relative discovery links cannot dangle in a build.
+`tooling/net/` contains the Framework analysis project and dependency lock.
+`tooling/rust/corpus/` contains reviewed fuzz seeds. These are support inputs,
+not duplicate configurations. EditorConfig, package metadata, the hook entry
+point and `.envrc` also remain at the root where their tools expect them.
+Nix copies root configurations directly into its isolated source-quality check.
 
 Tests have the same static analysis rules as source. Oxlint and TypeScript
 include tests/; Clang-Tidy includes tests/native/xinput-race.c; both Roslyn scopes

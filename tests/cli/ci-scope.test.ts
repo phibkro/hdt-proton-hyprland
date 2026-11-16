@@ -53,7 +53,7 @@ test.each([
   ["docs/guide\nwith-newline.md", "true"],
   [".cursor/skills/verify-hdt-proton/features/launch.md", "true"],
   [".github/workflows/check.yml", "false"],
-  ["tooling/rust/clippy.toml", "false"],
+  ["clippy.toml", "false"],
   ["docs/example.sh", "false"],
   ["src/fixture.rs", "false"],
 ])("classifies %s as documentation-only=%s", async (file, expected) => {

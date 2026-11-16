@@ -96,7 +96,6 @@ switch (language) {
       "src",
       "tests",
       "scripts",
-      "tooling/ts",
       "oxlint.config.ts",
       "oxfmt.config.ts",
       "package.json",
@@ -110,7 +109,6 @@ switch (language) {
       "src",
       "tests",
       "scripts",
-      "tooling/ts",
       "oxlint.config.ts",
       "oxfmt.config.ts",
     ]);
@@ -260,12 +258,12 @@ switch (language) {
       "--profile",
       "ci",
       "--config-file",
-      "tooling/rust/nextest.toml",
+      "nextest.toml",
       "--test-threads",
       "2",
     ]);
     run(["cargo", "test", "--locked", "--doc"]);
-    run(["cargo", "deny", "--config", "tooling/rust/deny.toml", "check"]);
+    run(["cargo", "deny", "--config", "deny.toml", "check"]);
     run(["cargo", "machete"]);
 
     break;

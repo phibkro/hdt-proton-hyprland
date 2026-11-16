@@ -113,7 +113,14 @@ if (
   files.some(
     (file) =>
       file.endsWith(".rs") ||
-      ["Cargo.toml", "Cargo.lock"].includes(file) ||
+      [
+        "Cargo.toml",
+        "Cargo.lock",
+        "rustfmt.toml",
+        "clippy.toml",
+        "nextest.toml",
+        "deny.toml",
+      ].includes(file) ||
       file.startsWith("tooling/rust/")
   )
 ) {

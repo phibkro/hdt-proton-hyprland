@@ -53,7 +53,7 @@ if [[ "$mode" == suite ]]; then
     measure typescript-static 0 bun run lint:ts
     measure typescript-types 0 bun run typecheck
     measure shell-static 0 bun scripts/quality.ts check shell
-    measure rust-tests 0 cargo nextest run --locked --config-file tooling/rust/nextest.toml --profile ci --test-threads 2
+    measure rust-tests 0 cargo nextest run --locked --config-file nextest.toml --profile ci --test-threads 2
     measure boundary-tests 0 bash scripts/test-unit.sh
 fi
 jq -s --arg revision "$(git rev-parse HEAD)" --argjson dirty "$(if [[ -z $(git status --porcelain) ]]; then echo false; else echo true; fi)" \

@@ -1,1 +1,2 @@
-tooling/rust/rustfmt.toml
+edition = "2024"
+max_width = 100

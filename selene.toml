@@ -1,1 +1,1 @@
-tooling/lua/selene.toml
+std = "lua53+hdt-hyprland"

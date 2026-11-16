@@ -1,1 +1,21 @@
-{ "extends": "./tooling/ts/tsconfig.json" }
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "types": ["bun"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "tooling/**/*.ts",
+    "*.config.ts"
+  ],
+  "exclude": ["local", "evidence", "reference", "node_modules"]
+}

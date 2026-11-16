@@ -8,7 +8,7 @@ observations remain separate evidence.
 | Layer | Maintained entry point | Evidence |
 |---|---|---|
 | Static checks | `bun scripts/quality.ts check all` | Formats, types, analyzers and dependency policy |
-| Rust contracts and properties | `cargo nextest run --locked --config-file tooling/rust/nextest.toml --test-threads 2` | Unit, CLI/file boundary and shrinking generated cases |
+| Rust contracts and properties | `cargo nextest run --locked --config-file nextest.toml --test-threads 2` | Unit, CLI/file boundary and shrinking generated cases |
 | X11 protocol/fault tests | `bash scripts/check-rust-x11.sh` | Real private X server, owner exclusion, freshness, corrupt/missing producer recovery, shape/focus cleanup, C/Rust pixel comparison |
 | WPF journey | `bash scripts/replay.sh run --with-plugin --without-particles --desktop-input` | Native clicks through Rust, Wine and the actual HDT overlay |
 | Parser fuzzing | `bash scripts/check-fuzz.sh` | Two bounded, coverage-guided smoke runs with retained corpus/artifacts |
