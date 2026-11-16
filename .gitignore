@@ -265,3 +265,8 @@
 !/avalonia/Hdt.Avalonia/CardCatalogView.cs
 
 !/avalonia/Hdt.Checks/OverlayDesktopAcceptance.cs
+
+!/docs/specs/native-layout.md
+!/avalonia/Hdt.Avalonia/TrackerLayout.cs
+!/avalonia/Hdt.Avalonia/SettingsView.cs
+!/scripts/check-native-failure.sh

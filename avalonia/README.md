@@ -306,9 +306,42 @@ The existing `base64`, `serde`, `uuid`, `chrono`, `nix` and already-locked
 and rejected as a current card catalog; no card definitions or copyrighted
 artwork are bundled.
 
+## Native window layout
+
+The independently authored layout follows the inspected WPF information hierarchy:
+
+```text
+Main window
+├─ application title / New, Deck, Import, Export, Stats menu / navigation
+├─ My Decks
+│  ├─ searchable deck browser
+│  ├─ My Games: persisted supplied observations
+│  └─ selected deck: saved identities, counts and notes
+│     └─ New / Edit / Import opens the secondary editor across the right columns
+├─ Options
+│  ├─ Arena draft
+│  ├─ Native overlay
+│  └─ Local files (configured paths)
+└─ Arena Draft / Stats / Help / Live Game
+```
+
+No global winrates, card artwork or mana curve is fabricated. Saved deck codes
+contain identities/counts, so missing class labels and cost metadata stay unknown.
+The rendered driver checks nonoverlapping geometry and visible navigation at
+1120×760 and 800×600, drives minimum-width editor actions, filters real decks,
+and captures `layout-{library,settings,arena}-{1120,800}.png`, `layout-editor-800.png`
+and long-path settings captures. This is a hierarchy/layout pass, not pixel parity.
+
+An assertion failure in the managed test runner preserves the full exception,
+returns 1 and shuts down owned windows, actors and publisher workers. Verify the
+negative control after building the checks with
+`nix-shell avalonia/shell.nix --run 'bash scripts/check-native-failure.sh'`.
+It deliberately fails while a real owned helper is running and requires exit 1
+and exact-helper reaping; it never changes native crash-reporting settings.
+
 ## Optional native X11 overlay
 
-With `--native-state FILE`, open **Options**, **Find Hearthstone windows**, choose
+With `--native-state FILE`, open **Options › Native overlay**, **Find Hearthstone windows**, choose
 an explicit window and enable **Show native tracking overlay**. The opt-in is
 session-only. A separate Rust child creates its own opaque 320×640 window with
 an empty input shape **before mapping**. It reads the selected game's window
@@ -324,6 +357,14 @@ latest-only raster channel. The Rust boundary validates explicit version,
 dimensions, opaque BGRA pixels, session, monotonic sequence and observation time.
 No game discovery or external process IO runs on the UI dispatcher. The child
 has bounded status/diagnostic pipes and preparation/write deadlines.
+
+The current child is **not independent UI fault isolation**: the main process
+renders its pixels, owns its lifetime and supplies its frame stream. A frozen main
+renderer stops new pixels; stale frames unmap and parent death ends the child.
+There is no independent error visual. The requested future boundary is separate
+main/overlay processes fed from independently supervised shared observations,
+with explicit IPC, stale-fact clearing and responsive overlay error visuals.
+That architecture is not implemented by this layout pass.
 
 This first panel is opaque, X11/XWayland-only, fixed scale, and shows up to three
 Arena offers or 22 tracked deck/board entries. It has no artwork, tooltips,

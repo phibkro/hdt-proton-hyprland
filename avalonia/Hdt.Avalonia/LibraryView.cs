@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Input.Platform;
+using Avalonia.Controls.Templates;
 
 namespace Hdt.Avalonia;
 
@@ -14,15 +15,26 @@ public sealed class LibraryView : UserControl
     private ulong _shownRevision = ulong.MaxValue;
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _historyDeck = new() { TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 2 };
-    public ListBox Decks { get; } = new() { MinHeight = 120, MaxHeight = 400 };
+    public ListBox Decks { get; } = new() { MinHeight = 120 };
+    public TextBox SearchBox { get; } = new() { PlaceholderText = "Search decks or class", MaxLength = 256 };
+    public Button OverviewButton { get; } = new() { Content = "Back to deck overview" };
+    public Button EditButton { get; } = new() { Content = "Edit selected deck" };
+    public Expander EditorPane { get; } = new() { Header = "Deck editor / import", HorizontalAlignment = HorizontalAlignment.Stretch };
+    public Border BrowserPanel { get; private set; } = null!;
+    public Border GamesPanel { get; private set; } = null!;
+    public Border SelectedPanel { get; private set; } = null!;
+    private readonly TextBlock _selectedTitle = new() { Text = "No deck selected", FontSize = 18, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 3 };
+    private readonly TextBlock _selectedFacts = TrackerLayout.Text("Choose a deck in the browser to inspect it.");
+    private readonly TextBlock _selectedNotes = TrackerLayout.Text("");
+    private readonly StackPanel _selectedCards = new() { Spacing = 3 };
     public TextBox NameBox { get; } = new() { MaxLength = 256, PlaceholderText = "Deck name" };
     public TextBox ClassBox { get; } = new() { MaxLength = 64, PlaceholderText = "Class label (optional)" };
     public TextBox HeroBox { get; } = new() { MaxLength = 10, PlaceholderText = "Hero DBF ID, e.g. 637" };
     public TextBox FormatBox { get; } = new() { MaxLength = 1, Text = "2", PlaceholderText = "Format: 1 Wild, 2 Standard, 3 Classic, 4 Twist" };
-    public TextBox CardsBox { get; } = new() { MaxLength = 16384, AcceptsReturn = true, MinHeight = 120, PlaceholderText = "One DBF ID and count per line, e.g. 77 2" };
-    public TextBox SideboardsBox { get; } = new() { MaxLength = 16384, AcceptsReturn = true, MinHeight = 65, PlaceholderText = "Sideboard: owner DBF ID, card DBF ID, count" };
-    public TextBox NotesBox { get; } = new() { MaxLength = 8192, AcceptsReturn = true, MinHeight = 60, PlaceholderText = "Deck notes" };
-    public TextBox CodeBox { get; } = new() { MaxLength = 65536, AcceptsReturn = true, MinHeight = 70, PlaceholderText = "Paste a Hearthstone deckstring or commented deck export" };
+    public TextBox CardsBox { get; } = new() { MaxLength = 16384, AcceptsReturn = true, Height = 140, PlaceholderText = "One DBF ID and count per line, e.g. 77 2" };
+    public TextBox SideboardsBox { get; } = new() { MaxLength = 16384, AcceptsReturn = true, Height = 80, PlaceholderText = "Sideboard: owner DBF ID, card DBF ID, count" };
+    public TextBox NotesBox { get; } = new() { MaxLength = 8192, AcceptsReturn = true, Height = 80, PlaceholderText = "Deck notes" };
+    public TextBox CodeBox { get; } = new() { MaxLength = 65536, AcceptsReturn = true, Height = 110, PlaceholderText = "Paste a Hearthstone deckstring or commented deck export" };
     public Button NewButton { get; } = new() { Content = "New deck" };
     public Button SaveButton { get; } = new() { Content = "Save deck" };
     public Button ImportButton { get; } = new() { Content = "Import code" };
@@ -100,22 +112,59 @@ public sealed class LibraryView : UserControl
         ReloadButton.Click += (_, _) => Start(_library.ReloadAsync);
         Decks.SelectionChanged += (_, _) => { if (!_updatingDeckList && Decks.SelectedItem is DeckEntry deck) Edit(deck); };
         _library.Changed += Refresh;
-        var columns = new Grid { ColumnDefinitions = new("300,*"), Margin = new(16) };
-        var list = new StackPanel { Spacing = 12, Children = { Label("MY DECKS"), NewButton, ReloadButton, ShowArchived, _historyDeck, Decks, _status } };
-        columns.Children.Add(list);
+        Decks.ItemTemplate = new FuncDataTemplate<DeckEntry>((entry, _) => entry is null ? null : new StackPanel
+        {
+            Spacing = 4,
+            Margin = new(2, 5),
+            Children = {
+            new TextBlock { Text = entry.Name, FontSize = 15, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 1 },
+            TrackerLayout.Text($"{(string.IsNullOrWhiteSpace(entry.HeroClass) ? "Unknown class" : entry.HeroClass)} • {entry.Content.Cards.Sum(card => (long)card.Count)} cards", 12) }
+        });
+        SearchBox.TextChanged += (_, _) => { _shownRevision = ulong.MaxValue; Refresh(); };
+        EditButton.Click += (_, _) => EditSelected();
+        var columns = new Grid { ColumnDefinitions = new("210,*,235"), ColumnSpacing = 12, Margin = new(12) };
+        var browser = new DockPanel { LastChildFill = true };
+        var tools = new StackPanel { Spacing = 8, Children = { SearchBox, NewButton, ShowArchived, _historyDeck } };
+        DockPanel.SetDock(tools, Dock.Top); browser.Children.Add(tools);
+        var status = new StackPanel { Spacing = 8, Margin = new(0, 8, 0, 0), Children = { ReloadButton, _status } };
+        DockPanel.SetDock(status, Dock.Bottom); browser.Children.Add(status); browser.Children.Add(Decks);
+        BrowserPanel = TrackerLayout.Section("My decks", browser); columns.Children.Add(BrowserPanel);
         var editor = new StackPanel
         {
-            Margin = new(20, 0, 0, 0),
+            Margin = new(0, 12, 0, 0),
             Spacing = 10,
             Children = {
-            Label("Deck editor"), NameBox, ClassBox, HeroBox, FormatBox, Catalog, CardsBox, SideboardsBox, NotesBox,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { SaveButton, UseButton, ArchiveButton } },
+            OverviewButton, Label("Deck editor"), NameBox, ClassBox, HeroBox, FormatBox, Catalog, CardsBox, SideboardsBox, NotesBox,
+            new WrapPanel { Orientation = Orientation.Horizontal, Children = { SaveButton, UseButton, ArchiveButton } },
             Label("Hearthstone import / export"), CodeBox,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { ImportButton, ExportButton, CopyButton } },
+            new WrapPanel { Orientation = Orientation.Horizontal, Children = { ImportButton, ExportButton, CopyButton } },
             new TextBlock { Text = "Choose a deck here to label new game history. Live card counts come from the observation source. Optional catalog search adds cards by name; deckcode validation checks structure, not game legality.", TextWrapping = TextWrapping.Wrap }
         }
         };
-        columns.Children.Add(new ScrollViewer { Content = editor, [Grid.ColumnProperty] = 1 });
+        EditorPane.Content = editor;
+        GamesPanel = TrackerLayout.Section("My games", new StackPanel
+        {
+            Spacing = 14,
+            Children = {
+            new HistoryView(library, compact: true), EditorPane }
+        }, scroll: true);
+        Grid.SetColumn(GamesPanel, 1); columns.Children.Add(GamesPanel);
+        SelectedPanel = TrackerLayout.Section("Selected deck", new StackPanel
+        {
+            Spacing = 12,
+            Children = {
+            _selectedTitle, _selectedFacts, EditButton, _selectedCards,
+            TrackerLayout.Text("NOTES", 12), _selectedNotes,
+            TrackerLayout.Text("MANA CURVE", 12), TrackerLayout.Text("Unavailable: saved deck codes contain card identities and counts, not mana costs. No curve is guessed.", 12) }
+        }, scroll: true);
+        Grid.SetColumn(SelectedPanel, 2); columns.Children.Add(SelectedPanel);
+        OverviewButton.Click += (_, _) => EditorPane.IsExpanded = false;
+        EditorPane.PropertyChanged += (_, change) =>
+        {
+            if (change.Property != Expander.IsExpandedProperty) return;
+            Grid.SetColumnSpan(GamesPanel, EditorPane.IsExpanded ? 2 : 1);
+            SelectedPanel.IsVisible = !EditorPane.IsExpanded;
+        };
         Content = columns; Refresh();
     }
     private static TextBlock Label(string text) => new() { Text = text, FontSize = 20 };
@@ -123,18 +172,24 @@ public sealed class LibraryView : UserControl
     public void NewDeck()
     {
         if (_working || _library.Busy) return;
-        if (ShowArchived.IsChecked == true) { ShowArchived.IsChecked = false; return; }
-        ClearEditor();
+        if (ShowArchived.IsChecked == true) ShowArchived.IsChecked = false;
+        ClearEditor(); OpenEditor(NameBox);
     }
+    private void OpenEditor(Control target)
+    {
+        EditorPane.IsExpanded = true; UpdateLayout(); target.BringIntoView(); target.Focus();
+    }
+    public void EditSelected() => OpenEditor(NameBox);
     private void ClearEditor()
     {
         _creating = true; _editing = null; Decks.SelectedItem = null;
         NameBox.Text = ClassBox.Text = HeroBox.Text = CardsBox.Text = SideboardsBox.Text = NotesBox.Text = CodeBox.Text = "";
-        FormatBox.Text = "2"; RefreshButtons(); NameBox.Focus();
+        FormatBox.Text = "2"; RefreshButtons(); RefreshSelected();
     }
-    public void FocusImport() => CodeBox.Focus();
+    public void FocusImport() => OpenEditor(CodeBox);
     public void ExportSelected()
     {
+        OpenEditor(CodeBox);
         if (_editing is null) { _status.Text = "Select a saved deck before exporting."; return; }
         Start(async () => { var export = await _library.ExportAsync(_editing); CodeBox.Text = $"### {export.Name}\n{export.Code}"; });
     }
@@ -145,7 +200,7 @@ public sealed class LibraryView : UserControl
         HeroBox.Text = deck.Content.HeroDbfId.ToString(); FormatBox.Text = deck.Content.Format.ToString();
         CardsBox.Text = string.Join('\n', deck.Content.Cards.Select(card => $"{card.DbfId} {card.Count}"));
         SideboardsBox.Text = string.Join('\n', deck.Content.Sideboards.Select(card => $"{card.OwnerDbfId} {card.DbfId} {card.Count}"));
-        NotesBox.Text = deck.Notes; RefreshButtons();
+        NotesBox.Text = deck.Notes; RefreshButtons(); RefreshSelected();
     }
     private void Start(Func<Task> action, string? success = null)
     {
@@ -170,7 +225,9 @@ public sealed class LibraryView : UserControl
         {
             _shownRevision = _library.State.Revision;
             var selected = _editing ?? _library.State.SelectedDeckId;
-            bool Visible(DeckEntry deck) => deck.Archived == (ShowArchived.IsChecked == true);
+            bool Visible(DeckEntry deck) => deck.Archived == (ShowArchived.IsChecked == true)
+                && (string.IsNullOrWhiteSpace(SearchBox.Text) || deck.Name.Contains(SearchBox.Text, StringComparison.OrdinalIgnoreCase)
+                    || deck.HeroClass.Contains(SearchBox.Text, StringComparison.OrdinalIgnoreCase));
             var next = _creating ? null : _library.State.Decks.FirstOrDefault(deck => deck.Id == selected && Visible(deck))
                 ?? _library.State.Decks.FirstOrDefault(deck => deck.Id == _library.State.SelectedDeckId && Visible(deck));
             _updatingDeckList = true;
@@ -178,7 +235,18 @@ public sealed class LibraryView : UserControl
             finally { _updatingDeckList = false; }
             if (next is not null && next.Id != _editing) Edit(next);
         }
-        RefreshButtons();
+        RefreshButtons(); RefreshSelected();
+    }
+    private void RefreshSelected()
+    {
+        var deck = _library.State.Decks.FirstOrDefault(entry => entry.Id == _editing);
+        _selectedTitle.Text = deck?.Name ?? "No deck selected";
+        _selectedFacts.Text = deck is null ? "Choose a saved deck, or create/import one in the browser." :
+            $"{(string.IsNullOrWhiteSpace(deck.HeroClass) ? "Unknown class" : deck.HeroClass)} • {deck.Content.Cards.Sum(card => (long)card.Count)} cards\nHero DBF {deck.Content.HeroDbfId} • format {deck.Content.Format}";
+        _selectedNotes.Text = string.IsNullOrWhiteSpace(deck?.Notes) ? "No saved notes." : deck.Notes;
+        _selectedCards.Children.Clear();
+        if (deck is not null) foreach (var card in deck.Content.Cards)
+            _selectedCards.Children.Add(new Border { Background = TrackerLayout.Line, Padding = new(7, 5), Child = TrackerLayout.Text($"{card.Count} × DBF {card.DbfId}") });
     }
     private void RefreshButtons()
     {
@@ -187,6 +255,7 @@ public sealed class LibraryView : UserControl
         SaveButton.IsEnabled = !_working && !_library.Busy && _library.Ready && !browsingArchived;
         ImportButton.IsEnabled = SaveButton.IsEnabled;
         UseButton.IsEnabled = SaveButton.IsEnabled && _editing is not null;
+        EditButton.IsEnabled = !_working && !_library.Busy && _editing is not null;
         ArchiveButton.IsEnabled = ExportButton.IsEnabled = !_working && !_library.Busy && _library.Ready && _editing is not null;
         ArchiveButton.Content = archived ? "Restore" : "Archive";
         NewButton.IsEnabled = ReloadButton.IsEnabled = CopyButton.IsEnabled = !_working && !_library.Busy;
@@ -202,18 +271,29 @@ public sealed class HistoryView : UserControl
 {
     private readonly TextBlock _summary = new() { FontSize = 22 };
     private readonly ListBox _matches = new() { MaxHeight = 500 };
-    public HistoryView(ClientLibrary library)
+    public HistoryView(ClientLibrary library, bool compact = false)
     {
         void Refresh()
         {
-            _summary.Text = $"Match history • {library.State.Matches.Length} recorded • {library.State.Matches.Count(match => match.Result == "Win")} wins / {library.State.Matches.Count(match => match.Result == "Loss")} losses";
+            _summary.Text = $"{library.State.Matches.Length} supplied games • {library.State.Matches.Count(match => match.Result == "Win")} wins / {library.State.Matches.Count(match => match.Result == "Loss")} losses";
             _matches.ItemsSource = library.State.Matches.Reverse().ToArray();
         }
         library.Changed += Refresh;
+        _summary.FontSize = compact ? 16 : 22;
+        _matches.MinHeight = compact ? 100 : 180;
+        _matches.MaxHeight = compact ? 250 : 500;
+        _matches.ItemTemplate = new FuncDataTemplate<MatchRecord>((match, _) => match is null ? null : new StackPanel
+        {
+            Spacing = 4,
+            Margin = new(0, 4),
+            Children = {
+            TrackerLayout.Text($"{match.Result} • {match.Mode}", 14), TrackerLayout.Text($"{match.PlayerHero} vs {match.OpponentHero} • {match.Turns} turns", 12),
+            TrackerLayout.Text(match.ObservedAt, 11) }
+        });
         Content = new StackPanel
         {
-            Margin = new(24),
-            Spacing = 16,
+            Margin = new(compact ? 0 : 24),
+            Spacing = 12,
             Children = { _summary, _matches,
             new TextBlock { Text = "Only supplied observations are recorded. There is no automatic import from Windows HDT's database.", TextWrapping = TextWrapping.Wrap } }
         };

@@ -93,7 +93,7 @@ public sealed class NativeGameView : UserControl
     private readonly ListBox _hand = new() { MaxHeight = 180 };
     private readonly ListBox _player = new() { MaxHeight = 220 };
     private readonly ListBox _opponent = new() { MaxHeight = 220 };
-    private readonly StackPanel _deck;
+    private readonly Border _deck;
     public string ModeText => _mode.Text ?? "";
     public int CardCount => _remaining.ItemCount + _hand.ItemCount + _player.ItemCount + _opponent.ItemCount;
     public NativeGameView()
@@ -106,7 +106,7 @@ public sealed class NativeGameView : UserControl
         Content = new ScrollViewer { Content = new StackPanel { Margin = new(24), Spacing = 18, Children = { _mode, _counts, columns } } };
         Unavailable("No native observation source configured.");
     }
-    private static StackPanel Panel(string title, Control content) => new() { Spacing = 8, Children = { new TextBlock { Text = title, FontSize = 18 }, content } };
+    private static Border Panel(string title, Control content) => TrackerLayout.Section(title, content);
     public void Unavailable(string reason)
     {
         _mode.Text = "Game observations unavailable"; _counts.Text = reason;

@@ -38,6 +38,7 @@ public sealed class MainWindow : Window
     public ClientLibrary Library { get; }
     public LibraryView DeckLibrary { get; }
     public NativeOverlayControls NativeOverlay { get; }
+    public SettingsView SettingsPanel { get; }
     public Button NextButton { get; } = new() { Content = "Next observation", IsEnabled = false };
     public Button ResetButton { get; } = new() { Content = "Rewind", IsEnabled = false };
     public CheckBox ScoresToggle { get; } = new() { Content = "Show Arenasmith scores" };
@@ -54,6 +55,8 @@ public sealed class MainWindow : Window
     {
         Title = "Hearthstone Deck Tracker • Avalonia migration preview";
         Width = 1120; Height = 760; MinWidth = 800; MinHeight = 540;
+        Background = new SolidColorBrush(Color.Parse("#151B21"));
+        FontSize = 13;
         _store = new(options.Settings);
         Library = new(options.ClientData ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.Settings))!, "library.json"), _lifetime.Token);
         DeckLibrary = new(Library, _lifetime.Token);
@@ -79,35 +82,45 @@ public sealed class MainWindow : Window
         Grid.SetColumn(deck, 1); content.Children.Add(new ScrollViewer { Content = deck, [Grid.ColumnProperty] = 1 });
         var optionsPane = new StackPanel
         {
-            Margin = new(24),
-            Spacing = 20,
+            Margin = new(4),
+            Spacing = 16,
             Children = {
-            Text("Options › Overlay › Arena", 24), ScoresToggle, SynergiesToggle, _preferencesStatus,
+            Text("Arena draft assistance", 18), ScoresToggle, SynergiesToggle, _preferencesStatus,
             Text("These preferences affect the native draft view and are saved locally.", 15),
-            Text("Hero selection, related-card tooltips and redraft-discard suggestions are not migrated yet.", 15), NativeOverlay }
+            Text("Hero selection, related-card tooltips and redraft-discard suggestions are not migrated yet.", 13) }
         };
+        SettingsPanel = new(optionsPane, NativeOverlay, options);
         _tabs = new TabControl
         {
             ItemsSource = new TabItem[] {
             new() { Header = "My Decks", Content = DeckLibrary },
             new() { Header = "Arena Draft", Content = content },
             new() { Header = "Stats", Content = new HistoryView(Library) },
-            new() { Header = "Options", Content = new ScrollViewer { Content = optionsPane } },
+            new() { Header = "Options", Content = SettingsPanel },
             new() { Header = "Help", Content = Notice("Migration preview", "Native deck library and Arena rendering. Optional read-only Proton observations provide known cards and supplied history; native acquisition, account login and combat odds are not implemented. Native X11 overlays require explicit opt-in. No actions are sent to Hearthstone.") },
             new() { Header = "Live Game", Content = GameView }
         },
+            FontSize = 14,
             SelectedIndex = options.Replay is null ? 0 : 1
         };
+        foreach (var tab in _tabs.Items.Cast<TabItem>())
+            tab.Header = new TextBlock { Text = (string)tab.Header!, FontSize = 14 };
         var menu = new Menu
         {
             ItemsSource = new MenuItem[] {
             LibraryAction("New", () => { _tabs.SelectedIndex = 0; DeckLibrary.NewDeck(); }),
+            LibraryAction("Deck", () => { _tabs.SelectedIndex = 0; DeckLibrary.EditSelected(); }),
             LibraryAction("Import", () => { _tabs.SelectedIndex = 0; DeckLibrary.FocusImport(); }),
             LibraryAction("Export", () => { _tabs.SelectedIndex = 0; DeckLibrary.ExportSelected(); }), Navigate("Stats", 2),
             Missing("HSReplay.net", "Account login and authenticated acquisition are not migrated."), Navigate("Options", 3), Navigate("Help", 4), Navigate("Live Game", 5)
         }
         };
         var root = new DockPanel();
+        var brand = new Grid { ColumnDefinitions = new("*,Auto"), Background = TrackerLayout.Accent };
+        brand.Children.Add(new TextBlock { Text = "HEARTHSTONE DECK TRACKER", Margin = new(12, 7), FontSize = 15, FontWeight = FontWeight.SemiBold });
+        brand.Children.Add(new TextBlock { Text = "NATIVE PREVIEW", Margin = new(12, 7), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, [Grid.ColumnProperty] = 1 });
+        DockPanel.SetDock(brand, Dock.Top); root.Children.Add(brand);
+        menu.Background = TrackerLayout.Surface;
         DockPanel.SetDock(menu, Dock.Top); root.Children.Add(menu);
         var footer = new Border { Padding = new(16, 10), Background = new SolidColorBrush(Color.Parse("#182831")), Child = _status };
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer); root.Children.Add(_tabs); Content = root;

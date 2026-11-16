@@ -148,3 +148,23 @@ retain URL/time/hash privately and never turn its data into a tracked fixture.
 The driver must also browse archived entries and restore one without changing its
 stable identity, notes, history association or tracking selection. The native file
 chooser remains a separate unverified route.
+
+## Main-window hierarchy and managed failure boundary
+
+Feature ID: `native-window-layout`. After building, run
+`nix-shell avalonia/shell.nix --run 'bash scripts/check-native-failure.sh'`.
+Require the intentional assertion to preserve its full stack, return1 and reap
+its exact helper. A failing assertion must never be confused with a successful
+run or escape the entrypoint as an unhandled managed exception.
+
+The ordinary rendered route checks library/browser/MyGames/selected-deck order,
+settings sidebar/content separation and every navigation target at 1120×760 and
+800×600. Inspect `layout-library-*`, `layout-settings-*`, `layout-arena-*`,
+`layout-local-files-*` and `layout-editor-800.png`. Require a collapsed raw editor
+on overview, real filtered decks and supplied games, unknown metadata retained,
+long names/paths contained, and minimum-width pointer save/export/copy. New from
+archived browsing must expose/focus the new name field with one action, before
+the input helper can scroll it into view.
+
+The X11 child still depends on main-process raster rendering and parent lifetime;
+this acceptance does not establish independent overlay UI/error handling.

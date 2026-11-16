@@ -56,6 +56,8 @@ jobs:
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilation=false'
       - name: Check native C# formatting
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet format whitespace Hdt.Avalonia/Hdt.Avalonia.csproj --no-restore --verify-no-changes && dotnet format whitespace Hdt.Checks/Hdt.Checks.csproj --no-restore --verify-no-changes'
+      - name: Verify managed assertion failure and owned cleanup
+        run: nix-shell avalonia/shell.nix --run 'bash scripts/check-native-failure.sh'
       - name: Exercise rendered native controls
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalonia-evidence'
       - name: Verify rendered pixels and input-empty overlay in isolated X11

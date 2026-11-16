@@ -48,7 +48,7 @@ public sealed class CardCatalogView : UserControl
             {
                 Spacing = 8,
                 Children = { ChooseButton, PathBox, QueryBox, IncludeNonCollectible, SearchButton, Results,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { AddButton, RemoveButton, HeroButton } }, _status }
+            new WrapPanel { Orientation = Orientation.Horizontal, Children = { AddButton, RemoveButton, HeroButton } }, _status }
             }
         };
         Availability();

@@ -1229,6 +1229,9 @@ fn native_overlay_desktop_acceptance(
         3,
         "actual X11 pointer opens Options"
     );
+    click(request(
+        json!({"action":"point","target":"overlay-settings"}),
+    ));
     click(request(json!({"action":"point","target":"enabled"})));
     let state = request(json!({"action":"inspect"}));
     assert!(

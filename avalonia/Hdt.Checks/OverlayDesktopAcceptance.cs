@@ -64,6 +64,7 @@ public sealed class OverlayDesktopAcceptance : Application
                     Control Locate() => target switch
                     {
                         "options" => (TabItem)window.GetVisualDescendants().OfType<TabControl>().Single().Items[3]!,
+                        "overlay-settings" => window.SettingsPanel.OverlayCategory,
                         "find" => window.NativeOverlay.RefreshButton,
                         "enabled" => window.NativeOverlay.EnabledToggle,
                         _ => throw new IOException("Unknown private control target.")
