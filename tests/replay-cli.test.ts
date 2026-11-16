@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop -- Fixture setup serializes file creation before launching the subprocess under test. */
 import { test, expect } from "bun:test";
 import {
   mkdtemp,
@@ -9,12 +10,12 @@ import {
   rm,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import nodePath from "node:path";
 
-const root = resolve(import.meta.dir, "..");
+const root = nodePath.resolve(import.meta.dir, "..");
 
 test("replay preserves namespace arguments and a failing supervisor result without touching a game", async () => {
-  const temp = await mkdtemp(join(tmpdir(), "hdt-replay-boundary-"));
+  const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-replay-boundary-"));
 
   try {
     for (const dir of [
@@ -25,44 +26,53 @@ test("replay preserves namespace arguments and a failing supervisor result witho
       "local/replay/seed/prefix",
       "local/replay/seed/app",
     ]) {
-      await mkdir(join(temp, dir), { recursive: true });
+      await mkdir(nodePath.join(temp, dir), { recursive: true });
     }
-    for (const name of ["process.ts", "replay.ts"]) {
-      await copyFile(join(root, "scripts", name), join(temp, "scripts", name));
+
+    for (const name of ["replay.sh"]) {
+      await copyFile(
+        nodePath.join(root, "scripts", name),
+        nodePath.join(temp, "scripts", name)
+      );
     }
-    await Bun.write(join(temp, "src/fixture.txt"), "source snapshot\n");
-    const sourcePrefix = join(temp, "real-game-prefix");
+
     await Bun.write(
-      join(temp, "local/replay/ownership.json"),
+      nodePath.join(temp, "src/fixture.txt"),
+      "source snapshot\n"
+    );
+    const sourcePrefix = nodePath.join(temp, "real-game-prefix");
+    await Bun.write(
+      nodePath.join(temp, "local/replay/ownership.json"),
       JSON.stringify({
         schema: 2,
         kind: "hdt-ui-replay",
         project: temp,
-        proton: join(temp, "proton"),
+        proton: nodePath.join(temp, "proton"),
         sourcePrefix,
       })
     );
-    const argsFile = join(temp, "arguments.json");
+    const argsFile = nodePath.join(temp, "arguments.json");
     await Bun.write(
-      join(temp, "tools/git"),
+      nodePath.join(temp, "tools/git"),
       '#!/bin/sh\ncase "$*" in *rev-parse*) printf "%s\\n" fixture-revision;; esac\n'
     );
     await Bun.write(
-      join(temp, "tools/bwrap"),
+      nodePath.join(temp, "tools/bwrap"),
       `#!/bin/sh\nexec "$TEST_BUN" "$TEST_CAPTURE" "$@"\n`
     );
     await Bun.write(
-      join(temp, "capture.ts"),
+      nodePath.join(temp, "capture.ts"),
       "await Bun.write(process.env.TEST_ARGV!, JSON.stringify(process.argv.slice(2))); process.exit(17);"
     );
 
     for (const name of ["git", "bwrap"]) {
-      await chmod(join(temp, "tools", name), 0o700);
+      await chmod(nodePath.join(temp, "tools", name), 0o700);
     }
+
     const child = Bun.spawn(
       [
-        process.execPath,
-        join(temp, "scripts/replay.ts"),
+        "bash",
+        nodePath.join(temp, "scripts/replay.sh"),
         "run",
         "--with-plugin",
         "--without-particles",
@@ -72,7 +82,7 @@ test("replay preserves namespace arguments and a failing supervisor result witho
           ...process.env,
           PATH: `${temp}/tools:${process.env.PATH}`,
           TEST_BUN: process.execPath,
-          TEST_CAPTURE: join(temp, "capture.ts"),
+          TEST_CAPTURE: nodePath.join(temp, "capture.ts"),
           TEST_ARGV: argsFile,
         },
         stdout: "pipe",
@@ -83,12 +93,24 @@ test("replay preserves namespace arguments and a failing supervisor result witho
     const status = await child.exited;
 
     if (status !== 17) {
-      throw Error(
+      throw new Error(
         `Replay boundary fixture exited ${status}: ${await new Response(child.stderr).text()}`
       );
     }
+
     expect(status).toBe(17);
-    const args: string[] = JSON.parse(await readFile(argsFile, "utf-8"));
+    const captured: unknown = JSON.parse(await readFile(argsFile, "utf-8"));
+
+    if (
+      !Array.isArray(captured) ||
+      !captured.every(
+        (value: unknown): value is string => typeof value === "string"
+      )
+    ) {
+      throw new TypeError("Captured supervisor arguments must be strings");
+    }
+
+    const args = captured;
 
     for (const required of [
       "--die-with-parent",
@@ -98,6 +120,7 @@ test("replay preserves namespace arguments and a failing supervisor result witho
     ]) {
       expect(args).toContain(required);
     }
+
     expect(
       args.some(
         (arg, index) => arg === "--tmpfs" && args[index + 1] === sourcePrefix
@@ -111,10 +134,10 @@ test("replay preserves namespace arguments and a failing supervisor result witho
     ).toBe(true);
 
     const inside = args.findIndex((arg) =>
-      arg.endsWith("/scripts/replay-inside.ts")
+      arg.endsWith("/scripts/replay-inside.sh")
     );
 
-    expect(args[inside - 1]).toBe(process.execPath);
+    expect(args[inside - 1]).toBe("bash");
     expect(args.slice(inside + 4)).toEqual([
       "false",
       "true",
@@ -124,23 +147,37 @@ test("replay preserves namespace arguments and a failing supervisor result witho
       "false",
       "false",
     ]);
-    const runs = await readdir(join(temp, "local/replay/runs"));
+    const runs = await readdir(nodePath.join(temp, "local/replay/runs"));
     expect(runs.length).toBe(1);
 
-    const result = JSON.parse(
+    const result: unknown = JSON.parse(
       await readFile(
-        join(temp, "local/replay/runs", runs[0], "result.json"),
+        nodePath.join(temp, "local/replay/runs", runs[0], "result.json"),
         "utf-8"
       )
     );
 
+    /* eslint-disable anti-slop/no-runtime-typeof -- Validate untrusted JSON evidence at its filesystem boundary before accessing fields. */
+    if (
+      typeof result !== "object" ||
+      result === null ||
+      !("exitStatus" in result) ||
+      !("sourceRevision" in result) ||
+      !("sourceManifestSHA256" in result) ||
+      !("particles" in result)
+    ) {
+      throw new TypeError("Replay result is missing required evidence fields");
+    }
+
+    /* eslint-enable anti-slop/no-runtime-typeof */
+
     expect(result.exitStatus).toBe(17);
     expect(result.sourceRevision).toBe("fixture-revision");
-    expect(result.sourceManifestSHA256).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.sourceManifestSHA256).toMatch(/^[0-9a-f]{64}$/u);
     expect(result.particles).toBe(false);
-    expect(await Bun.file(join(sourcePrefix, "system.reg")).exists()).toBe(
-      false
-    );
+    expect(
+      await Bun.file(nodePath.join(sourcePrefix, "system.reg")).exists()
+    ).toBe(false);
   } finally {
     await rm(temp, { recursive: true, force: true });
   }

@@ -1,19 +1,27 @@
+/* eslint-disable no-await-in-loop -- Fixture setup serializes file creation before launching the subprocess under test. */
 import { expect, test } from "bun:test";
 import { mkdtemp, chmod, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import nodePath from "node:path";
 
-const root = resolve(import.meta.dir, "..");
+const root = nodePath.resolve(import.meta.dir, "..");
 
-for (const scenario of ["restart", "game-owned", "no-game", "ambiguous"]) {
+for (const scenario of [
+  "restart",
+  "game-owned",
+  "no-game",
+  "ambiguous",
+] as const) {
   test(`desktop action preserves the game boundary: ${scenario}`, async () => {
-    const dir = await mkdtemp(join(tmpdir(), "hdt-desktop-test-"));
+    const dir = await mkdtemp(nodePath.join(tmpdir(), "hdt-desktop-test-"));
 
     try {
-      const group = (await readFile(`/proc/${process.pid}/cgroup`, "utf-8"))
-        .trim()
-        .split("::")
-        .at(-1)!;
+      const cgroup = await readFile(`/proc/${process.pid}/cgroup`, "utf-8");
+      const group = cgroup.trim().split("::").at(-1);
+
+      if (group === undefined || group.length === 0) {
+        throw new Error("Fixture process has no readable cgroup identity");
+      }
 
       const game = {
         class: "steam_app_123",
@@ -27,15 +35,16 @@ for (const scenario of ["restart", "game-owned", "no-game", "ambiguous"]) {
         pid: process.pid,
       };
 
+      const snapshots = {
+        ambiguous: [tracker, tracker],
+        "no-game": [],
+        "game-owned": [game],
+        restart: [game],
+      };
+
       await Bun.write(
-        join(dir, "clients"),
-        JSON.stringify(
-          scenario === "ambiguous"
-            ? [tracker, tracker]
-            : scenario === "no-game"
-              ? []
-              : [game]
-        )
+        nodePath.join(dir, "clients"),
+        JSON.stringify(snapshots[scenario])
       );
 
       for (const [name, source] of Object.entries({
@@ -44,13 +53,13 @@ for (const scenario of ["restart", "game-owned", "no-game", "ambiguous"]) {
         systemctl: `if [ "$2" = show ]; then printf '%s\\n' "$TEST_GROUP"; else printf '%s\\n' "$*" >> "$TEST_DIR/calls"; fi`,
         "notify-send": "exit 0",
       })) {
-        const file = join(dir, name);
+        const file = nodePath.join(dir, name);
         await Bun.write(file, `#!/bin/sh\n${source}\n`);
         await chmod(file, 0o700);
       }
 
       const p = Bun.spawn(
-        [process.execPath, join(root, "scripts/desktop.ts"), "restart"],
+        ["bash", nodePath.join(root, "scripts/desktop.sh"), "restart"],
         {
           env: {
             ...process.env,
@@ -69,9 +78,11 @@ for (const scenario of ["restart", "game-owned", "no-game", "ambiguous"]) {
       expect(await p.exited).toBe(rejected ? 1 : 0);
 
       if (rejected) {
-        expect(await Bun.file(join(dir, "calls")).exists()).toBe(false);
+        expect(await Bun.file(nodePath.join(dir, "calls")).exists()).toBe(
+          false
+        );
       } else {
-        expect(await readFile(join(dir, "calls"), "utf8")).toBe(
+        expect(await readFile(nodePath.join(dir, "calls"), "utf-8")).toBe(
           `--user ${scenario === "no-game" ? "start" : "restart"} hdt-proton-autostart.service\n`
         );
       }

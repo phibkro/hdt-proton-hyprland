@@ -14,7 +14,7 @@ Run the selected checks:
 devenv shell -- hdt-check
 ```
 
-Confirm that the command exits with status zero. The command runs `scripts/check.ts`: selected tests, ShellCheck, TypeScript bundles, and native helper builds. The `.sh` file is a compatibility entry point.
+Confirm that the command exits with status zero. The command runs `scripts/check.sh`: selected tests, ShellCheck/shfmt, TypeScript bundles, and native helper builds.
 
 Do not run unbounded test discovery in a checkout that contains private prefix backups. Those backups can contain unrelated test files.
 

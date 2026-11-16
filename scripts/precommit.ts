@@ -5,7 +5,10 @@ import { run } from "./process";
 // pre-commit supplies staged filenames and temporarily hides unstaged tracked
 // edits. Do not rewrite files or perform dependency installation in this hook.
 const files = process.argv.slice(2);
-const owned = files.filter((file) => /^(?:src|tests|scripts)\//u.test(file));
+
+const owned = files.filter((file) =>
+  /^(?:src|tests|scripts|tooling)\//u.test(file)
+);
 
 const typescript = files.filter(
   (file) =>
@@ -73,11 +76,13 @@ if (workflows.length > 0) {
 }
 
 const shell = files.filter(
-  (file) => file.endsWith(".sh") || file === ".githooks/pre-commit"
+  (file) =>
+    file.endsWith(".sh") || file === ".githooks/pre-commit" || file === ".envrc"
 );
 
 if (shell.length > 0) {
   run(["shellcheck", ...shell]);
+  run(["shfmt", "-d", ...shell]);
 }
 
 for (const directory of ["src", "tests"]) {

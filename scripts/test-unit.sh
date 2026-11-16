@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
-# Compatibility entry point; implementation is readable Bun TypeScript.
-exec bun "$(dirname -- "${BASH_SOURCE[0]}")/test-unit.ts" "$@"
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+export HS_APP_ID=1234567890
+exec bun test ./tests/*.test.ts

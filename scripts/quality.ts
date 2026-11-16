@@ -7,7 +7,7 @@ const [mode = "check", language = "all"] = process.argv.slice(2);
 
 if (!new Set(["check", "fix"]).has(mode)) {
   throw new Error(
-    "Usage: bun scripts/quality.ts [check|fix] [all|ts|types|c|lua|csharp|csharp-analysis|zig]"
+    "Usage: bun scripts/quality.ts [check|fix] [all|ts|types|c|lua|csharp|csharp-core|csharp-analysis|shell|zig]"
   );
 }
 
@@ -74,7 +74,15 @@ const binary = (name: string) => path.resolve("node_modules/.bin", name);
 
 switch (language) {
   case "all": {
-    for (const item of ["ts", "types", "c", "lua", "csharp", "csharp-core"]) {
+    for (const item of [
+      "ts",
+      "types",
+      "c",
+      "lua",
+      "csharp",
+      "csharp-core",
+      "shell",
+    ]) {
       run([process.execPath, import.meta.filename, mode, item]);
     }
 
@@ -86,6 +94,7 @@ switch (language) {
       "src",
       "tests",
       "scripts",
+      "tooling/ts",
       "oxlint.config.ts",
       "oxfmt.config.ts",
       "package.json",
@@ -99,6 +108,7 @@ switch (language) {
       "src",
       "tests",
       "scripts",
+      "tooling/ts",
       "oxlint.config.ts",
       "oxfmt.config.ts",
     ]);
@@ -189,17 +199,36 @@ switch (language) {
       );
     }
 
-    run(["dotnet", "restore", "tooling/HdtAnalysis.csproj", "--locked-mode"]);
+    run([
+      "dotnet",
+      "restore",
+      "tooling/net/HdtAnalysis.csproj",
+      "--locked-mode",
+    ]);
     run([
       "dotnet",
       "build",
-      "tooling/HdtAnalysis.csproj",
+      "tooling/net/HdtAnalysis.csproj",
       "--no-restore",
       `-p:AnalysisScope=${language === "csharp-core" ? "core" : "full"}`,
       ...(app === undefined ? [] : [`-p:HdtAppDir=${app}`]),
-      "-p:ErrorLog=../local/analysis/csharp.sarif",
+      `-p:ErrorLog=${path.resolve("local/analysis/csharp.sarif")}`,
       "-warnaserror",
     ]);
+
+    break;
+  }
+
+  case "shell": {
+    const files = [
+      "autostart.sh",
+      ...sources("sh"),
+      ".envrc",
+      ".githooks/pre-commit",
+    ];
+
+    run(["shellcheck", ...files]);
+    run(["shfmt", mode === "fix" ? "-w" : "-d", ...files]);
 
     break;
   }

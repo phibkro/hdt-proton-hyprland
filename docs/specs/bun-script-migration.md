@@ -1,5 +1,9 @@
 # Bun script migration
 
+**Withdrawn on 2026-11-16:** the operator chose to retain Bash scripts and add
+ShellCheck/shfmt. This document records the earlier experiment; current tooling
+is specified in [Source tooling](ecosystem-tooling.md).
+
 ## Contract
 
 Preserve command arguments, exit codes, real process ownership, watcher backoff,

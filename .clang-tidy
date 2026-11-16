@@ -1,5 +1,1 @@
-Checks: '-*,clang-analyzer-*,bugprone-*,cert-err34-c,cert-flp30-c,cert-str34-c,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling'
-# Annex K *_s functions are unavailable in the target glibc/Xlib environment.
-# Keep format-string diagnostics and the other security analyzer checks enabled.
-WarningsAsErrors: '*'
-HeaderFilterRegex: '^(src|tests)/'
+tooling/c/.clang-tidy

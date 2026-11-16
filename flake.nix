@@ -39,12 +39,17 @@
           cp -R ${./src} source/src
           cp -R ${./tests} source/tests
           cp -R ${./scripts} source/scripts
+          cp ${./autostart.sh} source/autostart.sh
+          cp ${./.envrc} source/.envrc
+          mkdir -p source/.githooks
+          cp ${./.githooks/pre-commit} source/.githooks/pre-commit
+          cp ${./tooling/shell/shellcheckrc} source/.shellcheckrc
           cp ${./.editorconfig} source/.editorconfig
-          cp ${./.clang-format} source/.clang-format
-          cp ${./.clang-tidy} source/.clang-tidy
-          cp ${./stylua.toml} source/stylua.toml
-          cp ${./selene.toml} source/selene.toml
-          cp ${./hdt-hyprland.yml} source/hdt-hyprland.yml
+          cp -L ${./tooling/c/.clang-format} source/.clang-format
+          cp -L ${./tooling/c/.clang-tidy} source/.clang-tidy
+          cp ${./tooling/lua/stylua.toml} source/stylua.toml
+          cp ${./tooling/lua/selene.toml} source/selene.toml
+          cp ${./tooling/lua/hdt-hyprland.yml} source/hdt-hyprland.yml
           chmod -R u+w source
           cd source
           export HOME="$TMPDIR/home"
@@ -52,6 +57,7 @@
           bun scripts/quality.ts check c
           bun scripts/quality.ts check lua
           bun scripts/quality.ts check csharp
+          bun scripts/quality.ts check shell
           touch "$out"
         '';
         tests = pkgs.runCommand "hdt-proton-tests" {
@@ -60,13 +66,18 @@
           mkdir source
           cp -R ${./src} source/src
           cp -R ${./scripts} source/scripts
+          cp ${./autostart.sh} source/autostart.sh
+          cp ${./.envrc} source/.envrc
+          mkdir -p source/.githooks
+          cp ${./.githooks/pre-commit} source/.githooks/pre-commit
+          cp ${./tooling/shell/shellcheckrc} source/.shellcheckrc
           cp -R ${./tests} source/tests
           cp -R ${./.github} source/.github
           chmod -R u+w source
           cd source
           export HOME="$TMPDIR/home" HS_APP_ID=1234567890
           mkdir -p "$HOME"
-          bun scripts/test-unit.ts
+          bash scripts/test-unit.sh
           shellcheck scripts/*.sh
           actionlint .github/workflows/check.yml
           touch "$out"

@@ -22,3 +22,13 @@ dotnet_diagnostic.CA1050.severity = none
 
 [*.md]
 trim_trailing_whitespace = false
+
+[*.sh]
+indent_size = 4
+shell_variant = bash
+binary_next_line = true
+switch_case_indent = true
+
+[{.envrc,.githooks/pre-commit}]
+indent_size = 4
+shell_variant = bash

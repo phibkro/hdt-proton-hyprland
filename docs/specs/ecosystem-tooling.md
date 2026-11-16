@@ -77,3 +77,33 @@ Do not merge this tooling branch until the full workflow is green. The remote
 workflow has not run for this local branch. Full HDT-dependent C# and WPF replay
 remain local checks because the public repository does not distribute HDT or
 Microsoft runtime binaries.
+
+## Revisions after initial checks
+
+- 2026-11-16: User retained shell implementations instead of the Bun migration.
+  Restore Bash entry points and test the real shell boundaries; add ShellCheck
+  and shfmt to development, staged checks, and full CI. Keep existing TypeScript
+  application code and the bounded development-tool drivers.
+- 2026-11-16: Move language configuration into tooling/{net,ts,lua,c,shell}.
+  Root discovery files reference one authoritative configuration through imports,
+  extends, or relative symlinks. Keep EditorConfig and environment activation at
+  the root for tool discovery.
+- 2026-11-16: Static analysis includes test sources under the same rules as source:
+  TypeScript lint/types, C analyzer, and C# Roslyn. No test-directory exclusion.
+- 2026-11-16: A clean-head test rerun found a fixture timestamp race despite an
+  earlier passing run. Clock/compositor snapshots now publish atomically and
+  launch records are consumed only when newline-complete. Rerun results follow
+  after verification; earlier results do not establish this revision's status.
+
+## Reorganized tooling verification, 2026-11-16
+
+- Restored shell process boundaries: 47 tests and 156 assertions passed.
+- Test lint was run over all TypeScript tests, without exclusions. It reports
+  191 remaining findings; this is a failed analysis gate, not a passing suite.
+  The changed watcher, Steam wrapper, desktop, and replay boundary tests pass
+  the strict rules. Remaining files are input-journal.test.ts, xinput-race.ts,
+  config.test.ts, and trace-export.test.ts.
+- Clang-Tidy covered tests/xinput-race.c. Roslyn core covered
+  tests/FlightRecorderChecks.cs with zero build warnings/errors.
+- Lua's discovery symlinks resolve correctly with StyLua and Selene.
+- ShellCheck and shfmt pass for all owned shell entry points.

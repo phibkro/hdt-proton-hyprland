@@ -1,10 +1,12 @@
-import { exec, main, root, run } from "./process";
+import { main, root, run } from "./process";
 
-main(() => {
+await main(() => {
   process.env.PRE_COMMIT_HOME = `${root}/cache/pre-commit`;
 
   if (process.argv[2] === "run") {
-    exec(["pre-commit", "run", "--hook-stage", "pre-commit"]);
+    run(["pre-commit", "run", "--hook-stage", "pre-commit"]);
+
+    return;
   }
 
   switch (process.argv[2]) {

@@ -35,8 +35,8 @@ stdenv.mkDerivation {
     cp -R src scripts LICENSE "$out/share/hdt-proton/"
     install -m755 overlay-link x-surface-probe "$out/libexec/hdt-proton/"
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: command: ''
-      makeWrapper ${bun}/bin/bun "$out/bin/${name}" \
-        --add-flags "$out/share/hdt-proton/scripts/hdt.ts ${command}" \
+      makeWrapper ${bash}/bin/bash "$out/bin/${name}" \
+        --add-flags "$out/share/hdt-proton/scripts/hdt.sh ${command}" \
         --prefix PATH : "$out/bin:${runtimePath}" \
         --set HDT_NATIVE_DIR "$out/libexec/hdt-proton" \
         --set HDT_INSTALLED 1 \

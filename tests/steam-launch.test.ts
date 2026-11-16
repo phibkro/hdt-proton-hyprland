@@ -1,16 +1,17 @@
+/* eslint-disable no-await-in-loop -- Fixture setup serializes file creation before launching the subprocess under test. */
 import { expect, test } from "bun:test";
 import { mkdtemp, mkdir, chmod, rm, symlink, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import nodePath from "node:path";
 
-const root = resolve(import.meta.dir, "..");
+const root = nodePath.resolve(import.meta.dir, "..");
 
 for (const serviceExit of [0, 1]) {
   test(`Steam argv and exit status survive service status ${serviceExit}`, async () => {
-    const temp = await mkdtemp(join(tmpdir(), "hdt-steam-test-"));
+    const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-steam-test-"));
 
     try {
-      const ctl = join(temp, "systemctl");
+      const ctl = nodePath.join(temp, "systemctl");
       await Bun.write(
         ctl,
         `#!/bin/sh\nprintf '%s\\n' "$@" > "$TEST_SERVICE_CALL"\nexit ${serviceExit}\n`
@@ -25,12 +26,12 @@ for (const serviceExit of [0, 1]) {
         "; exit 98",
       ];
 
-      const output = join(temp, "argv.json");
+      const output = nodePath.join(temp, "argv.json");
 
       const p = Bun.spawn(
         [
-          process.execPath,
-          join(root, "scripts/steam-launch.ts"),
+          "bash",
+          nodePath.join(root, "scripts/steam-launch.sh"),
           process.execPath,
           "-e",
           "await Bun.write(process.env.TEST_ARGV!, JSON.stringify({args:process.argv.slice(1),pid:process.pid})); process.exit(23)",
@@ -40,7 +41,7 @@ for (const serviceExit of [0, 1]) {
           env: {
             ...process.env,
             PATH: `${temp}:${process.env.PATH}`,
-            TEST_SERVICE_CALL: join(temp, "service"),
+            TEST_SERVICE_CALL: nodePath.join(temp, "service"),
             TEST_ARGV: output,
           },
           stdout: "pipe",
@@ -53,12 +54,11 @@ for (const serviceExit of [0, 1]) {
         args: argv,
         pid: p.pid,
       });
-      expect(await readFile(join(temp, "service"), "utf-8")).toBe(
+      expect(await readFile(nodePath.join(temp, "service"), "utf-8")).toBe(
         "--user\nstart\nhdt-proton-autostart.service\n"
       );
-      expect(
-        (await new Response(p.stderr).text()).includes("service unavailable")
-      ).toBe(serviceExit !== 0);
+      const stderr = await new Response(p.stderr).text();
+      expect(stderr.includes("service unavailable")).toBe(serviceExit !== 0);
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
@@ -66,23 +66,23 @@ for (const serviceExit of [0, 1]) {
 }
 
 test("Launch Options quote an absolute checkout containing spaces and apostrophes", async () => {
-  const temp = await mkdtemp(join(tmpdir(), "hdt-options-"));
+  const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-options-"));
 
   try {
-    const checkout = join(temp, "tracker's folder");
-    await mkdir(join(checkout, "scripts"), { recursive: true });
+    const checkout = nodePath.join(temp, "tracker's folder");
+    await mkdir(nodePath.join(checkout, "scripts"), { recursive: true });
     await symlink(
-      join(root, "scripts/steam-options.sh"),
-      join(checkout, "scripts/steam-options.sh")
+      nodePath.join(root, "scripts/steam-options.sh"),
+      nodePath.join(checkout, "scripts/steam-options.sh")
     );
     // A harmless stand-in records the parsed path and Steam placeholder argument.
     await Bun.write(
-      join(checkout, "scripts/steam-launch.sh"),
+      nodePath.join(checkout, "scripts/steam-launch.sh"),
       'printf "%s\\n" "$0" "$@"'
     );
 
     const options = Bun.spawn(
-      ["bash", join(checkout, "scripts/steam-options.sh")],
+      ["bash", nodePath.join(checkout, "scripts/steam-options.sh")],
       { stdout: "pipe" }
     );
 
@@ -100,8 +100,11 @@ test("Launch Options quote an absolute checkout containing spaces and apostrophe
 
 test("wrapper without Steam command refuses to start the service", async () => {
   const p = Bun.spawn(
-    [process.execPath, join(root, "scripts/steam-launch.ts")],
-    { stdout: "pipe", stderr: "pipe" }
+    ["bash", nodePath.join(root, "scripts/steam-launch.sh")],
+    {
+      stdout: "pipe",
+      stderr: "pipe",
+    }
   );
 
   expect(await p.exited).toBe(2);
@@ -109,13 +112,13 @@ test("wrapper without Steam command refuses to start the service", async () => {
 
 for (const failingStep of ["none", "build", "install"]) {
   test(`setup composes existing tools and stops at ${failingStep}`, async () => {
-    const temp = await mkdtemp(join(tmpdir(), "hdt-setup-test-"));
+    const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-setup-test-"));
 
     try {
-      const log = join(temp, "calls");
+      const log = nodePath.join(temp, "calls");
 
       for (const tool of ["hdt-launch", "bun"]) {
-        const path = join(temp, tool);
+        const path = nodePath.join(temp, tool);
         await Bun.write(
           path,
           `#!/bin/sh
@@ -128,7 +131,7 @@ esac
         await chmod(path, 0o700);
       }
 
-      const p = Bun.spawn([process.execPath, join(root, "scripts/setup.ts")], {
+      const p = Bun.spawn(["bash", nodePath.join(root, "scripts/setup.sh")], {
         cwd: temp,
         env: {
           ...process.env,
@@ -141,7 +144,8 @@ esac
       });
 
       expect(await p.exited).toBe(failingStep === "none" ? 0 : 31);
-      const calls = (await readFile(log, "utf-8")).trim().split("\n");
+      const contents = await readFile(log, "utf-8");
+      const calls = contents.trim().split("\n");
       expect(calls).toEqual([
         "hdt-launch --build-plugin",
         ...(failingStep === "build"
