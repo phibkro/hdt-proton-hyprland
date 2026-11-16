@@ -51,7 +51,7 @@ public sealed record LaunchOptions(string? Replay, string Settings, string? Prot
         return new(replay, settings, protonState, clientData, nativeState, role, instance, role == NativeUiRole.Overlay ? new(gameWindow, gamePid, gameClass!) : null);
     }
 }
-public sealed class App : Application
+public class App : Application
 {
     public override void Initialize()
     {
