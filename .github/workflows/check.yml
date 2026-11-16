@@ -63,6 +63,9 @@ jobs:
       - name: Analyze portable Framework code
         if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: nix develop --command bun scripts/quality.ts check csharp-core
+      - name: Evaluate analyzer sentinels
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: nix develop --command bash scripts/evaluate.sh sentinels
 
   rust-quality:
     needs: scope

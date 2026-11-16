@@ -754,13 +754,47 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
     for (session, age) in [("other", 0), ("owned", 5000), ("owned", -5000)] {
         publish("owned", 0);
         wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
+        assert_eq!(
+            conn.shape_get_rectangles(overlay, SK::INPUT)
+                .unwrap()
+                .reply()
+                .unwrap()
+                .rectangles
+                .len(),
+            1
+        );
         publish(session, age);
         wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == false && v["controls"] == 0);
+        assert!(
+            conn.shape_get_rectangles(overlay, SK::INPUT)
+                .unwrap()
+                .reply()
+                .unwrap()
+                .rectangles
+                .is_empty()
+        );
     }
     publish("owned", 0);
     wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
+    assert_eq!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1
+    );
     std::fs::remove_file(&region).unwrap();
     wait_ack(&|v| v["fresh"] == false && v["controls"] == 0);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty()
+    );
     nix::sys::signal::kill(
         nix::unistd::Pid::from_raw(owner.0.id() as i32),
         nix::sys::signal::Signal::SIGTERM,

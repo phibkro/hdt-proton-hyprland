@@ -909,6 +909,11 @@ mod tests {
         }
 
         #[test]
+        fn arbitrary_ascii_tokens_never_panic(text in "[ -~]{0,4096}") {
+            let _ = validate_input_frame(text.as_bytes());
+        }
+
+        #[test]
         fn accepted_rectangles_are_inside_the_actual_window(
             width in 1u16..=u16::MAX, height in 1u16..=u16::MAX,
             x in any::<u16>(), y in any::<u16>(), w in any::<u16>(), h in any::<u16>()
@@ -921,11 +926,11 @@ mod tests {
         }
 
         #[test]
-        fn producer_sequences_reject_expiry_resize_and_replaced_sessions(
+        fn producer_sequences_follow_current_time_dimensions_and_session(
             operations in proptest::collection::vec((0u8..6, 0i64..4000), 1..100)
         ) {
             // Reference model tracks the producer and native geometry separately;
-            // restarting or resizing must never revive an old snapshot.
+            // acceptance depends on the currently matching context, not a latched invalidation history.
             let mut now = 10_000i64;
             let mut width = 100u16;
             let mut generation = 0u32;

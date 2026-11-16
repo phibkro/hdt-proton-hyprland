@@ -28,8 +28,11 @@ wait_for 'WPF control layout' '.desktopControl!=null' "$state"
 jq -e '.overlayExtendedStyle / 134217728 | floor % 2 == 1' "$state" >/dev/null
 for variant in wrong-session stale future wrong-hwnd fractional not-ready; do
     jq -n --arg variant "$variant" --argjson hwnd "$(jq .overlayHwnd "$state")" \
-        '{backend:"x11",overlayHwnd:(if $variant=="wrong-hwnd" then $hwnd+1 else $hwnd end),session:(if $variant=="wrong-session" then "wrong" else "isolated-replay" end),nativeReady:($variant!="not-ready"),observedMS:((if $variant=="fractional" then now*1000+0.5 else (now*1000|floor) end)-(if $variant=="stale" then 5000 elif $variant=="future" then -5000 else 0 end))}' >"$ack"
-    sleep 0.3
+        '{backend:"x11",overlayHwnd:(if $variant=="wrong-hwnd" then $hwnd+1 else $hwnd end),session:(if $variant=="wrong-session" then "wrong" else "isolated-replay" end),nativeReady:($variant!="not-ready"),observedMS:((if $variant=="fractional" then now*1000+0.5 else (now*1000|floor) end)-(if $variant=="stale" then 5000 elif $variant=="future" then -5000 else 0 end))}' >"$ack.next"
+    mv "$ack.next" "$ack"
+    updates=$(jq .pluginUpdates "$state")
+    # Two completed UI cycles exclude an update already in flight at rename.
+    wait_for 'plugin consumed invalid acknowledgement' ".pluginUpdates>=$((updates + 2))" "$state"
     jq -e '.overlayExtendedStyle / 134217728 | floor % 2 == 1' "$state" >/dev/null
 done
 HS_APP_ID=1234567890 HDT_PROJECT_DIR="$run" "$host" x11-control isolated-replay >"$run/portable-controller.log" 2>&1 &

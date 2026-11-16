@@ -223,3 +223,4 @@
 !/scripts/check-fuzz.sh
 !/docs/TEST-STRATEGY.md
 !/scripts/bench-host.sh
+!/scripts/evaluate.sh

@@ -26,7 +26,7 @@ rectangle acceptance against an independent geometric predicate. Generated
 producer-operation sequences cover publication, clock advance/rollback, window
 resize, session replacement and missing handles. Failures shrink to a smaller
 sequence. The default suite runs 256 cases per property and keeps regression
-seeds in private evidence until reviewed for publication.
+seeds in private ignored regression files until reviewed for publication.
 
 The real X11 fault journey complements those models: competing owners must not
 change an existing region; malformed, missing, old, future or wrong-session
@@ -82,3 +82,20 @@ The fuzz wrapper uses one libFuzzer process: an unsanitized two-worker fork run
 failed in the native fuzzer supervisor (`free(): invalid size`), while the empty
 artifact replay and single-process campaign succeeded. This does not attribute
 that supervisor failure to HDT's Rust parser.
+
+## Evaluate the development suite
+
+Run `bash scripts/evaluate.sh` for a sequential evaluation of static gates,
+Nextest and subprocess tests. Each run creates a private JSON report with the
+Git revision, dirty-source flag, compiler version, elapsed milliseconds and
+expected/actual exit results. Known-good and known-bad Rust/compiler and
+ShellCheck fixtures verify specific diagnostic codes as positive/negative
+controls. `bash scripts/evaluate.sh sentinels` runs only those analyzer controls;
+CI runs this mode and writes the timing table into its job summary.
+
+The report treats a correctly rejected bad fixture as a passing control. It does
+not reinterpret a real suite failure as an expected rejection. Repeated reports
+can compare cold/warm runs on the same runner; no cross-machine timing threshold
+or overall "quality score" is invented. Compiler time, test time, fuzzing time
+and UI latency remain distinct measurements. Current sentinels test selected
+rules, not every Roslyn, Clippy, TS or shell diagnostic.
