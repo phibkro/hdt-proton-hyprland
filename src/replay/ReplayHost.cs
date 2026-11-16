@@ -351,6 +351,7 @@ sealed class ReplayHost
             pluginUpdates,
             desktopClicks,
             desktopControl = desktopBounds,
+            desktopControlHovered = desktopControl != null && desktopControl.IsMouseOver,
             overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
             foregroundHwnd = GetForegroundWindow().ToInt64(),
             overlayExtendedStyle = WindowStyle(new WindowInteropHelper(overlay).Handle, -20),
