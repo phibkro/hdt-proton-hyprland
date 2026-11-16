@@ -168,3 +168,26 @@ the input helper can scroll it into view.
 
 The X11 child still depends on main-process raster rendering and parent lifetime;
 this acceptance does not establish independent overlay UI/error handling.
+
+## Independent UI lifetimes (explicit opt-in)
+
+Feature ID: `native-ui-isolation`. The coupled single-main preview above remains
+available. The opt-in Rust session owner starts sibling Main and overlay-renderer
+processes from an explicit configuration; both independently read the existing
+observation source. See [the ownership/protocol contract](../../../../docs/specs/native-ui-isolation.md).
+The cached-HDT producer still depends on its own dispatcher.
+
+After the rendered driver above produces its fixtures, run from repository root:
+
+```sh
+bash scripts/check-native-isolation.sh "$HDT_VERIFY_ROOT/native-ui"
+```
+
+Require the actual ignored test to run, exit zero and retain the printed private
+evidence directory. It launches the real application and Rust owner, uses actual
+X11 pointer input for Main navigation/preferences, freezes/kills/restarts each UI
+role, compares independently rendered expected pixels, verifies source failures,
+focus/geometry/empty input shape, and observes exact role/group cleanup. Inspect
+`main-stopped-overlay.png`, `preferences-overlay.png`, `stale-notice.png`,
+`isolated-desktop.png` and `session-actions.jsonl`. No setters or Main-relayed game
+facts are used. This is owned fake-game acceptance, not live game acquisition.

@@ -62,3 +62,5 @@ jobs:
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalonia-evidence'
       - name: Verify rendered pixels and input-empty overlay in isolated X11
         run: nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json --native-ui'
+      - name: Verify independent real UI process lifetimes and pixels
+        run: nix-shell avalonia/shell.nix --run 'bash scripts/check-native-isolation.sh local/avalonia-evidence'

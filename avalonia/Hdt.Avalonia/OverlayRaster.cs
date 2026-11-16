@@ -17,7 +17,9 @@ public sealed record OverlaySpec(int SchemaVersion, int Width, int Height, strin
             throw new InvalidDataException("Unsupported bounded native overlay raster specification.");
     }
 }
-public sealed record OverlayRaster(string SourceSession, int Sequence, long ObservedMs, byte[] Pixels);
+public abstract record OverlayUpdate(byte[] Pixels);
+public sealed record OverlayRaster(string SourceSession, int Sequence, long ObservedMs, byte[] Pixels) : OverlayUpdate(Pixels);
+public sealed record OverlayNotice(string RendererSession, int Sequence, long RenderedMs, byte[] Pixels) : OverlayUpdate(Pixels);
 public static class OverlayRendering
 {
     public static OverlayRaster Render(NativeObservation value, TrackerSettings settings, OverlaySpec spec, string? capture = null)
@@ -68,6 +70,31 @@ public static class OverlayRendering
         using var buffer = new PixelBuffer(spec.Width, spec.Height);
         image.CopyPixels(buffer);
         return new(value.SessionId, value.Sequence, value.ObservedAt.ToUnixTimeMilliseconds(), buffer.Pixels);
+    }
+    public static OverlayNotice Notice(string rendererSession, int sequence, OverlaySpec spec, string heading, string explanation)
+    {
+        spec.Validate();
+        var content = new Border
+        {
+            Width = spec.Width,
+            Height = spec.Height,
+            Padding = new(14),
+            Background = new SolidColorBrush(Color.Parse("#182831")),
+            Child = new StackPanel
+            {
+                Spacing = 14,
+                Children = {
+                new TextBlock { Text = "Native deck tracker", FontSize = 19, Foreground = Brushes.White },
+                new TextBlock { Text = heading, FontSize = 18, Foreground = Brushes.Orange, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = explanation, FontSize = 14, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = "Previous game advice cleared. Waiting for fresh validated observations.", FontSize = 14, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = "Independent renderer • game input passes through", FontSize = 11, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap } }
+            }
+        };
+        content.Measure(new(spec.Width, spec.Height)); content.Arrange(new(0, 0, spec.Width, spec.Height)); content.UpdateLayout();
+        using var image = new RenderTargetBitmap(new(spec.Width, spec.Height), new(96, 96)); image.Render(content);
+        using var buffer = new PixelBuffer(spec.Width, spec.Height); image.CopyPixels(buffer);
+        return new(rendererSession, sequence, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), buffer.Pixels);
     }
     private sealed class PixelBuffer : ILockedFramebuffer
     {

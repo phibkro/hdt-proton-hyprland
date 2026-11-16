@@ -2,6 +2,7 @@ use anyhow::{Context, Result, bail};
 use hdt_host::{config::Config, control, launch, setup, status, x11};
 
 fn run() -> Result<i32> {
+    hdt_host::native_session::bind_owned_parent()?;
     let mut args = std::env::args_os().skip(1);
     let command = args.next().unwrap_or_else(|| "help".into());
     let args: Vec<_> = args.collect();
@@ -18,6 +19,7 @@ fn run() -> Result<i32> {
             hdt_host::client::run(&args)?;
             Ok(0)
         }
+        "native-session" => hdt_host::native_session::run(&args),
         "read-snapshot" => hdt_host::snapshot::run(&args),
         "observe" => {
             hdt_host::journal::run(&args)?;
@@ -100,7 +102,7 @@ fn run() -> Result<i32> {
         }
         "help" | "--help" | "-h" => {
             println!(
-                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export|read-snapshot|client|native-overlay|catalog"
+                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export|read-snapshot|client|native-overlay|native-session|catalog"
             );
             Ok(0)
         }

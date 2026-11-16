@@ -21,10 +21,10 @@ public sealed class NativeOverlayControls : UserControl
     public Task PendingChange { get; private set; } = Task.CompletedTask;
     public Task OwnerCompletion => _actor?.Completion ?? Task.CompletedTask;
     public string Status => _status.Text ?? "";
-    public NativeOverlayControls(bool configured, CancellationToken lifetime)
+    public NativeOverlayControls(bool configured, CancellationToken lifetime, string? externalOwner = null)
     {
         _configured = configured; _lifetime = lifetime;
-        _status.Text = configured ? "Find and choose a game window to enable the native overlay." : "Attach a native observation source to enable the overlay.";
+        _status.Text = externalOwner ?? (configured ? "Find and choose a game window to enable the native overlay." : "Attach a native observation source to enable the overlay.");
         EnabledToggle.IsCheckedChanged += (_, _) =>
         {
             if (!_restoring && !_changing) PendingChange = ChangeAsync();
@@ -35,7 +35,7 @@ public sealed class NativeOverlayControls : UserControl
             Spacing = 12,
             Children = {
             new TextBlock { Text = "Native overlay preview", FontSize = 22 },
-            new TextBlock { Text = "An opaque tracking panel follows the selected X11 game window. All game input passes through. It hides when the game is inactive or observations are stale.", TextWrapping = TextWrapping.Wrap },
+            new TextBlock { Text = externalOwner is null ? "An opaque tracking panel follows the selected X11 game window. All game input passes through. It hides when the game is inactive or observations are stale." : "The independent renderer follows the configured X11 game window. Source failures show an unavailable notice; loss of game focus hides the panel. These Main-owned overlay controls are disabled in this mode.", TextWrapping = TextWrapping.Wrap },
             RefreshButton, GameWindows, EnabledToggle, _status }
         };
         Availability();

@@ -129,6 +129,16 @@ fn candidates(conn: &RustConnection, root: u32) -> Result<Vec<GameWindow>> {
 )]
 enum Packet {
     Hide,
+    Notice {
+        schema_version: u8,
+        renderer_session: String,
+        sequence: u32,
+        rendered_ms: i64,
+        width: u16,
+        height: u16,
+        pixel_format: RasterFormat,
+        pixels: String,
+    },
     Frame {
         schema_version: u8,
         source_session: String,
@@ -149,11 +159,28 @@ struct Frame {
 enum Directive {
     Hide,
     Frame(Frame),
+    Notice(Frame),
 }
 fn decode(bytes: &[u8]) -> Result<Directive> {
     let packet: Packet = serde_json::from_slice(bytes).context("invalid raster protocol")?;
     match packet {
         Packet::Hide => Ok(Directive::Hide),
+        Packet::Notice {
+            schema_version,
+            renderer_session,
+            sequence,
+            rendered_ms,
+            width,
+            height,
+            pixel_format,
+            pixels,
+        } => {
+            let frame = serde_json::json!({"kind":"frame","schemaVersion":schema_version,"sourceSession":renderer_session,"sequence":sequence,"observedMs":rendered_ms,"width":width,"height":height,"pixelFormat":pixel_format,"pixels":pixels});
+            match decode(&serde_json::to_vec(&frame)?)? {
+                Directive::Frame(value) => Ok(Directive::Notice(value)),
+                _ => bail!("invalid notice raster"),
+            }
+        }
         Packet::Frame {
             schema_version,
             source_session,
@@ -376,7 +403,7 @@ fn run_window(game: u32, pid: u32, class: &str) -> Result<()> {
         "explicit owned game window identity is required"
     );
     let parent = nix::unistd::getppid();
-    nix::sys::prctl::set_pdeathsig(Some(nix::sys::signal::Signal::SIGTERM))?;
+    nix::sys::prctl::set_pdeathsig(Some(nix::sys::signal::Signal::SIGKILL))?;
     ensure!(
         nix::unistd::getppid() == parent,
         "overlay parent exited during preparation"
@@ -418,6 +445,7 @@ fn run_window(game: u32, pid: u32, class: &str) -> Result<()> {
     let mut last: Option<(String, u32, i64, Instant)> = None;
     let mut high_water: Option<(String, u32, i64)> = None;
     let mut visible = false;
+    let mut notice_high_water: Option<(String, u32, i64)> = None;
     let mut geometry = None;
     let mut next_status = Instant::now();
     loop {
@@ -434,6 +462,33 @@ fn run_window(game: u32, pid: u32, class: &str) -> Result<()> {
         if let Some(directive) = directive {
             match directive {
                 Directive::Hide => last = None,
+                Directive::Notice(frame) => {
+                    let backwards =
+                        notice_high_water
+                            .as_ref()
+                            .is_some_and(|(session, sequence, time)| {
+                                session == &frame.session
+                                    && (frame.sequence < *sequence || frame.observed_ms < *time)
+                            });
+                    if backwards
+                        || chrono::Utc::now()
+                            .timestamp_millis()
+                            .abs_diff(frame.observed_ms)
+                            > 5000
+                    {
+                        last = None;
+                    } else {
+                        notice_high_water =
+                            Some((frame.session.clone(), frame.sequence, frame.observed_ms));
+                        surface.upload(&frame.pixels)?;
+                        last = Some((
+                            frame.session,
+                            frame.sequence,
+                            frame.observed_ms,
+                            Instant::now(),
+                        ));
+                    }
+                }
                 Directive::Frame(frame) => {
                     let backwards = high_water
                         .as_ref()
