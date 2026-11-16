@@ -40,7 +40,7 @@ if [[ "$action" == prepare ]]; then
     [[ -x "$proton/files/bin/wine" && -x "$runtime/run" ]] || fail 'Select an installed Proton directory and Steam runtime directory.'
     cd "$root"
     paths=$(bash scripts/native-host.sh config)
-    source_prefix=$(jq -er .prefix <<<"$paths")
+    source_prefix=$(realpath -e -- "$(jq -er .prefix <<<"$paths")")
     source_app=$(realpath -e -- "$(jq -er .appDirectory <<<"$paths")")
     clr=drive_c/windows/Microsoft.NET/Framework64/v4.0.30319/clr.dll
     [[ -f "$source_prefix/$clr" ]] || fail 'Native .NET is required in the source prefix.'
