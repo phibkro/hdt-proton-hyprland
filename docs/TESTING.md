@@ -139,7 +139,7 @@ mechanism and the remaining gap to a tested Wine fix.
 
 ## Test stable Proton
 
-Stable Proton has not passed this project's desktop tests. The tested version remains Experimental. Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.
+Stable 11.0-2 passed baseline desktop checks but showed submenu slowdowns and temporary freezes. Experimental remains the current selection. Read the [observed comparison](COMPATIBILITY.md#proton-version-comparison) before repeating the test. Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.
 
 1. Finish play.
 2. Close HDT, Hearthstone, and Battle.net normally.

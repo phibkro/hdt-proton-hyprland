@@ -1,8 +1,50 @@
 # HDT compatibility design
 
-Why does HDT need more than the same Wine prefix to work with Hearthstone on this desktop?
-
 HDT reads game logs, inspects live state through HearthMirror, and draws a separate WPF overlay. Each path has different dependencies. The fixes in this project address process discovery, rendering, geometry, and input separately.
+
+## The current execution path
+
+HDT remains a Windows .NET Framework WPF application. The compatibility plugin
+does not replace HDT with a Linux UI. Native Microsoft .NET Framework 4.8 runs
+inside Proton's Wine environment, which supplies the Windows API implementation.
+HDT's windows reach the Wayland desktop through XWayland:
+
+```text
+HDT main window, overlay, and popups
+                |
+       Microsoft .NET and WPF
+                |
+       Proton Experimental / Wine
+                |
+           X11 windows
+                |
+            XWayland
+                |
+      Hyprland Wayland compositor
+```
+
+Rendering also crosses WPF's composition and Direct3D paths. The current launcher
+applies an HDT-only DXVK shader-model setting, while the plugin requests WPF
+software rendering. These settings do not force Hearthstone to use software
+rendering. The faint overlay background and Arena particle workaround address
+separate rendering failures, described below.
+
+The launcher joins the running game's Steam namespace and Wine prefix, and uses
+that session's Proton executable. The plugin refreshes overlay geometry and
+exports clickable control bounds. Hyprland rules and the X11 transient link keep
+the overlay aligned, stacked with the game, and interactive only over exported
+controls. This compositor integration is specific to the tested Hyprland setup.
+
+Ordinary match tracking still consumes `Power.log`. Live Arena offers and state
+still come from HearthMirror. ArenaSmith ratings use HDT's HSReplay integration
+and require the relevant account entitlement. Working overlay rendering does
+not prove that any of these data paths is advancing.
+
+The current baseline is Experimental after a desktop comparison with Stable
+11.0-2. Stable showed submenu performance and responsiveness problems in that
+comparison. Experimental also retains unresolved freezes and fatal XInput
+errors. The [observed version comparison](COMPATIBILITY.md#proton-version-comparison)
+owns the test results and their limits.
 
 ## The Steam process namespace
 

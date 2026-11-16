@@ -2,7 +2,7 @@
 
 This project runs Hearthstone Deck Tracker with Hearthstone from an existing Battle.net Steam shortcut. It provides an HDT plugin, a launcher, and Hyprland rules. The HDT executable is unmodified.
 
-The [tested configuration](docs/COMPATIBILITY.md#tested-environment) uses Proton Experimental and XWayland. Stable Proton and native Wayland remain untested.
+The [tested configuration](docs/COMPATIBILITY.md#tested-environment) uses Proton Experimental and XWayland on Hyprland. In the desktop comparison, Stable 11.0-2 showed submenu slowdowns and temporary freezes that were less apparent after returning to Experimental. Experimental still has unresolved freezes and crashes. See the [Proton version comparison](docs/COMPATIBILITY.md#proton-version-comparison). Native Wayland remains untested.
 
 Plugin 0.5.0 prevents Arena score particles from triggering the reproduced WPF rendering failure. Ratings, scores, and badge artwork remain enabled. The operator completed the current draft with the workaround. Existing Nix installations must [update their package before rebuilding the plugin](docs/NIX.md#update-an-existing-home-manager-installation).
 
