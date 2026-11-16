@@ -263,3 +263,5 @@
 
 !/src/host/catalog.rs
 !/avalonia/Hdt.Avalonia/CardCatalogView.cs
+
+!/avalonia/Hdt.Checks/OverlayDesktopAcceptance.cs

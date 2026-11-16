@@ -416,6 +416,7 @@ fn isolated_x11_relationship_and_argb_pixels() {
     conn.destroy_window(game).unwrap().check().unwrap();
     portable_bridge_acceptance(&conn, &display, root.root, pid_atom);
     native_overlay_acceptance(&conn, &display, root.root, pid_atom);
+    native_overlay_desktop_acceptance(&conn, &display, root.root, pid_atom);
     conn.flush().unwrap();
 }
 
@@ -1072,5 +1073,393 @@ fn native_overlay_acceptance(conn: &RustConnection, display: &str, root: u32, pi
     conn.destroy_window(game).unwrap().check().unwrap();
     eprintln!(
         "native overlay: input-empty before map, actual pixels, geometry follow, focus hide, stale/backward rejection, recovery and owned-child cleanup passed"
+    );
+}
+
+fn native_overlay_desktop_acceptance(
+    conn: &RustConnection,
+    display: &str,
+    root: u32,
+    pid_atom: u32,
+) {
+    use serde_json::{Value, json};
+    use x11rb::protocol::xproto::{ImageFormat, MapState};
+    let Some(dll) = std::env::var_os("HDT_TEST_NATIVE_UI_DLL") else {
+        return;
+    };
+    let screen = &conn.setup().roots[0];
+    let game = conn.generate_id().unwrap();
+    conn.create_window(
+        screen.root_depth,
+        game,
+        root,
+        600,
+        100,
+        640,
+        680,
+        0,
+        WindowClass::INPUT_OUTPUT,
+        screen.root_visual,
+        &CreateWindowAux::new().background_pixel(0x223344),
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    identity(conn, game, pid_atom, std::process::id(), b"Hearthstone");
+    conn.map_window(game).unwrap().check().unwrap();
+    let active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    let clients = conn
+        .intern_atom(false, b"_NET_CLIENT_LIST")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    conn.change_property32(PropMode::REPLACE, root, clients, AtomEnum::WINDOW, &[game])
+        .unwrap()
+        .check()
+        .unwrap();
+    let activate = |window| {
+        conn.change_property32(PropMode::REPLACE, root, active, AtomEnum::WINDOW, &[window])
+            .unwrap()
+            .check()
+            .unwrap();
+        conn.flush().unwrap();
+    };
+    activate(game);
+    std::fs::create_dir("desktop-ui").unwrap();
+    let mut observation: Value =
+        serde_json::from_slice(&std::fs::read("ui-observation.json").unwrap()).unwrap();
+    let mut sequence = 100;
+    let mut publish = || {
+        sequence += 1;
+        let now = chrono::Utc::now().to_rfc3339();
+        observation["sequence"] = json!(sequence);
+        observation["observedAt"] = json!(now);
+        observation["arena"]["sequence"] = json!(sequence);
+        observation["arena"]["observedAt"] = json!(now);
+        std::fs::write(
+            "desktop-ui/observation.next",
+            serde_json::to_vec(&observation).unwrap(),
+        )
+        .unwrap();
+        std::fs::rename("desktop-ui/observation.next", "desktop-ui/observation.json").unwrap();
+    };
+    publish();
+    let stderr = std::fs::File::create("desktop-ui/stderr.txt").unwrap();
+    let mut app = Server(
+        Command::new(std::env::var_os("HDT_TEST_UI_DOTNET").unwrap())
+            .arg(dll)
+            .args(["--desktop-overlay-ui", "/capture/desktop-ui"])
+            .env("DISPLAY", display)
+            .env("HDT_HOST_BINARY", "/capture/hdt-host")
+            .env("DOTNET_PROCESSOR_COUNT", "2")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(stderr)
+            .spawn()
+            .unwrap(),
+    );
+    let app_pid = app.0.id();
+    let stdout = app.0.stdout.take().unwrap();
+    let (tx, rx) = mpsc::sync_channel(16);
+    let reader = std::thread::spawn(move || {
+        let mut input = BufReader::new(stdout);
+        loop {
+            let mut line = Vec::new();
+            let count = std::io::Read::take(&mut input, 8193)
+                .read_until(b'\n', &mut line)
+                .unwrap();
+            if count == 0 {
+                break;
+            }
+            assert!(count <= 8192 && line.last() == Some(&b'\n'));
+            let value = serde_json::from_slice::<Value>(&line).unwrap();
+            if tx.send(value).is_err() {
+                break;
+            }
+        }
+    });
+    let ready = rx
+        .recv_timeout(Duration::from_secs(8))
+        .expect("real desktop app ready; inspect desktop-ui/stderr.txt on failure");
+    assert_eq!(ready["kind"], "ready");
+    assert_eq!(ready["pid"], app_pid);
+    let mut stdin = app.0.stdin.take().unwrap();
+    let mut transcript = std::fs::File::create("desktop-ui/actions.jsonl").unwrap();
+    let mut request = |value: Value| {
+        serde_json::to_writer(&mut stdin, &value).unwrap();
+        stdin.write_all(b"\n").unwrap();
+        stdin.flush().unwrap();
+        let reply = rx
+            .recv_timeout(Duration::from_secs(4))
+            .expect("real desktop control reply");
+        writeln!(transcript, "{}", json!({"request":value,"reply":reply})).unwrap();
+        reply
+    };
+    let click = |point: Value| {
+        assert_eq!(point["kind"], "point");
+        let x = point["x"].as_i64().unwrap();
+        let y = point["y"].as_i64().unwrap();
+        assert!(
+            (0..600).contains(&x) && (0..900).contains(&y),
+            "pointer must stay in the app's own area, outside the fake game"
+        );
+        let status = Command::new(std::env::var_os("HDT_TEST_UI_XDOTOOL").unwrap())
+            .args([
+                "mousemove",
+                "--sync",
+                &x.to_string(),
+                &y.to_string(),
+                "click",
+                "1",
+            ])
+            .env("DISPLAY", display)
+            .status()
+            .unwrap();
+        assert!(status.success());
+    };
+    click(request(json!({"action":"point","target":"options"})));
+    assert_eq!(
+        request(json!({"action":"inspect"}))["page"],
+        3,
+        "actual X11 pointer opens Options"
+    );
+    click(request(json!({"action":"point","target":"enabled"})));
+    let state = request(json!({"action":"inspect"}));
+    assert!(
+        !state["enabled"].as_bool().unwrap()
+            && state["status"]
+                .as_str()
+                .unwrap()
+                .contains("choose a Hearthstone window"),
+        "invalid missing selection must fail visibly and roll back: {state}"
+    );
+    request(json!({"action":"capture"}));
+    std::fs::copy("desktop-ui/options.png", "desktop-ui/invalid-selection.png").unwrap();
+    publish();
+    click(request(json!({"action":"point","target":"find"})));
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["idle"] == true && state["choices"] == 1 {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "real game discovery did not complete: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    publish();
+    click(request(json!({"action":"point","target":"enabled"})));
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["idle"] == true && state["enabled"] == true {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "real Options enable failed: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let find_overlay = || {
+        conn.query_tree(root)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .children
+            .into_iter()
+            .find(|window| {
+                conn.get_property(false, *window, AtomEnum::WM_NAME, AtomEnum::STRING, 0, 128)
+                    .unwrap()
+                    .reply()
+                    .is_ok_and(|reply| reply.value == b"HDT native tracking overlay")
+            })
+    };
+    let overlay = find_overlay().expect("Options must create the real Rust-owned window");
+    let pid_reply = conn
+        .get_property(false, overlay, pid_atom, AtomEnum::CARDINAL, 0, 1)
+        .unwrap()
+        .reply()
+        .unwrap();
+    let owner_pid = pid_reply.value32().unwrap().next().unwrap();
+    assert_eq!(property(conn, overlay), Some(game));
+    let wait_map = |mapped: bool| {
+        let deadline = Instant::now() + Duration::from_secs(4);
+        loop {
+            assert!(
+                conn.shape_get_rectangles(overlay, SK::INPUT)
+                    .unwrap()
+                    .reply()
+                    .unwrap()
+                    .rectangles
+                    .is_empty()
+            );
+            if (conn
+                .get_window_attributes(overlay)
+                .unwrap()
+                .reply()
+                .unwrap()
+                .map_state
+                == MapState::VIEWABLE)
+                == mapped
+            {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "desktop overlay visibility did not become {mapped}"
+            );
+            std::thread::sleep(Duration::from_millis(30));
+        }
+    };
+    publish();
+    request(json!({"action":"expected"}));
+    let expected = std::fs::read("desktop-ui/expected.bgra").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let pixels = loop {
+        wait_map(true);
+        let actual = conn
+            .get_image(ImageFormat::Z_PIXMAP, overlay, 0, 0, 320, 640, u32::MAX)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .data;
+        if actual.len() == expected.len()
+            && actual
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(expected.as_chunks::<4>().0)
+                .all(|(left, right)| left[..3] == right[..3])
+        {
+            break actual;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "real Options -> actor -> Rust X11 pixels differ from actual renderer"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let mut ppm = b"P6\n320 640\n255\n".to_vec();
+    for pixel in pixels.as_chunks::<4>().0 {
+        ppm.extend([pixel[2], pixel[1], pixel[0]]);
+    }
+    std::fs::write("desktop-ui/overlay.ppm", ppm).unwrap();
+    request(json!({"action":"capture"}));
+    let desktop = conn
+        .get_image(
+            ImageFormat::Z_PIXMAP,
+            root,
+            0,
+            0,
+            screen.width_in_pixels,
+            screen.height_in_pixels,
+            u32::MAX,
+        )
+        .unwrap()
+        .reply()
+        .unwrap();
+    let mut desktop_ppm = format!(
+        "P6\n{} {}\n255\n",
+        screen.width_in_pixels, screen.height_in_pixels
+    )
+    .into_bytes();
+    for pixel in desktop.data.as_chunks::<4>().0 {
+        desktop_ppm.extend([pixel[2], pixel[1], pixel[0]]);
+    }
+    std::fs::write("desktop-ui/desktop.ppm", desktop_ppm).unwrap();
+    publish();
+    activate(root);
+    wait_map(false);
+    activate(game);
+    wait_map(true);
+    std::thread::sleep(Duration::from_millis(5200));
+    wait_map(false);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["source"].as_str().unwrap().contains("unavailable") && state["cards"] == 0 {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "stale observations must clear real game cards by the next one-second UI timer tick: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    request(json!({"action":"capture"}));
+    std::fs::copy("desktop-ui/options.png", "desktop-ui/stale.png").unwrap();
+    publish();
+    wait_map(true);
+    let owner_alive = std::path::PathBuf::from(format!("/proc/{owner_pid}"));
+    assert!(owner_alive.exists());
+    click(request(json!({"action":"point","target":"enabled"})));
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["enabled"] == false
+            && state["idle"] == true
+            && state["ownerCompleted"] == true
+            && state["status"].as_str().unwrap().contains("stopped")
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "disable must await the owned child: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    assert!(
+        !owner_alive.exists(),
+        "Options disable must reap its exact Rust child"
+    );
+    assert!(
+        conn.get_window_attributes(overlay)
+            .unwrap()
+            .reply()
+            .is_err()
+    );
+    request(json!({"action":"capture"}));
+    std::fs::copy("desktop-ui/options.png", "desktop-ui/disabled.png").unwrap();
+    std::fs::write("desktop-ui/identity.json",json!({"appPid":app_pid,"gameWindow":game,"gamePid":std::process::id(),"overlayWindow":overlay,"overlayPid":owner_pid,"inputRectangles":0,"reaped":true}).to_string()).unwrap();
+    request(json!({"action":"close"}));
+    drop(stdin);
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        if let Some(status) = app.0.try_wait().unwrap() {
+            assert!(status.success());
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    drop(rx);
+    reader.join().unwrap();
+    let bounds = conn.get_geometry(game).unwrap().reply().unwrap();
+    assert_eq!(
+        (bounds.x, bounds.y, bounds.width, bounds.height),
+        (600, 100, 640, 680)
+    );
+    assert_eq!(
+        conn.shape_get_rectangles(game, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1
+    );
+    conn.destroy_window(game).unwrap().check().unwrap();
+    eprintln!(
+        "native desktop Options: actual X11 pointer navigation, visible invalid selection, discovery/enable, real Rust pixels/input-empty, focus/stale/recovery, disable/exact-child reap passed"
     );
 }

@@ -336,7 +336,7 @@ has **not** been run; no installed plugin or game was changed.
 After the normal rendered acceptance, run from the repository root:
 
 ```sh
-nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json'
+nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json --native-ui'
 ```
 
 This uses the actual Avalonia-produced raster on a private Bubblewrap/Xvfb
@@ -347,8 +347,13 @@ Evidence includes `native-overlay.ppm`. Without `--native-frame`, the same Rust
 route explicitly reports protocol-only solid pixels; that is not managed-renderer
 acceptance. The managed driver separately proves changing rendered offers and a
 stalled helper's deadline/reaping while pointer navigation remains responsive.
-The complete Options-enable → streaming-child flow is not yet an automated
-rendered end-to-end route.
+The additional desktop journey uses real X11 pointer input on production Options
+controls to reject missing selection visibly, discover the owned fake game,
+enable the real Rust child, compare every displayed pixel, hide on focus loss
+and stale observation, recover, then disable and reap that exact child. Evidence
+includes `desktop-ui/actions.jsonl`, `desktop.ppm`, `invalid-selection.png`,
+`stale.png`, `disabled.png` and process/window identities. Its private `/tmp` and
+X11 socket directory never connect to the operator display.
 
 ## Optional local card catalog
 

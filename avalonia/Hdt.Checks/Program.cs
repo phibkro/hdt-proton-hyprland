@@ -7,7 +7,9 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Hdt.Avalonia;
 
-if (args.Length != 2) throw new ArgumentException("Usage: Hdt.Checks FIXTURE EVIDENCE_DIRECTORY");
+if (args is ["--desktop-overlay-ui", var desktopEvidence])
+{ Environment.ExitCode = OverlayDesktopAcceptance.Run(desktopEvidence); return; }
+if (args.Length != 2) throw new ArgumentException("Usage: Hdt.Checks FIXTURE EVIDENCE_DIRECTORY | --desktop-overlay-ui EVIDENCE_DIRECTORY");
 var fixture = Path.GetFullPath(args[0]);
 var evidence = Path.GetFullPath(args[1]);
 Directory.CreateDirectory(evidence);
@@ -416,6 +418,8 @@ Check(serialized == 2 && serializationThread != uiThread, "producer serializes o
 var overlaySpec = Result(SnapshotFiles.InvokeJsonAsync<OverlaySpec>(["native-overlay", "info"], SnapshotFiles.StatusBytes));
 overlaySpec.Validate();
 var overlayObservation = NativeFrame("Arena", 20, frames[1]);
+File.WriteAllText(Path.Combine(evidence, "native-overlay-observation.json"), System.Text.Json.JsonSerializer.Serialize(overlayObservation,
+    new System.Text.Json.JsonSerializerOptions(ReplaySource.JsonOptions) { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
 var overlayRaster = OverlayRendering.Render(overlayObservation, new TrackerSettings(), overlaySpec, Path.Combine(evidence, "native-overlay-render.png"));
 Check(overlayRaster.Pixels.Length == overlaySpec.Width * overlaySpec.Height * 4
     && Enumerable.Range(0, overlayRaster.Pixels.Length / 4).All(index => overlayRaster.Pixels[index * 4 + 3] == 255), "actual Avalonia renderer produces a complete opaque bounded raster for Rust-owned overlay");

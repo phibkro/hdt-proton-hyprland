@@ -116,7 +116,7 @@ Feature ID: `native-x11-overlay`. After the rendered driver, return to the root
 and run the private protocol journey with the actual emitted frame:
 
 ```sh
-nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json'
+nix-shell avalonia/shell.nix --run 'bash scripts/check-rust-x11.sh --native-frame local/avalonia-evidence/native-overlay-frame.json --native-ui'
 ```
 
 Require the log to say `exercising actual Avalonia-rendered raster`, all actual
@@ -126,9 +126,15 @@ fresh observations to recover, and owned child exit/window destruction while
 the fake game's geometry and input remain intact. Inspect retained
 `native-overlay.ppm` and the rendered driver's `native-overlay-render.png`.
 The ordinary Rust route without the frame argument reports protocol-only pixels.
-This is isolated X11 acceptance; actual Hearthstone/compositor and complete
-Options-enable → child streaming acceptance remain unverified. Do not use the
-operator's game or display to fill that gap without separate authorization.
+The additional desktop route must drive production Options controls with real
+X11 pointer input: missing selection fails visibly, discovery finds the owned
+fake game, enable starts the real Rust child, actual pixels match and input
+shape is empty, focus/stale transitions hide, fresh data recovers, and disable
+reaps that exact child and destroys its window. Inspect `desktop-ui/actions.jsonl`,
+`desktop.ppm`, `invalid-selection.png`, `stale.png`, `disabled.png` and
+`identity.json`. This is isolated X11 acceptance; actual Hearthstone/compositor
+acceptance remains unverified. Do not use the operator's game or display to fill
+that gap without separate authorization.
 
 ## Local catalog and archive restore
 
@@ -141,4 +147,4 @@ manual CLI probe of a current public catalog can establish format compatibility;
 retain URL/time/hash privately and never turn its data into a tracked fixture.
 The driver must also browse archived entries and restore one without changing its
 stable identity, notes, history association or tracking selection. The native file
-chooser and full Options-enable → overlay stream remain separate unverified routes.
+chooser remains a separate unverified route.
