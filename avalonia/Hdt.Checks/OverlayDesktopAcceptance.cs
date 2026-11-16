@@ -42,6 +42,9 @@ public sealed class OverlayDesktopAcceptance : Application
     }
     private static async Task DriveAsync(MainWindow window)
     {
+#if WATCHER_ACCEPTANCE
+        NativeWatcherChecks.SourceDispatcher? watcher = null;
+#endif
         try
         {
             await ReplyAsync(new { kind = "ready", pid = Environment.ProcessId });
@@ -64,6 +67,7 @@ public sealed class OverlayDesktopAcceptance : Application
                     Control Locate() => target switch
                     {
                         "options" => (TabItem)window.GetVisualDescendants().OfType<TabControl>().Single().Items[3]!,
+                        "arena" => (TabItem)window.GetVisualDescendants().OfType<TabControl>().Single().Items[1]!,
                         "overlay-settings" => window.SettingsPanel.OverlayCategory,
                         "find" => window.NativeOverlay.RefreshButton,
                         "enabled" => window.NativeOverlay.EnabledToggle,
@@ -92,7 +96,9 @@ public sealed class OverlayDesktopAcceptance : Application
                         ownerCompleted = window.NativeOverlay.OwnerCompletion.IsCompleted,
                         choices = window.NativeOverlay.GameWindows.ItemCount,
                         source = window.GameView.ModeText,
-                        cards = window.GameView.CardCount
+                        cards = window.GameView.CardCount,
+                        arena = window.Summary,
+                        offers = window.OfferCount
                     });
                     await ReplyAsync(state);
                 }
@@ -113,6 +119,32 @@ public sealed class OverlayDesktopAcceptance : Application
                     });
                     await ReplyAsync(new { kind = "capture" });
                 }
+#if WATCHER_ACCEPTANCE
+                else if (action == "watcher")
+                {
+                    // Only this owned fixture instance changes context/lifetime, never original HDT.
+                    var command = json.RootElement.GetProperty("command").GetString();
+                    if (command == "stop")
+                    {
+                        watcher?.Dispose(); watcher = null;
+                        await ReplyAsync(new { kind = "watcher", command });
+                        continue;
+                    }
+                    watcher ??= new(Path.Combine(_root, "observation.json"));
+                    switch (command)
+                    {
+                        case "heroes": watcher.Change(["FIXTURE_HERO_A", "FIXTURE_HERO_B", "FIXTURE_HERO_C"]); break;
+                        case "cards": watcher.Change(["FIXTURE_CARD_A", "FIXTURE_CARD_B", "FIXTURE_CARD_C"]); break;
+                        case "replacement": watcher.Change(["FIXTURE_CARD_D", "FIXTURE_CARD_E", "FIXTURE_CARD_F"]); break;
+                        case "menu": watcher.Menu(); break;
+                        case "pause": watcher.Pause(); break;
+                        case "resume": watcher.Resume(); break;
+                        default: throw new IOException("Unknown real-watcher fixture command.");
+                    }
+                    watcher.ThrowFailure();
+                    await ReplyAsync(new { kind = "watcher", command });
+                }
+#endif
                 else if (action == "close")
                 {
                     await window.NativeOverlay.OwnerCompletion.WaitAsync(TimeSpan.FromSeconds(3));
@@ -128,6 +160,17 @@ public sealed class OverlayDesktopAcceptance : Application
             Console.Error.WriteLine(error);
             await Dispatcher.UIThread.InvokeAsync(() => ((IClassicDesktopStyleApplicationLifetime)Current!.ApplicationLifetime!).Shutdown(1));
         }
+#if WATCHER_ACCEPTANCE
+        finally
+        {
+            try { watcher?.Dispose(); }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine(error);
+                await Dispatcher.UIThread.InvokeAsync(() => ((IClassicDesktopStyleApplicationLifetime)Current!.ApplicationLifetime!).Shutdown(1));
+            }
+        }
+#endif
     }
     private static async Task ReplyAsync(object value)
     { await Console.Out.WriteLineAsync(JsonSerializer.Serialize(value)); await Console.Out.FlushAsync(); }

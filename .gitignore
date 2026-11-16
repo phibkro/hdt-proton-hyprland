@@ -278,3 +278,8 @@
 !/avalonia/Hdt.Avalonia/IndependentOverlay.cs
 !/tests/host/rust-native-session-isolated.rs
 !/scripts/check-native-isolation.sh
+
+!/src/plugin/NativeArenaEventBridge.cs
+!/docs/specs/native-arena-event-bridge.md
+
+!/tests/native/NativeWatcherChecks.cs

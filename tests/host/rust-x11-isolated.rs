@@ -1379,6 +1379,132 @@ fn native_overlay_desktop_acceptance(
         desktop_ppm.extend([pixel[2], pixel[1], pixel[0]]);
     }
     std::fs::write("desktop-ui/desktop.ppm", desktop_ppm).unwrap();
+    if std::env::var_os("HDT_TEST_WATCHER_ACCEPTANCE").is_some() {
+        // One file writer at a time: the normal fixture publisher is idle until
+        // the real-watcher fixture explicitly stops and joins its atomic writer.
+        click(request(json!({"action":"point","target":"arena"})));
+        {
+            let mut capture_watcher = |command: &str, phase: &str| {
+                request(json!({"action":"watcher","command":command}));
+                let deadline = Instant::now() + Duration::from_secs(5);
+                loop {
+                    let state = request(json!({"action":"inspect"}));
+                    if state["offers"] == 3 && state["arena"].as_str().unwrap().contains(phase) {
+                        break;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "real watcher phase never reached native controls: {state}"
+                    );
+                    std::thread::sleep(Duration::from_millis(30));
+                }
+                request(json!({"action":"watcher","command":"pause"}));
+                request(json!({"action":"expected"}));
+                let expected = std::fs::read("desktop-ui/expected.bgra").unwrap();
+                let deadline = Instant::now() + Duration::from_secs(3);
+                let actual = loop {
+                    wait_map(true);
+                    let actual = conn
+                        .get_image(ImageFormat::Z_PIXMAP, overlay, 0, 0, 320, 640, u32::MAX)
+                        .unwrap()
+                        .reply()
+                        .unwrap()
+                        .data;
+                    if actual.len() == expected.len()
+                        && actual
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .zip(expected.as_chunks::<4>().0)
+                            .all(|(a, b)| a[..3] == b[..3])
+                    {
+                        break actual;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "real watcher -> adapter -> file -> Rust -> overlay pixels differ for {command}"
+                    );
+                    std::thread::sleep(Duration::from_millis(30));
+                };
+                assert!(
+                    conn.shape_get_rectangles(overlay, SK::INPUT)
+                        .unwrap()
+                        .reply()
+                        .unwrap()
+                        .rectangles
+                        .is_empty()
+                );
+                let mut ppm = b"P6\n320 640\n255\n".to_vec();
+                for pixel in actual.as_chunks::<4>().0 {
+                    ppm.extend([pixel[2], pixel[1], pixel[0]]);
+                }
+                std::fs::write(format!("desktop-ui/watcher-{command}-overlay.ppm"), ppm).unwrap();
+                request(json!({"action":"capture"}));
+                std::fs::copy(
+                    "desktop-ui/options.png",
+                    format!("desktop-ui/watcher-{command}-main.png"),
+                )
+                .unwrap();
+                std::fs::copy(
+                    "desktop-ui/observation.json",
+                    format!("desktop-ui/watcher-{command}.json"),
+                )
+                .unwrap();
+                request(json!({"action":"watcher","command":"resume"}));
+            };
+            capture_watcher("heroes", "Choose a hero");
+            capture_watcher("cards", "Card draft");
+            capture_watcher("replacement", "Card draft");
+        }
+        request(json!({"action":"watcher","command":"menu"}));
+        wait_map(false);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            let state = request(json!({"action":"inspect"}));
+            if state["offers"] == 0 && state["source"].as_str().unwrap().starts_with("Menu") {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "watcher menu must clear prior choices: {state}"
+            );
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        request(json!({"action":"capture"}));
+        std::fs::copy("desktop-ui/options.png", "desktop-ui/watcher-menu-main.png").unwrap();
+        request(json!({"action":"watcher","command":"heroes"}));
+        wait_map(true);
+        request(json!({"action":"watcher","command":"pause"}));
+        request(json!({"action":"watcher","command":"cards"}));
+        std::thread::sleep(Duration::from_millis(5200));
+        wait_map(false);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let state = request(json!({"action":"inspect"}));
+            if state["source"].as_str().unwrap().contains("unavailable") && state["offers"] == 0 {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "paused source delivery must become unavailable by the next one-second UI refresh even though provider Update completed: {state}"
+            );
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        click(request(json!({"action":"point","target":"options"})));
+        assert_eq!(request(json!({"action":"inspect"}))["page"], 3);
+        request(json!({"action":"capture"}));
+        std::fs::copy(
+            "desktop-ui/options.png",
+            "desktop-ui/watcher-dispatcher-stopped.png",
+        )
+        .unwrap();
+        request(json!({"action":"watcher","command":"resume"}));
+        wait_map(true);
+        request(json!({"action":"watcher","command":"stop"}));
+        eprintln!(
+            "actual installed watcher/scripted provider -> copied events -> atomic file -> Rust -> pointer-driven Main and input-empty X11 overlay: hero/card/replacement/menu/dispatcher stop/recovery passed"
+        );
+    }
     publish();
     activate(root);
     wait_map(false);

@@ -12,7 +12,7 @@ public sealed record ArenaRelations(string[] Direct, string[] Indirect)
     public IEnumerable<string> All => Direct.Concat(Indirect);
 }
 public sealed record ArenaOffer(ArenaCard Card, ArenaRating? BaseRating, ArenaRating? DynamicRating,
-    ArenaRelations Enabled, ArenaRelations EnhancedBy)
+    ArenaRelations Enabled, ArenaRelations EnhancedBy, int? SourceIndex = null)
 {
     public string DisplayScore
     {
@@ -34,7 +34,14 @@ public sealed record ArenaOffer(ArenaCard Card, ArenaRating? BaseRating, ArenaRa
 }
 public enum ArenaMode { Inactive, Drafting }
 public enum ArenaUnavailableKind { Unknown, HeroPower, DualClass, Package, Redraft }
-public sealed record ArenaHeroChoice(string Id, string Name, string? Class);
+public enum ArenaChoiceOrigin { HdtWatcherEvent }
+public enum ArenaCachedDeckOrigin { HdtPublicTileModel }
+public sealed record ArenaHeroChoice(string Id, string Name, string? Class, int? SourceIndex = null);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ArenaCachedDeck([property: JsonRequired] ArenaCachedDeckOrigin Origin, [property: JsonRequired] ArenaCard[] Cards);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ArenaChoiceEvidence([property: JsonRequired] ArenaChoiceOrigin Origin, [property: JsonRequired] DateTimeOffset ReceivedAt,
+    [property: JsonRequired] long Revision, [property: JsonRequired] long Generation);
 // A phase owns exactly one choice shape. Schema 2 never puts hero choices in card offers.
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "phase")]
 [JsonDerivedType(typeof(ArenaInactive), "Inactive")]
@@ -52,12 +59,13 @@ public sealed record ArenaCardDraft(ArenaOffer[] Choices) : ArenaSelection;
 public sealed record ArenaUnavailable([property: JsonRequired] ArenaUnavailableKind Kind, string Reason) : ArenaSelection;
 public sealed record ArenaObservation(int SchemaVersion, string SessionId, DateTimeOffset ObservedAt,
     int Sequence, ArenaMode Mode, int PickIndex, string? SelectedCardId, string Hero, bool Underground,
-    ArenaCard[] PickedDeck, ArenaOffer[] Offers, string Description, ArenaSelection? Selection = null)
+    ArenaCard[] PickedDeck, ArenaOffer[] Offers, string Description, ArenaSelection? Selection = null,
+    ArenaChoiceEvidence? ChoiceEvidence = null, ArenaCachedDeck? CachedDeck = null)
 {
     // Explicit compatibility: schema 1 can only describe inactive/card drafts, never heroes.
     [JsonIgnore]
     public ArenaSelection ViewSelection => SchemaVersion == 1
-        ? ArenaV1Adapter.CardOnly(this) : Selection ?? throw new InvalidDataException("Arena schema 2 requires an explicit selection phase.");
+        ? ArenaV1Adapter.CardOnly(this) : Selection ?? throw new InvalidDataException("Arena schemas 2 and 3 require an explicit selection phase.");
     [JsonIgnore] public ArenaOffer[] CardOffers => ViewSelection is ArenaCardDraft cards ? cards.Choices : [];
 }
 public static class ArenaV1Adapter
@@ -85,17 +93,30 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
         var previous = -1;
         foreach (var frame in frames)
         {
-            if (frame is null || frame.SchemaVersion is not (1 or 2) || string.IsNullOrWhiteSpace(frame.SessionId)
+            if (frame is null || frame.SchemaVersion is not (1 or 2 or 3) || string.IsNullOrWhiteSpace(frame.SessionId)
                 || frame.ObservedAt == default || !Enum.IsDefined(frame.Mode)
                 || frame.Sequence <= previous || string.IsNullOrWhiteSpace(frame.Hero)
                 || frame.PickedDeck is null || frame.Offers is null || frame.Description is null)
-                throw new InvalidDataException("Observations require schema 1 or 2, session/time, known mode, increasing sequence, hero, deck, offers and description.");
-            if (frame.SchemaVersion == 1 && frame.Selection is not null || frame.SchemaVersion == 2 && (frame.Selection is null || frame.Offers.Length != 0))
-                throw new InvalidDataException("Schema 1 is card-only; schema 2 requires its tagged phase and empty legacy offers.");
+                throw new InvalidDataException("Observations require schema 1, 2 or 3, session/time, known mode, increasing sequence, hero, deck, offers and description.");
+            if (frame.SchemaVersion == 1 && frame.Selection is not null || frame.SchemaVersion >= 2 && (frame.Selection is null || frame.Offers.Length != 0))
+                throw new InvalidDataException("Schema 1 is card-only; schemas 2 and 3 require their tagged phase and empty legacy offers.");
             var selection = frame.ViewSelection;
+            if (frame.SchemaVersion == 3 ? frame.CachedDeck is not { Cards: not null } cached
+                    || !Enum.IsDefined(cached.Origin) || cached.Cards.Length > 100
+                    || frame.PickedDeck.Length != 0 || frame.PickIndex != 0 || frame.SelectedCardId is not null
+                : frame.CachedDeck is not null)
+                throw new InvalidDataException("Schema 3 cached deck is a separate bounded public model, never correlated pick progress.");
+            var hasChoices = selection is ArenaHeroSelection or ArenaCardDraft;
+            var evidence = frame.ChoiceEvidence;
+            if (frame.SchemaVersion < 3 && evidence is not null
+                || frame.SchemaVersion == 3 && (hasChoices != (evidence is not null)
+                    || evidence is not null && (!Enum.IsDefined(evidence.Origin) || evidence.ReceivedAt == default
+                        || evidence.ReceivedAt > frame.ObservedAt || evidence.ReceivedAt.Offset != TimeSpan.Zero
+                        || evidence.Revision < 1 || evidence.Generation < 0)))
+                throw new InvalidDataException("Schema 3 choices require bounded delivered-event evidence; legacy or unavailable phases cannot claim that evidence.");
             if ((selection is ArenaInactive) != (frame.Mode == ArenaMode.Inactive))
                 throw new InvalidDataException("Arena phase must match active/inactive mode.");
-            if (frame.SchemaVersion == 2 && selection is ArenaInactive && (frame.PickIndex != 0 || frame.SelectedCardId is not null))
+            if (frame.SchemaVersion >= 2 && selection is ArenaInactive && (frame.PickIndex != 0 || frame.SelectedCardId is not null))
                 throw new InvalidDataException("Schema 2 inactive phase must clear previous picked-deck facts.");
             if (selection is ArenaHeroSelection heroes)
             {
@@ -115,10 +136,19 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
                 throw new InvalidDataException("Unsupported selections require an explicit kind and bounded reason.");
             var offers = frame.CardOffers;
             if (offers is null) throw new InvalidDataException("Card draft requires explicit choices.");
+            if (frame.SchemaVersion == 3 && (selection is ArenaHeroSelection { Choices.Length: 0 }
+                || selection is ArenaCardDraft { Choices.Length: 0 }
+                || offers.Any(offer => offer is null || offer.BaseRating is not null || offer.DynamicRating is not null
+                    || offer.Enabled is null || offer.EnhancedBy is null || offer.Enabled.All.Any() || offer.EnhancedBy.All.Any())))
+                throw new InvalidDataException("Raw watcher choices require nonempty identities and cannot claim joined rating/synergy generations.");
+            var sourceSlots = selection is ArenaHeroSelection heroChoices ? heroChoices.Choices.Select(hero => hero.SourceIndex) : offers.Select(offer => offer?.SourceIndex);
+            if (frame.SchemaVersion == 3 && (sourceSlots.Any(slot => slot is null or < 0) || sourceSlots.Distinct().Count() != sourceSlots.Count())
+                || frame.SchemaVersion < 3 && sourceSlots.Any(slot => slot is not null))
+                throw new InvalidDataException("Only raw schema 3 choices carry unique bounded opaque source actor indices.");
             if (frame.PickedDeck.Length > 100 || offers.Length > 12 || frame.Hero.Length > 128 || frame.SessionId.Length > 128 || frame.Description.Length > 2048)
                 throw new InvalidDataException("Replay exceeds preview collection/text limits.");
             if (offers.Any(offer => offer is null)) throw new InvalidDataException("Offers cannot be null.");
-            foreach (var card in frame.PickedDeck.Concat(offers.Select(o => o.Card)))
+            foreach (var card in frame.PickedDeck.Concat(offers.Select(o => o.Card)).Concat(frame.CachedDeck?.Cards ?? []))
                 if (card is null || string.IsNullOrWhiteSpace(card.Id) || string.IsNullOrWhiteSpace(card.Name) || card.Mana < 0 || card.Id.Length > 128 || card.Name.Length > 512)
                     throw new InvalidDataException("Cards require an ID, name and nonnegative mana.");
             foreach (var offer in offers)
@@ -144,7 +174,9 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
         // The transport already bounds the complete document before parsing.
         AllowOutOfOrderMetadataProperties = true,
         WriteIndented = true,
-        Converters = { new JsonStringEnumConverter<ArenaUnavailableKind>(allowIntegerValues: false),
+        Converters = { new JsonStringEnumConverter<ArenaCachedDeckOrigin>(allowIntegerValues: false),
+            new JsonStringEnumConverter<ArenaChoiceOrigin>(allowIntegerValues: false),
+            new JsonStringEnumConverter<ArenaUnavailableKind>(allowIntegerValues: false),
             new System.Text.Json.Serialization.JsonStringEnumConverter<ArenaMode>(allowIntegerValues: false),
             new System.Text.Json.Serialization.JsonStringEnumConverter<NativeMode>(allowIntegerValues: false),
             new System.Text.Json.Serialization.JsonStringEnumConverter<NativeAvailability>(allowIntegerValues: false) }

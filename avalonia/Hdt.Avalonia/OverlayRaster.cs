@@ -32,6 +32,7 @@ public static class OverlayRendering
         if (value.Mode == NativeMode.Arena && value.Arena is { } arena)
         {
             content.Children.Add(Text(ArenaPresentation.Heading(arena), 14));
+            if (arena.ChoiceEvidence is { } evidence) content.Children.Add(Text(ArenaPresentation.Evidence(evidence), 11));
             foreach (var choice in ArenaPresentation.Choices(arena, settings, 16).Take(3)) content.Children.Add(choice);
             if (arena.CardOffers.Length > 3) content.Children.Add(Text($"{arena.CardOffers.Length - 3} more offers in the native app."));
         }
@@ -113,12 +114,13 @@ public static class OverlayRendering
 public static class ArenaPresentation
 {
     private static TextBlock Text(string value, double size) => new() { Text = value, FontSize = size, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap };
+    public static string Evidence(ArenaChoiceEvidence evidence) => $"HDT watcher event received {evidence.ReceivedAt:HH:mm:ss} UTC • memory freshness unknown";
     public static string Heading(ArenaObservation frame)
     {
         var phase = frame.ViewSelection switch
         {
             ArenaHeroSelection => "Choose a hero",
-            ArenaCardDraft => $"Card draft • {frame.PickIndex} cards picked",
+            ArenaCardDraft => frame.SchemaVersion == 3 ? "Card draft • pick progress unavailable" : $"Card draft • {frame.PickIndex} cards picked",
             ArenaUnavailable => "Selection unavailable",
             _ => "Arena menu • no active choices"
         };
@@ -134,23 +136,31 @@ public static class ArenaPresentation
                     {
                         Spacing = 6,
                         Children = {
-                        Text(hero.Class ?? "Class not observed", size - 3), Text(hero.Id, 12), Text("Hero statistics unavailable", 13) }
+                        Text(hero.Class ?? "Class not observed", size - 3), Text(hero.Id, 12),
+                        Text(hero.SourceIndex is { } index ? $"Source actor index {index} • position unknown" : "Source position not supplied", 11),
+                        Text("Hero statistics unavailable", 13) }
                     });
                 if (heroes.UnavailableReason is not null) yield return Text(heroes.UnavailableReason, 14);
                 break;
             case ArenaCardDraft cards:
-                foreach (var offer in cards.Choices) yield return Offer(offer, frame.PickedDeck, settings, frame.Underground, size);
+                foreach (var offer in cards.Choices) yield return Offer(offer, frame.PickedDeck, settings, frame.Underground, size, frame.SchemaVersion != 3);
                 break;
             case ArenaUnavailable unavailable:
                 yield return Text($"{unavailable.Kind} choices unavailable • {unavailable.Reason}", 14);
                 break;
         }
+        if (frame.ChoiceEvidence is { } evidence) yield return Text(Evidence(evidence), 12);
     }
-    public static Border Offer(ArenaOffer offer, ArenaCard[] deck, TrackerSettings settings, bool underground, double size)
+    public static Border Offer(ArenaOffer offer, ArenaCard[] deck, TrackerSettings settings, bool underground, double size, bool adviceAvailable = true)
     {
         var lines = new StackPanel { Spacing = 6, Children = { Text($"{offer.Card.Mana} mana   {offer.Card.Name}", size), Text(offer.Card.Id, 12) } };
-        if (settings.ShowArenasmithScore) lines.Children.Add(Text($"Arenasmith {offer.DisplayScore} • plaque {offer.Plaque}", size - 3));
-        if (settings.ShowArenaDeckSynergies) lines.Children.Add(Text($"Deck synergies: {offer.SynergyCount(deck)}", 14));
+        if (offer.SourceIndex is { } index) lines.Children.Add(Text($"Source actor index {index} • position unknown", 11));
+        if (!adviceAvailable) lines.Children.Add(Text("Ratings and deck synergies unavailable • no matching source generation", 13));
+        else
+        {
+            if (settings.ShowArenasmithScore) lines.Children.Add(Text($"Arenasmith {offer.DisplayScore} • plaque {offer.Plaque}", size - 3));
+            if (settings.ShowArenaDeckSynergies) lines.Children.Add(Text($"Deck synergies: {offer.SynergyCount(deck)}", 14));
+        }
         return new Border
         {
             Padding = new(size < 20 ? 10 : 16),

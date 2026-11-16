@@ -3,6 +3,7 @@ set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 frame=
 native_ui=false
+watcher_events=false
 while (($#)); do
     case $1 in
         --native-frame)
@@ -15,13 +16,18 @@ while (($#)); do
             native_ui=true
             shift
             ;;
+        --watcher-events)
+            watcher_events=true
+            shift
+            ;;
         *)
-            echo 'Usage: check-rust-x11.sh [--native-frame FILE [--native-ui]]' >&2
+            echo 'Usage: check-rust-x11.sh [--native-frame FILE [--native-ui [--watcher-events]]]' >&2
             exit 2
             ;;
     esac
 done
 [[ $native_ui == false || -n $frame ]] || exit 2
+[[ $watcher_events == false || $native_ui == true ]] || exit 2
 mkdir -p evidence
 run=$(mktemp -d "$PWD/evidence/rust-x11-XXXXXXXX")
 chmod 700 "$run"
@@ -33,7 +39,19 @@ if [[ -n $frame ]]; then
     native_env=(--setenv HDT_TEST_AVALONIA_FRAME /capture/native-frame.json)
 fi
 if [[ $native_ui == true ]]; then
-    cp -R avalonia/Hdt.Checks/bin/Debug/net10.0 "$run/managed"
+    managed=$(dotnet msbuild avalonia/Hdt.Checks/Hdt.Checks.csproj -getProperty:TargetDir "-p:WatcherAcceptance=$watcher_events")
+    [[ -f "$managed/Hdt.Checks.dll" ]] || {
+        echo 'Build the selected native checks variant first.' >&2
+        exit 2
+    }
+    if [[ $watcher_events == false ]]; then
+        vendor_files=$(rg --files --hidden --no-ignore -g HearthWatcher.dll -g HearthMirror.dll "$managed") || [[ $? == 1 ]]
+        if [[ -n $vendor_files ]]; then
+            echo 'Ordinary native checks contain optional vendor assemblies; refusing to bundle them.' >&2
+            exit 2
+        fi
+    fi
+    cp -R "$managed" "$run/managed"
     cp -- "$(dirname -- "$frame")/native-overlay-observation.json" "$run/ui-observation.json"
     native_env+=(--setenv HDT_TEST_NATIVE_UI_DLL /capture/managed/Hdt.Checks.dll
         --setenv HDT_TEST_UI_DOTNET "$(readlink -f "$(command -v dotnet)")"
@@ -41,6 +59,7 @@ if [[ $native_ui == true ]]; then
         --setenv LD_LIBRARY_PATH "$LD_LIBRARY_PATH"
         --setenv DOTNET_SYSTEM_GLOBALIZATION_INVARIANT 1)
 fi
+if [[ $watcher_events == true ]]; then native_env+=(--setenv HDT_TEST_WATCHER_ACCEPTANCE 1); fi
 build=$(CARGO_BUILD_JOBS=2 cargo test --locked --test rust-x11-isolated --no-run --message-format=json)
 executable=$(jq -er 'select(.reason=="compiler-artifact" and .target.name=="rust-x11-isolated" and .executable!=null) | .executable' <<<"$build")
 CARGO_BUILD_JOBS=2 cargo build --locked
