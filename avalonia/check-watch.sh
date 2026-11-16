@@ -8,6 +8,9 @@ chmod 700 "$run"
 git rev-parse HEAD >"$run/source-head.txt"
 git status --porcelain >"$run/source-status.txt"
 mkdir "$run/source"
+printf 'developer:x:%s:%s:Native development test:/capture/home:/bin/sh\n' "$(id -u)" "$(id -g)" >"$run/passwd"
+printf 'developer:x:%s:\n' "$(id -g)" >"$run/group"
+printf 'passwd: files\ngroup: files\nhosts: files\n' >"$run/nsswitch.conf"
 git archive HEAD avalonia | tar -x -C "$run/source"
 [[ -d ${NUGET_PACKAGES:?Enter the pinned Avalonia shell first.} ]]
 cat >"$run/drive.sh" <<'DRIVE'
@@ -86,6 +89,8 @@ status=0
 timeout --kill-after=5s 150 bwrap --unshare-all --die-with-parent --new-session --clearenv \
     --ro-bind /nix/store /nix/store --proc /proc --dev /dev --tmpfs /tmp \
     --dir /bin --ro-bind "$shell" /bin/sh --bind "$run" /capture \
+    --dir /etc --ro-bind "$run/passwd" /etc/passwd --ro-bind "$run/group" /etc/group \
+    --ro-bind "$run/nsswitch.conf" /etc/nsswitch.conf \
     --bind "$NUGET_PACKAGES" /packages --chdir /capture \
     --setenv PATH "$PATH" --setenv HOME /capture/home \
     --setenv DOTNET_CLI_HOME /capture/dotnet --setenv NUGET_PACKAGES /packages \

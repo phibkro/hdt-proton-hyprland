@@ -25,7 +25,14 @@ separate prerequisites, not a consequence of a successful watch test.
 - Save source identity, commands, logs, screenshots and expected failure evidence.
 - Missing licensed/editor prerequisites remain explicit. No invented attachment.
 
+NuGet/MSBuild require user resolution even in an offline namespace. Supply a
+synthetic run-owned passwd/group identity; do not bind the host account database.
+
 ## Revisions
 
 - 2026-11-16: Initial bounded workflow acceptance after operator requested all
   outstanding lanes in parallel. This lane owns developer-loop checks only.
+
+- 2026-11-16: Initial isolated attempt stalled before GenerateWatchList completed.
+  Owned-process syscall evidence showed repeated missing passwd lookups; add the
+  synthetic identity prerequisite rather than changing SDK or allowing network.
