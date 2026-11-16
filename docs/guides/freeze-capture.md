@@ -9,11 +9,11 @@ for the distinction between collected bytes and processed game events.
 
 1. Open a terminal in the checkout.
 2. Set these variables to the current files. Use HDT's own diagnostic log and the
-   active Hearthstone session's log directory:
+   Hearthstone log root containing session directories:
 
    ```sh
    HDT_LOG='/absolute/path/to/HearthstoneDeckTracker/Logs/hdt_log.txt'
-   GAME_LOGS='/absolute/path/to/Hearthstone/Logs/Hearthstone_CURRENT_SESSION'
+   GAME_LOGS='/absolute/path/to/Hearthstone/Logs'
    RECORDER_ROOT="$PWD/evidence"
    ```
 
@@ -30,17 +30,20 @@ for the distinction between collected bytes and processed game events.
      --max-bytes 536870912 \
      --recorder-root "$RECORDER_ROOT" \
      --source "hdt=$HDT_LOG" \
-     --source "power=$GAME_LOGS/Power.log" \
-     --source "loading=$GAME_LOGS/LoadingScreen.log" \
-     --source "arena=$GAME_LOGS/Arena.log"
+     --game-log-root "$GAME_LOGS" \
+     --game-log Power.log \
+     --game-log LoadingScreen.log \
+     --game-log Arena.log
    ```
 
 4. Keep the terminal open while you play. Capture from before the next match
    through the return to the Arena lobby.
 
-`--from end` skips bytes already present at the first poll. Use `--from start`
-to capture existing file contents too. The output directory must be new. The
-512 MiB limit includes journal metadata and base64 expansion.
+For files discovered under the selected roots, `--from end` records each
+existing file's end offset during startup; files appearing afterward start at
+zero. Explicit `--source` files establish their initial offset at the first
+poll. Use `--from start` to capture existing contents too. The output directory
+must be new. The 512 MiB limit includes journal metadata and base64 expansion.
 
 ## Preserve a failure
 
@@ -55,8 +58,16 @@ the capture private. Review and sanitize evidence before sharing it.
 
 ## Start another session
 
-If Hearthstone restarts, select its new session directory and start another
-capture. If only HDT restarts, the existing capture follows replacement of the
+With `--game-log-root`, leave the collector running when Hearthstone restarts:
+each new immediate session directory gets separate cursors, and old streams keep
+draining. Newly discovered sessions/files start at byte zero even with `--from end`.
+The root and selected log names are explicit; no active game or Steam prefix is
+inferred. For a flat directory use the existing `--source name=/absolute/file`
+form. Symlink path components fail; missing roots/files can recover. See the
+[discovery contract](../specs/independent-log-session-discovery.md) for supported
+names, limits and acquisition boundaries.
+
+If only HDT restarts, the existing capture follows replacement of the
 selected `hdt_log.txt` path and records a new source generation.
 With `--recorder-root`, the capture also discovers each restarted HDT recorder
 and collects that session from its first byte. Leave the collector running

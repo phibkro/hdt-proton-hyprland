@@ -83,7 +83,11 @@ Every matching HDT session owns a separate cursor, so a restart does not replace
 an older session that still has unread bytes. New sessions start at byte zero.
 Startup sessions follow the requested offset policy. Discovery has a limit of
 128 sessions and shares the journal's byte limit. Both limits fail explicitly.
-Hearthstone log-session discovery remains outside this implementation.
+Explicit-root Hearthstone log-session discovery is specified in
+[independent-log-session-discovery.md](independent-log-session-discovery.md).
+It shares the collector's discovery/cursor machinery and preserves selected
+bytes across session changes; it does not add independent semantic game events
+or Arena-choice acquisition. No installation path or active session is guessed.
 
 `hdt-replay run --canonical-events --with-plugin` loads the installed HDT and
 HearthWatcher assemblies in the existing isolated WPF host. It invokes

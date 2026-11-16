@@ -30,7 +30,7 @@ The Nix package provides `hdt-proton`. Its subcommands reuse the same scripts as
 | `watch` | Runs the existing automatic-start watcher |
 | `setup` | Applies the compatibility plugin and settings |
 | `status` | Reports the filtered runtime status |
-| `observe` | Collects exact bytes from explicit log paths in a separate native process; see [capture instructions](../guides/freeze-capture.md) |
+| `observe` | Collects exact bytes from explicit files and selected session-root logs in a separate native process; see [capture instructions](../guides/freeze-capture.md) |
 | `trace-export` | Converts local flight-recorder files to Perfetto trace-event JSON |
 | `overlay-launch` | Starts HDT with the compatibility defaults |
 | `raw-launch` | Starts the namespace launcher with its supplied arguments |
