@@ -20,8 +20,8 @@ for(const scenario of ["restart","game-owned","no-game","ambiguous"]) {
       })) {
         const file=join(dir,name);await Bun.write(file,`#!/bin/sh\n${source}\n`);await chmod(file,0o700);
       }
-      const p=Bun.spawn(["bash",join(root,"scripts/desktop.sh"),"restart"],{
-        env:{...process.env,PATH:`${dir}:${process.env.PATH}`,TEST_DIR:dir,TEST_GROUP:scenario==="game-owned"?group:"/separate-hdt-service"},
+      const p=Bun.spawn([process.execPath,join(root,"scripts/desktop.ts"),"restart"],{
+        env:{...process.env,PATH:`${dir}:${process.env.PATH}`,TEST_DIR:dir,HS_APP_ID:"123",TEST_GROUP:scenario==="game-owned"?group:"/separate-hdt-service"},
         stdout:"pipe",stderr:"pipe",
       });
       const rejected=["game-owned","ambiguous"].includes(scenario);

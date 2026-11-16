@@ -24,7 +24,7 @@ test("installed source reads configuration and app data from the explicit mutabl
   const dir = await mkdtemp("/tmp/hdt-config-");
   try {
     await Bun.write(`${dir}/hdt.local.json`,JSON.stringify({steamAppId:"6789",steamRoot:`${dir}/steam`}));
-    const env={...process.env,HDT_PROJECT_DIR:dir};
+    const env: NodeJS.ProcessEnv={...process.env,HDT_PROJECT_DIR:dir};
     delete env.HS_APP_ID;
     delete env.STEAM_ROOT;
     delete env.HDT_APP_DIR;

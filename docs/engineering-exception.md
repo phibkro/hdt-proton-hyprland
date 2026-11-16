@@ -94,3 +94,20 @@ existing test tooling exception without adding a TypeScript application runtime.
 LibXi is a development dependency only. No upstream code is copied into the
 fixture. A future Effect migration must retain server ownership, deadlines,
 desktop isolation, and the error-handling negative controls.
+
+## Bun shell migration recorded on 2026-11-16
+
+The operator explicitly requested readable Bun implementations. The process
+supervision exception is reopened: this checkout has no installed Effect package,
+Effect guidance, or house overlay. Effect's process and scoped-resource services
+are relevant alternatives, not established capability gaps. Introducing a new
+Effect dependency and redesigning all launcher ownership is deferred rather than
+misrepresented as a mechanical shell migration. The maintainer retains this
+bounded exception for Bun 1.4.4, pinned through devenv.lock.
+
+The watcher owns Bun subprocess objects instead of reusable numeric PIDs. A
+CLOEXEC descriptor retains the singleton flock; only the short flock acquisition
+child receives that descriptor explicitly. Steam command delegation uses Bun's
+process.execve to preserve process identity, signals, arguments, and exit status.
+Real subprocess fixtures must pass before acceptance. An Effect migration or
+runtime upgrade reopens this decision and must preserve those ownership tests.

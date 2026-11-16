@@ -107,3 +107,17 @@
 !/tests/tracker-environment.test.ts
 !/scripts/test-unit.sh
 !/docs/specs/xinput-device-race.md
+!/scripts/process.ts
+!/scripts/autostart.ts
+!/scripts/check-xinput.ts
+!/scripts/check.ts
+!/scripts/desktop.ts
+!/scripts/hdt.ts
+!/scripts/replay-inside.ts
+!/scripts/replay.ts
+!/scripts/setup.ts
+!/scripts/steam-launch.ts
+!/scripts/steam-options.ts
+!/scripts/test-unit.ts
+!/docs/specs/bun-script-migration.md
+!/tests/replay-cli.test.ts

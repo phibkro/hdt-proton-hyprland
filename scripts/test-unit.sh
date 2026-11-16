@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
-set -euo pipefail
-cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
-exec bun test ./tests/*.test.ts
+# Compatibility entry point; implementation is readable Bun TypeScript.
+exec bun "$(dirname -- "${BASH_SOURCE[0]}")/test-unit.ts" "$@"

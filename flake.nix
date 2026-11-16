@@ -28,7 +28,7 @@
       checks.${system} = {
         inherit package;
         tests = pkgs.runCommand "hdt-proton-tests" {
-          nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.shellcheck pkgs.actionlint pkgs.jq pkgs.coreutils pkgs.util-linux ];
+          nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.shellcheck pkgs.actionlint pkgs.jq pkgs.coreutils pkgs.util-linux pkgs.ripgrep ];
         } ''
           mkdir source
           cp -R ${./src} source/src
@@ -39,7 +39,7 @@
           cd source
           export HOME="$TMPDIR/home" HS_APP_ID=1234567890
           mkdir -p "$HOME"
-          bash scripts/test-unit.sh
+          bun scripts/test-unit.ts
           shellcheck scripts/*.sh
           actionlint .github/workflows/check.yml
           touch "$out"

@@ -13,13 +13,13 @@ for (const serviceExit of [0, 1]) {
       await chmod(ctl, 0o700);
       const argv = ["spaces in path", "literal $(exit 99)", "quote'\"", "", "; exit 98"];
       const output = join(temp, "argv.json");
-      const p = Bun.spawn(["bash", join(root, "scripts/steam-launch.sh"), process.execPath,
-        "-e", 'await Bun.write(process.env.TEST_ARGV!, JSON.stringify(process.argv.slice(1))); process.exit(23)', ...argv], {
+      const p = Bun.spawn([process.execPath, join(root, "scripts/steam-launch.ts"), process.execPath,
+        "-e", 'await Bun.write(process.env.TEST_ARGV!, JSON.stringify({args:process.argv.slice(1),pid:process.pid})); process.exit(23)', ...argv], {
         env: { ...process.env, PATH: `${temp}:${process.env.PATH}`, TEST_SERVICE_CALL: join(temp, "service"), TEST_ARGV: output },
         stdout: "pipe", stderr: "pipe",
       });
       expect(await p.exited).toBe(23);
-      expect(JSON.parse(await readFile(output, "utf8"))).toEqual(argv);
+      expect(JSON.parse(await readFile(output, "utf8"))).toEqual({args:argv,pid:p.pid});
       expect(await readFile(join(temp, "service"), "utf8")).toBe("--user\nstart\nhdt-proton-autostart.service\n");
       expect((await new Response(p.stderr).text()).includes("service unavailable")).toBe(serviceExit !== 0);
     } finally { await rm(temp, { recursive: true, force: true }); }
@@ -44,7 +44,7 @@ test("Launch Options quote an absolute checkout containing spaces and apostrophe
 });
 
 test("wrapper without Steam command refuses to start the service", async () => {
-  const p = Bun.spawn(["bash", join(root, "scripts/steam-launch.sh")], { stdout: "pipe", stderr: "pipe" });
+  const p = Bun.spawn([process.execPath, join(root, "scripts/steam-launch.ts")], { stdout: "pipe", stderr: "pipe" });
   expect(await p.exited).toBe(2);
 });
 
@@ -63,7 +63,7 @@ esac
 `);
         await chmod(path, 0o700);
       }
-      const p = Bun.spawn(["bash", join(root, "scripts/setup.sh")], {
+      const p = Bun.spawn([process.execPath, join(root, "scripts/setup.ts")], {
         cwd: temp,
         env: { ...process.env, PATH: `${temp}:${process.env.PATH}`, TEST_CALLS: log, TEST_FAIL: failingStep },
         stdout: "pipe", stderr: "pipe",

@@ -5,6 +5,10 @@ import {tmpdir} from "node:os";
 
 // Only compositor snapshots and time are simulated. The watcher, launcher,
 // process identity checks, lock, and child exit statuses are real processes.
+function streamText(stream: unknown) {
+  if (!(stream instanceof ReadableStream)) throw Error("Expected a piped subprocess stream");
+  return new Response(stream).text();
+}
 type Fixture={dir:string;clients:string;start:()=>ReturnType<typeof Bun.spawn>;launches:()=>Promise<number[][]>;wait:(f:()=>Promise<boolean>)=>Promise<void>;processes:ReturnType<typeof Bun.spawn>[]};
 async function fixture(mode:string,run:(f:Fixture)=>Promise<void>) {
   const dir=await mkdtemp(join(tmpdir(),"hdt-watch-"));
@@ -28,14 +32,14 @@ esac`,
   for(const [name,source] of Object.entries(sources)) {
     const file=join(dir,name);await writeFile(file,`#!/bin/sh\n${source}\n`);await chmod(file,0o700);
   }
-  const env={...process.env,PATH:`${dir}:${process.env.PATH}`,XDG_RUNTIME_DIR:join(dir,"runtime"),TEST_DIR:dir,TEST_MODE:mode,TEST_BUN:process.execPath};
-  const start=()=>{const p=Bun.spawn(["bash",resolve(import.meta.dir,"../scripts/autostart.sh")],{env,stdin:"ignore",stdout:"pipe",stderr:"pipe"});processes.push(p);return p};
+  const env={...process.env,PATH:`${dir}:${process.env.PATH}`,XDG_RUNTIME_DIR:join(dir,"runtime"),TEST_DIR:dir,TEST_MODE:mode,TEST_BUN:process.execPath,HS_APP_ID:"123"};
+  const start=()=>{const p=Bun.spawn([process.execPath,resolve(import.meta.dir,"../scripts/autostart.ts")],{env,stdin:"ignore",stdout:"pipe",stderr:"pipe"});processes.push(p);return p};
   const launches=async()=>{try{return (await readFile(calls,"utf8")).trim().split("\n").filter(Boolean).map(s=>s.split(" ").map(Number))}catch{return []}};
   const wait=async(f:()=>Promise<boolean>)=>{
     for(let i=0;i<150;i++){
       if(await f())return;
       if(processes[0]?.exitCode!==null && processes[0]?.exitCode!==undefined)
-        throw Error(`Fixture process exited (${processes[0].exitCode}): ${await new Response(processes[0].stderr).text()}`);
+        throw Error(`Fixture process exited (${processes[0].exitCode}): ${await streamText(processes[0].stderr)}`);
       await Bun.sleep(20);
     }
     throw Error("Watcher fixture timed out");
@@ -46,6 +50,7 @@ esac`,
     // Launcher stand-ins belong to this fixture. Never signal a snapshot's PID.
     for(const [pid] of await launches()) {
       try {
+        if ((await readFile(`/proc/${pid}/stat`,"utf8")).match(/\) ([ZX]) /)) continue;
         const environment=(await readFile(`/proc/${pid}/environ`,"utf8")).split("\0");
         if(environment.includes(`TEST_DIR=${dir}`)) process.kill(pid,"SIGTERM");
       } catch(error) {if(!["ESRCH","ENOENT"].includes((error as NodeJS.ErrnoException).code!))throw error}
@@ -58,7 +63,7 @@ const game=(pid=123)=>({class:"steam_app_123",title:"Hearthstone",pid});
 test("lock tool failures cannot be reported as a successful existing owner",()=>fixture("lock-error",async f=>{
   await writeFile(f.clients,JSON.stringify([game()]));const watcher=f.start();
   expect(await watcher.exited).toBe(73);
-  expect(await new Response(watcher.stderr).text()).toContain("Could not acquire");
+  expect(await streamText(watcher.stderr)).toContain("Could not acquire");
   expect(await f.launches()).toEqual([]);
 }));
 
@@ -72,7 +77,7 @@ test("owned launcher crashes retry with backoff, stop after three failures, and 
   await f.wait(async()=>(await f.launches()).length===6);await Bun.sleep(120);
   expect((await f.launches()).length).toBe(6);
   watcher.kill("SIGTERM");await watcher.exited;
-  expect(await new Response(watcher.stdout).text()).toContain("failed three times");
+  expect(await streamText(watcher.stdout)).toContain("failed three times");
 }));
 
 test("a launcher that survives a minute gets a fresh failure budget",()=>fixture("recover",async f=>{
@@ -105,7 +110,7 @@ test("watcher neither duplicates an in-flight launcher nor keeps its lock in the
   }
   finally {process.kill(child,"SIGCONT");}
   const duplicate=f.start();expect(await duplicate.exited).toBe(0);
-  expect(await new Response(duplicate.stdout).text()).toContain("already has an owner");
+  expect(await streamText(duplicate.stdout)).toContain("already has an owner");
   watcher.kill("SIGTERM");await watcher.exited;
   // No game means a replacement watcher can acquire the lock without launching.
   await writeFile(f.clients,"[]");const replacement=f.start();await Bun.sleep(100);
