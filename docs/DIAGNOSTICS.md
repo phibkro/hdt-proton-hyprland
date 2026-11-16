@@ -66,7 +66,7 @@ The Battlegrounds test raises synthetic WPF pointer events at the actual bound c
 
 Existing HearthMirror reads, ArenaSmith request durations, native compositor acknowledgments, and graphics presentation completion do not yet have correlated traces. The recorder does not capture process dumps. Add observations to existing operations rather than polling the game or ratings service again.
 
-The implementation uses .NET Framework APIs and the project's existing Bun tooling. It adds no OpenTelemetry SDK or remote collector. The exporter uses Perfetto's documented trace-event format to keep the initial diagnostic path local.
+The recorder uses .NET Framework APIs inside HDT. The independent journal and trace exporter run in the native Rust host outside Wine; neither requires Bun. No OpenTelemetry SDK or remote collector is added. The exporter uses Perfetto's documented trace-event format to keep diagnostics local.
 
 ## Independent input journal
 
