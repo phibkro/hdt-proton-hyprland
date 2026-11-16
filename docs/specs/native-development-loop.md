@@ -47,3 +47,9 @@ synthetic run-owned passwd/group identity; do not bind the host account database
   timestamped XID/PID observations, wait for a different process before capturing
   the changed palette, and bound each image request. Window identity includes its
   PID because a new X11 client can legitimately reuse the old numeric XID.
+
+- 2026-11-16: Inspecting the changed screenshot exposed missing replay-reader
+  wiring despite successful palette assertions. Copy/hash the explicitly built
+  real Rust host into the run, pass its namespace path, and require loaded card
+  border pixels before accepting either screenshot. An empty/error page with a
+  correctly changed brand color is insufficient.

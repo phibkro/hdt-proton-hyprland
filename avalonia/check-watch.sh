@@ -2,11 +2,18 @@
 # Drive the real F# restart loop in committed source on an owned private display.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+[[ $# -eq 0 && ${HDT_HOST_BINARY:-} == /* && -x ${HDT_HOST_BINARY:-} ]] || {
+    echo 'Build the Rust host and set HDT_HOST_BINARY to its absolute executable path before running check-watch.sh without arguments.' >&2
+    exit 64
+}
 mkdir -p local
 run=$(mktemp -d "$PWD/local/native-watch-XXXXXXXX")
 chmod 700 "$run"
 git rev-parse HEAD >"$run/source-head.txt"
 git status --porcelain >"$run/source-status.txt"
+printf '%s\n' "$HDT_HOST_BINARY" >"$run/host-source-path.txt"
+cp -- "$HDT_HOST_BINARY" "$run/hdt-host"
+sha256sum "$run/hdt-host" >"$run/host-sha256.txt"
 mkdir "$run/source"
 printf 'developer:x:%s:%s:Native development test:/capture/home:/bin/sh\n' "$(id -u)" "$(id -g)" >"$run/passwd"
 printf 'developer:x:%s:\n' "$(id -g)" >"$run/group"
@@ -61,7 +68,12 @@ window_for_color() {
             if [[ $window_pid =~ ^[0-9]+$ && $window_pid != "$previous_pid" ]] &&
                 timeout --kill-after=1s 2 magick import -window "$windows" "$image" 2>/dev/null; then
                 magick "$image" -depth 8 -format %c histogram:info:- >/capture/palette.txt
-                if rg -qi -- "$color" /capture/palette.txt; then
+                # The cyan card borders belong to loaded replay choices. The
+                # empty/error page also has the brand palette, so it cannot
+                # satisfy this independent content assertion.
+                if rg -qi -- "$color" /capture/palette.txt &&
+                    awk '/#067F93/ { pixels += $1 } END { exit pixels < 1000 }' /capture/palette.txt; then
+                    cp /capture/palette.txt "${image%.png}-palette.txt"
                     printf '%s\n' "$windows"
                     return 0
                 fi
@@ -106,6 +118,7 @@ timeout --kill-after=5s 150 bwrap --unshare-all --die-with-parent --new-session 
     --bind "$NUGET_PACKAGES" /packages --chdir /capture \
     --setenv PATH "$PATH" --setenv HOME /capture/home \
     --setenv DOTNET_CLI_HOME /capture/dotnet --setenv NUGET_PACKAGES /packages \
+    --setenv HDT_HOST_BINARY /capture/hdt-host \
     --setenv LD_LIBRARY_PATH "$LD_LIBRARY_PATH" --setenv DOTNET_PROCESSOR_COUNT 2 \
     --setenv DOTNET_CLI_TELEMETRY_OPTOUT 1 --setenv DOTNET_NOLOGO 1 \
     --setenv DOTNET_SKIP_FIRST_TIME_EXPERIENCE 1 --setenv DOTNET_SYSTEM_GLOBALIZATION_INVARIANT 0 \
