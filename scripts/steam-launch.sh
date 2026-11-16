@@ -7,6 +7,6 @@ if (($# == 0)); then
     exit 2
 fi
 if ! systemctl --user start hdt-proton-autostart.service; then
-    echo 'HDT startup service unavailable. Install the desktop service described in docs/INSTALL.md; launching the game normally.' >&2
+    echo 'HDT startup service unavailable. Install the desktop service described in docs/guides/installation.md; launching the game normally.' >&2
 fi
 exec "$@"

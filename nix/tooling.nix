@@ -1,6 +1,13 @@
 { pkgs }:
 with pkgs;
 [
+  # Shared subprocess-test prerequisites for both development-shell entry points.
+  bash
+  coreutils
+  git
+  jq
+  ripgrep
+  util-linux
   bun
   rustc
   cargo

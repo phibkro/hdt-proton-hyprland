@@ -45,13 +45,13 @@
           cp ${./.envrc} source/.envrc
           mkdir -p source/.githooks
           cp ${./.githooks/pre-commit} source/.githooks/pre-commit
-          cp ${./tooling/shell/shellcheckrc} source/.shellcheckrc
+          cp ${./.shellcheckrc} source/.shellcheckrc
           cp ${./.editorconfig} source/.editorconfig
-          cp -L ${./tooling/c/.clang-format} source/.clang-format
-          cp -L ${./tooling/c/.clang-tidy} source/.clang-tidy
-          cp ${./tooling/lua/stylua.toml} source/stylua.toml
-          cp ${./tooling/lua/selene.toml} source/selene.toml
-          cp ${./tooling/lua/hdt-hyprland.yml} source/hdt-hyprland.yml
+          cp ${./.clang-format} source/.clang-format
+          cp ${./.clang-tidy} source/.clang-tidy
+          cp ${./stylua.toml} source/stylua.toml
+          cp ${./selene.toml} source/selene.toml
+          cp ${./hdt-hyprland.yml} source/hdt-hyprland.yml
           chmod -R u+w source
           cd source
           export HOME="$TMPDIR/home"
@@ -72,7 +72,7 @@
           cp ${./.envrc} source/.envrc
           mkdir -p source/.githooks
           cp ${./.githooks/pre-commit} source/.githooks/pre-commit
-          cp ${./tooling/shell/shellcheckrc} source/.shellcheckrc
+          cp ${./.shellcheckrc} source/.shellcheckrc
           cp -R ${./tests} source/tests
           cp -R ${./.github} source/.github
           chmod -R u+w source

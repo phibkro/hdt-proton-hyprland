@@ -1,1 +1,2 @@
-tooling/rust/clippy.toml
+# The host is a private executable; public Rust items are internal test seams.
+avoid-breaking-exported-api = false
