@@ -6,6 +6,7 @@ evidence are project-local; no global .NET tool or machine configuration is need
 ```sh
 # From the repository root:
 nix-shell avalonia/shell.nix
+cargo build --locked -j2
 bash avalonia/dev.sh setup
 bash avalonia/dev.sh build
 bash avalonia/dev.sh tools
@@ -76,6 +77,14 @@ workspace is this directory. Do not assume that a successful CLI help command
 or MCP initialization proves licensed runtime attachment.
 
 ## Verification
+
+The real F# restart journey is `bash avalonia/check-watch.sh` from the pinned
+shell after the Rust build and dependency setup above. It archives committed
+source into an owned private working copy, starts the documented watch command
+without host display or network access, edits the F# palette, then requires a
+new application PID, changed assembly bytes, loaded replay card pixels and the
+changed palette. Evidence stays under `local/native-watch-*`; the original
+source checkout is never edited by the test.
 
 Run the existing recipes in [README.md](README.md) and the
 [verification feature map](../.cursor/skills/verify-hdt-proton/features/native-avalonia.md).

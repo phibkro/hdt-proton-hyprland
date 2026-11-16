@@ -1,0 +1,55 @@
+# Reproducible native development loop
+
+## Goal and journey
+
+A developer runs the documented F# watch command, edits a view and sees a rebuilt
+native window. Verify a real source edit, process replacement and changed pixels,
+not just watch-file discovery. Keep the ordinary app free of diagnostics.
+
+## Constraints
+
+Reuse the pinned SDK, existing dev.sh entrypoint and private X11/bubblewrap
+patterns. Archive committed source into an owned disposable working copy; never
+edit an operator's source to trigger a test. No host display, network, account,
+license activation or game activity. Preserve evidence and bound/reap every child.
+F# uses full restart, not hot reload. Licensed inspector/MCP and editor attach are
+separate prerequisites, not a consequence of a successful watch test.
+
+## Acceptance
+
+- Locked development build and normal shell checks pass.
+- On a private X11 display, the real documented watch command opens the replay.
+- Change an F# palette value in that run's private source; observe a new native
+  window PID, changed assembly bytes and corresponding rendered palette pixels.
+- Previous window disappears and cleanup terminates watcher/X server and children.
+- Save source identity, commands, logs, screenshots and expected failure evidence.
+- Missing licensed/editor prerequisites remain explicit. No invented attachment.
+
+NuGet/MSBuild require user resolution even in an offline namespace. Supply a
+synthetic run-owned passwd/group identity; do not bind the host account database.
+
+## Revisions
+
+- 2026-11-16: Initial bounded workflow acceptance after operator requested all
+  outstanding lanes in parallel. This lane owns developer-loop checks only.
+
+- 2026-11-16: Initial isolated attempt stalled before GenerateWatchList completed.
+  Owned-process syscall evidence showed repeated missing passwd lookups; add the
+  synthetic identity prerequisite rather than changing SDK or allowing network.
+
+- 2026-11-16: With identity resolved, restore attempted vulnerability-feed access
+  despite complete local dependencies. The network-free drive now clears remote
+  package/audit sources and disables NuGet audit only in its owned test process.
+  Normal development and CI audit policy is unchanged.
+
+- 2026-11-16: The first source edit rebuilt and replaced the application, but the
+  check blocked capturing the retiring window during its destruction. Retain
+  timestamped XID/PID observations, wait for a different process before capturing
+  the changed palette, and bound each image request. Window identity includes its
+  PID because a new X11 client can legitimately reuse the old numeric XID.
+
+- 2026-11-16: Inspecting the changed screenshot exposed missing replay-reader
+  wiring despite successful palette assertions. Copy/hash the explicitly built
+  real Rust host into the run, pass its namespace path, and require loaded card
+  border pixels before accepting either screenshot. An empty/error page with a
+  correctly changed brand color is insufficient.

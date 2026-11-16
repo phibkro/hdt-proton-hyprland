@@ -53,7 +53,7 @@ case "$command" in
     watch)
         # F# edits use full restart. Licensed XAML/C# hot reload is not enabled.
         mkdir -p ../local/native-development
-        exec dotnet watch --project Hdt.Development/Hdt.Development.csproj --no-hot-reload run -- --replay "$PWD/fixtures/draft.json" --settings "$PWD/../local/native-development/settings.json" "$@"
+        exec dotnet watch --project Hdt.Development/Hdt.Development.csproj --no-hot-reload --non-interactive run -- --replay "$PWD/fixtures/draft.json" --settings "$PWD/../local/native-development/settings.json" "$@"
         ;;
     help)
         echo 'Inside nix-shell avalonia/shell.nix: bash avalonia/dev.sh setup|build|run|tools|mcp|watch'
