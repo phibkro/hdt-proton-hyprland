@@ -48,14 +48,18 @@ dotnet --version >/capture/sdk-version.txt 2>&1
 bash avalonia/dev.sh watch >/capture/watch.log 2>&1 &
 watcher=$!
 window_for_color() {
-    local color=$1 image=$2 windows
+    local color=$1 image=$2 previous_pid=${3:-} windows window_pid
     for ((attempt=0;attempt<300;attempt++)); do
         kill -0 "$watcher" || { cat /capture/watch.log >&2; return 1; }
         windows=$(xdotool search --onlyvisible --name '^Hearthstone Deck Tracker' 2>/dev/null || true)
         printf '%(%s)T color=%s attempt=%d windows=%q\n' -1 "$color" "$attempt" "$windows" >>/capture/window-search.log
         if [[ $windows =~ ^[0-9]+$ ]]; then
-            xdotool getwindowpid "$windows" >>/capture/window-search.log 2>&1 || true
-            if magick import -window "$windows" "$image" 2>/dev/null; then
+            window_pid=$(timeout 2 xdotool getwindowpid "$windows" 2>/dev/null || true)
+            printf 'pid=%s\n' "$window_pid" >>/capture/window-search.log
+            # Do not capture the retiring process: import can wait indefinitely
+            # when its target disappears during the X11 image request.
+            if [[ $window_pid =~ ^[0-9]+$ && $window_pid != "$previous_pid" ]] &&
+                timeout --kill-after=1s 2 magick import -window "$windows" "$image" 2>/dev/null; then
                 magick "$image" -depth 8 -format %c histogram:info:- >/capture/palette.txt
                 if rg -qi -- "$color" /capture/palette.txt; then
                     printf '%s\n' "$windows"
@@ -78,7 +82,7 @@ printf '%s\n' "$first_pid" >/capture/before-pid.txt
 sha256sum avalonia/Hdt.Views/bin/Debug/net10.0/Hdt.Views.dll >/capture/before-assembly.txt
 # Only the archived, run-owned F# source is edited, never the developer checkout.
 sed -i 's/#2489BD/#D95C90/g' avalonia/Hdt.Views/TrackerLayout.fs
-second=$(window_for_color '#D95C90' /capture/after.png)
+second=$(window_for_color '#D95C90' /capture/after.png "$first_pid")
 second_pid=$(xdotool getwindowpid "$second")
 printf '%s\n' "$second_pid" >/capture/after-pid.txt
 sha256sum avalonia/Hdt.Views/bin/Debug/net10.0/Hdt.Views.dll >/capture/after-assembly.txt

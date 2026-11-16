@@ -41,3 +41,9 @@ synthetic run-owned passwd/group identity; do not bind the host account database
   despite complete local dependencies. The network-free drive now clears remote
   package/audit sources and disables NuGet audit only in its owned test process.
   Normal development and CI audit policy is unchanged.
+
+- 2026-11-16: The first source edit rebuilt and replaced the application, but the
+  check blocked capturing the retiring window during its destruction. Retain
+  timestamped XID/PID observations, wait for a different process before capturing
+  the changed palette, and bound each image request. Window identity includes its
+  PID because a new X11 client can legitimately reuse the old numeric XID.
