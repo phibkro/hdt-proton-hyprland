@@ -28,7 +28,7 @@
       checks.${system} = {
         inherit package;
         tests = pkgs.runCommand "hdt-proton-tests" {
-          nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.shellcheck pkgs.actionlint pkgs.jq pkgs.coreutils ];
+          nativeBuildInputs = [ pkgs.bun pkgs.bash pkgs.shellcheck pkgs.actionlint pkgs.jq pkgs.coreutils pkgs.util-linux ];
         } ''
           mkdir source
           cp -R ${./src} source/src

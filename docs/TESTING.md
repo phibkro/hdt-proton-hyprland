@@ -110,6 +110,17 @@ Finish play before you close the current game session.
 
 To test the manual-close behavior, close HDT normally while the game remains open. Confirm that the watcher does not repeatedly reopen HDT in that game session.
 
+Run the isolated recovery checks without opening Hearthstone:
+
+```sh
+devenv shell -- bun test ./tests/autostart.test.ts
+```
+
+These checks run the watcher and launcher stand-ins as separate processes.
+Compositor snapshots and time are simulated. The checks cover failed launches,
+retry delays, failure limits, normal exits, process identity, and lock ownership.
+They do not establish recovery of the real Wine process or overlay after a crash.
+
 ## Test stable Proton
 
 Stable Proton has not passed this project's desktop tests. The tested version remains Experimental. Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.

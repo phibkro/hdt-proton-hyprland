@@ -42,6 +42,7 @@
 /tests/*
 !/tests/config.test.ts
 !/tests/steam-launch.test.ts
+!/tests/autostart.test.ts
 !/docs/
 /docs/*
 !/docs/COMPATIBILITY.md

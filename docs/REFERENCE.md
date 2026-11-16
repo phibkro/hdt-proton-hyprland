@@ -107,7 +107,21 @@ The installer refuses settings writes while an accessible `HearthstoneDeck` proc
 
 `scripts/steam-launch.sh` requests `hdt-proton-autostart.service`, then executes Steam's original arguments. A service failure produces a warning and does not block the game command.
 
-`scripts/autostart.sh` checks the exact Hearthstone window every two seconds. A runtime lock prevents duplicate monitors. The watcher starts HDT once per game process or reuses an existing HDT window. A manual HDT exit does not trigger a relaunch during that same game session.
+`scripts/autostart.sh` checks the exact Hearthstone window every two seconds.
+A runtime lock prevents duplicate monitors. The watcher validates the Linux
+process name and rejects zombie processes before accepting an existing HDT
+window. An existing tracker stays under its original launcher's ownership.
+The watcher does not relaunch that tracker in the same game session.
+
+For a tracker started by the watcher, a nonzero launcher exit schedules another
+attempt after at least five seconds. A second failure delays the retry by at
+least ten seconds. Three consecutive failures pause recovery. A launcher that
+stays running for one minute resets the failure count. Only one owned launcher
+can run at a time. A zero exit status pauses recovery, preserving normal-close
+behavior. A frozen tracker whose launcher stays alive is not restarted.
+
+A new game process or a tracker-service restart clears the paused state. Closing
+the game prevents new launch attempts. The watcher never signals the game.
 
 Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service declarations. The tested machine's service is declared separately in [homelab PR #93](https://github.com/phibkro/homelab/pull/93).
 

@@ -74,3 +74,12 @@ or house overlay. The change retains the existing process boundary and adds no
 runtime dependency. Tests use real files and a separate producer process that is
 stopped, killed, and restarted with a new recorder directory. An Effect migration
 must preserve discovery across producer restarts and both capacity failures.
+
+## Watcher recovery recorded on 2026-11-16
+
+The watcher retains its existing Bash supervisor and Bun configuration lookup.
+Recovery adds child-exit observation, delayed retries, and a failure limit.
+No TypeScript supervisor or runtime dependency is added. The child launcher
+retains ownership of Proton and its helpers. Tests exercise the actual Bash
+watcher, process identities, child exits, and lock release with simulated
+compositor snapshots and time. Live Wine recovery remains unverified.
