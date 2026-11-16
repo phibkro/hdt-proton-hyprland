@@ -33,12 +33,36 @@ sealed class ReplayHost
     static int pluginUpdates;
     static Button desktopControl;
     static int desktopClicks;
+    static int pointerMessages;
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
     [DllImport("user32.dll")] static extern bool GetCursorPos(out NativePoint point);
     [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(NativePoint point);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool MoveFileEx(string source, string destination, int flags);
+    static IntPtr ObservePointerMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (desktopControl != null && pointerMessages < 512 &&
+            (message == 0x200 || message == 0x201 || message == 0x202 || message == 0x2a3 ||
+             message == 0x20 || message == 0x21 || message == 0x84 || message == 7 || message == 8))
+        {
+            pointerMessages++;
+            NativePoint cursor;
+            GetCursorPos(out cursor);
+            File.AppendAllText(Path.Combine(directory, "pointer-messages.jsonl"), serializer.Serialize(new
+            {
+                observedUTC = DateTime.UtcNow.ToString("o"),
+                hwnd = hwnd.ToInt64(),
+                message,
+                wParam = wParam.ToInt64(),
+                lParam = lParam.ToInt64(),
+                screenX = cursor.X,
+                screenY = cursor.Y
+            }) + Environment.NewLine);
+        }
+        // Observe only: preserve WPF's normal message handling and result.
+        return IntPtr.Zero;
+    }
     static int? plaqueLevel;
     static JavaScriptSerializer serializer = new JavaScriptSerializer();
     static void Record(string phase, Exception error)
@@ -285,6 +309,8 @@ sealed class ReplayHost
                         VerticalAlignment = VerticalAlignment.Top
                     };
                     desktopControl.Click += (sender, e) => desktopClicks++;
+                    HwndSource.FromHwnd(new WindowInteropHelper(overlay).Handle).AddHook(ObservePointerMessage);
+                    HwndSource.FromHwnd(new WindowInteropHelper(main).Handle).AddHook(ObservePointerMessage);
                     hdt.GetType("Hearthstone_Deck_Tracker.Utility.Extensions.OverlayExtensions").GetMethod("SetIsOverlayHitTestVisible")
                         .Invoke(null, new object[] { desktopControl, true });
                     Panel.SetZIndex(desktopControl, Int32.MaxValue);

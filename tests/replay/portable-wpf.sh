@@ -27,6 +27,11 @@ wait_for() {
     xwininfo -root -tree >"$run/failed-input-tree.txt"
     xprop -root _NET_ACTIVE_WINDOW >"$run/failed-input-active.txt"
     xdotool getmouselocation --shell >"$run/failed-input-pointer.txt"
+    # Diagnostic only, after failure is established. Never turn this into a pass:
+    # find whether a subsequent real movement reaches WPF after native activation.
+    xdotool mousemove_relative -- 1 0
+    sleep 0.3
+    cp "$state" "$run/failed-input-after-motion.json"
     return 1
 }
 move() {
