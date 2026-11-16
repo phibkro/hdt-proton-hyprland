@@ -316,3 +316,4 @@
 
 !/docs/specs/fsharp-deck-library.md
 !/avalonia/Hdt.Views/DeckLibraryView.fs
+!docs/specs/shared-plugin-compiler.md
