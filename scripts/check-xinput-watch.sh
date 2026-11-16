@@ -24,6 +24,7 @@ if [[ ${1:-} == --inside ]]; then
     number=$(cat display.txt)
     [[ $number =~ ^[0-9]+$ ]]
     export DISPLAY=:$number
+    bash scripts/check-native-capture.sh
     ./hdt-host xinput-watch --output devices.jsonl --seconds 3 >observer.log 2>&1 &
     observer_pid=$!
     for ((i = 0; i < 100; i++)); do
@@ -87,9 +88,14 @@ mkdir -p evidence
 capture=$(mktemp -d "$PWD/evidence/xinput-watch-XXXXXXXX")
 cp "${CARGO_TARGET_DIR:-target}/debug/hdt-host" "$capture/hdt-host"
 cp scripts/check-xinput-watch.sh tests/native/xinput-race.c src/diagnostics/xlib-fatal.gdb "$capture/"
+mkdir "$capture/scripts" "$capture/src" "$capture/src/diagnostics"
+cp scripts/capture-native-error.sh scripts/check-native-capture.sh "$capture/scripts/"
+cp src/diagnostics/xlib-fatal.gdb "$capture/src/diagnostics/"
+cp tests/native/native-capture-target.c "$capture/"
+cc -Wall -Wextra -Werror -g -Og "$capture/native-capture-target.c" -o "$capture/wine64"
 read -r -a flags <<<"$(pkg-config --cflags --libs x11 xi)"
 cc -Wall -Wextra -Werror "$capture/xinput-race.c" -o "$capture/xinput-race" "${flags[@]}"
-(cd "$capture" && sha256sum hdt-host check-xinput-watch.sh xinput-race.c xinput-race xlib-fatal.gdb >sha256.txt)
+(cd "$capture" && sha256sum hdt-host check-xinput-watch.sh xinput-race.c xinput-race xlib-fatal.gdb scripts/*.sh src/diagnostics/*.gdb native-capture-target.c wine64 >sha256.txt)
 shell=$(readlink -f "$(command -v bash)")
 server=$(readlink -f "$(command -v Xvfb)")
 json=$(readlink -f "$(command -v jq)")

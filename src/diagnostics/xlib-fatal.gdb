@@ -18,8 +18,8 @@ echo HDT_NATIVE_XLIB_FATAL_BEGIN\n
 info registers rip rsp rbp rdi rsi
 x/3ub $rsi+32
 bt 24
-echo HDT_NATIVE_XLIB_FATAL_END\n
 detach
+echo HDT_NATIVE_XLIB_FATAL_END\n
 quit
 end
 set $hdt_mapping_queries = 0

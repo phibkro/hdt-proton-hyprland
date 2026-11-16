@@ -1,5 +1,14 @@
 # Fatal XInput mapping errors
 
+## Capture result contract
+
+The wrapper succeeds only when GDB exits zero and records the fatal completion
+marker after detaching. A deadline without a complete capture returns 124;
+partial captures, unexpected stops and debugger failures return nonzero. Raw
+evidence remains private on every outcome. The private regression must exercise
+the actual wrapper, including an owned target that remains alive and untraced
+after the deadline. Protocol failure controls do not establish Wine behavior.
+
 Repeated observed HDT exits on Proton Experimental ended with `XI_BadDevice`,
 request `X_GetDeviceButtonMapping`, and process status 1. The in-process recorder
 stopped without a managed exception. These exits are distinct from UI freezes.

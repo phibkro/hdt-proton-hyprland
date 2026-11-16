@@ -44,13 +44,14 @@ timeout --signal=TERM --kill-after=5 "$duration" "$gdb" -nx -nh -batch \
     -ex 'info address _XDefaultError' -ex 'info breakpoints' \
     -ex 'echo HDT_NATIVE_CAPTURE_ARMED\n' -ex continue >"$output/gdb.log" 2>&1 || status=$?
 printf '%s\n' "$status" >"$output/debugger-exit.txt"
-if grep -q '^HDT_NATIVE_XLIB_FATAL_END$' "$output/gdb.log"; then
+if ((status == 0)) && grep -q '^HDT_NATIVE_XLIB_FATAL_END$' "$output/gdb.log"; then
     echo 'Captured a native Xlib fatal-error stack; debugger detached.'
 elif grep -q '^HDT_NATIVE_XLIB_FATAL_BEGIN$' "$output/gdb.log"; then
     echo "Partial native stack retained; debugger failed before completing capture (status $status)." >&2
     exit 1
 elif ((status == 124)); then
     echo 'Capture deadline reached; no complete fatal-error stack was recorded.'
+    exit 124
 else
     echo "Capture ended without a complete fatal-error stack (debugger status $status). Inspect the private log." >&2
     # A debugger can exit zero after an unexpected stop; that is not a capture.
