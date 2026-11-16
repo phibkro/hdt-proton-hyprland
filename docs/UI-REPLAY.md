@@ -75,3 +75,29 @@ The run owns a separate PID namespace, network namespace, home directory, prefix
 A passing replay establishes that the exercised WPF path works under the isolated X11 configuration. It does not establish a fix for the live Arena failure. HearthMirror polling, watcher dispatch, ArenaSmith requests, real picks, and Hyprland composition are outside this fixture's coverage. The compatibility plugin runs only with `--with-plugin`; its updates run on the fixture's UI timer rather than HDT's plugin scheduler. The generic popup is not HDT's card-preview implementation.
 
 See [freeze diagnostics](DIAGNOSTICS.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.
+
+## Exercise the installed event pipeline
+
+Run the canonical event pilot:
+
+```sh
+devenv shell -- hdt-replay run --canonical-events --with-plugin
+```
+
+Confirm exit status zero. Inspect `canonical-session1.jsonl`, `canonical.jsonl`,
+and `journal/journal.jsonl` in the printed evidence directory.
+
+This option replaces the normal UI sequence. The host feeds recorded-format
+mode-transition fixtures into the installed `LogWatcherManager.OnNewLines`
+method. It subscribes to the installed `GameEvents` fields and `Log.OnLogLine`.
+It records the HDT and HearthWatcher hashes, canonical event names, argument
+types, and parser entry/return observations. Enum arguments use their HDT names.
+Other arguments use Newtonsoft's public JSON projection; capture failures are
+explicit. This projection does not preserve every property of a CLR object.
+
+The test repeats Arena/menu/Battlegrounds/menu inputs, freezes and kills the
+isolated application, and starts a new application process. The native journal
+must remain alive throughout. Its retained publisher bytes must match both
+application sessions exactly. These checks do not establish complete game-state
+equivalence, per-handler completion, or reproduction of the intermittent freeze
+after Arena battles. Live HearthMirror and remote ratings are outside the test.

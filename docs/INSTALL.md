@@ -17,7 +17,13 @@ Keep the existing Steam shortcut and Proton selection. The [tested environment](
 This guide starts after HDT and .NET installation. For the installation requirements, see the [HDT installation reference](REFERENCE.md#hdt-installation).
 
 1. Open a terminal in the repository checkout.
-2. If `hdt.local.json` does not exist, copy the example:
+2. Build the native host, then create the local configuration if it does not exist:
+
+   ```sh
+   devenv shell -- cargo build --locked
+   ```
+
+   Copy the example only if `hdt.local.json` is absent:
 
    ```sh
    cp hdt.local.example.json hdt.local.json

@@ -1,0 +1,25 @@
+{
+  "name": "hdt-proton",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bun scripts/quality.ts check all",
+    "fix": "bun scripts/quality.ts fix all",
+    "lint:ts": "oxlint --deny-warnings src tests scripts tooling/ts oxlint.config.ts oxfmt.config.ts",
+    "format:ts": "oxfmt --write src tests scripts tooling/ts oxlint.config.ts oxfmt.config.ts package.json tsconfig.json",
+    "format:ts:check": "oxfmt --check src tests scripts tooling/ts oxlint.config.ts oxfmt.config.ts package.json tsconfig.json",
+    "typecheck": "tsgo --noEmit",
+    "hooks:install": "bun scripts/hooks.ts install",
+    "test": "bash scripts/test-unit.sh",
+    "lint:tests": "oxlint --deny-warnings tests"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "ultracite": "8.2.1"
+  },
+  "packageManager": "bun@1.4.4"
+}

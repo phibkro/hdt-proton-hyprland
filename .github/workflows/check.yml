@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -15,7 +16,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  source-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Restore pinned development dependencies
+        id: dependencies
+        run: nix develop --command bun install --frozen-lockfile --ignore-scripts
+      - name: Check TypeScript formatting
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: nix develop --command bun run format:ts:check
+      - name: Lint TypeScript with Ultracite and anti-slop
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: nix develop --command bun run lint:ts
+      - name: Check TypeScript types
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: nix develop --command bun run typecheck
+      - name: Analyze portable Framework code
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: nix develop --command bun scripts/quality.ts check csharp-core
+
+  rust-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Fetch locked Rust dependencies
+        run: nix develop --command cargo fetch --locked
+      - name: Check native Rust host
+        run: nix develop --command bun scripts/quality.ts check rust
+
+  nix-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -28,3 +72,15 @@ jobs:
             experimental-features = nix-command flakes
       - name: Build package and run checks
         run: nix flake check --print-build-logs --no-write-lock-file --max-jobs 1 --cores 2
+
+  check:
+    if: ${{ always() }}
+    needs: [source-quality, rust-quality, nix-check]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all complete check jobs
+        env:
+          SOURCE_QUALITY: ${{ needs.source-quality.result }}
+          RUST_QUALITY: ${{ needs.rust-quality.result }}
+          NIX_CHECK: ${{ needs.nix-check.result }}
+        run: test "$SOURCE_QUALITY" = success && test "$RUST_QUALITY" = success && test "$NIX_CHECK" = success

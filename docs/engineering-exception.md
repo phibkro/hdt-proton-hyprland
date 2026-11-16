@@ -1,4 +1,4 @@
-# Bun runtime exception
+# Language and runtime decision record
 
 ## Scope and owner
 
@@ -53,3 +53,73 @@ The replay host uses C# to instantiate HDT's actual .NET Framework WPF classes. 
 ## Local diagnostics
 
 The recorder uses .NET Framework APIs inside HDT. The exporter is a bounded Bun CLI using the existing runtime exception. No installed Effect guidance or house overlay was found. Perfetto supplies the trace format and viewer. OpenTelemetry remains deferred until its Framework and Proton behavior is tested. Both plugin builds derive their C# source list from the plugin directory.
+
+## Independent input journal
+
+The 2026-11-15 lookup still found no installed Effect guidance, package, or house
+overlay. This reopens the diagnostics scope to include a native file collector
+with separate process ownership. The collector uses the existing Bun runtime and
+Node-compatible read-only file APIs. It preserves original bytes without a second
+game-event parser. Its explicit capacity bounds storage; failure stops collection
+and retains the evidence. Source files have one read-only owner per cursor.
+
+Tests cover byte preservation, rotation, rewrites, capacity, and producer failure
+using real processes. The isolated C# runner reuses the installed HDT parser and
+event publishers through reflection. Full semantic equivalence is not established.
+An Effect migration must preserve these tested ownership and failure boundaries.
+
+The 2026-11-16 recorder-discovery change extends this collector with additional
+read-only cursors. The dependency lookup still found no installed Effect package
+or house overlay. The change retains the existing process boundary and adds no
+runtime dependency. Tests use real files and a separate producer process that is
+stopped, killed, and restarted with a new recorder directory. An Effect migration
+must preserve discovery across producer restarts and both capacity failures.
+
+## Watcher recovery recorded on 2026-11-16
+
+The watcher retains its existing Bash supervisor and Bun configuration lookup.
+Recovery adds child-exit observation, delayed retries, and a failure limit.
+No TypeScript supervisor or runtime dependency is added. The child launcher
+retains ownership of Proton and its helpers. Tests exercise the actual Bash
+watcher, process identities, child exits, and lock release with simulated
+compositor snapshots and time. Live Wine recovery remains unverified.
+
+## Native XInput reproduction
+
+The 2026-11-16 fixture uses C to exercise libXi's native protocol boundary.
+Bash reuses the existing Bubblewrap isolation pattern. The bounded Bun runner
+owns one Xvfb process, fixture deadlines, and private evidence files. The lookup
+still found no installed Effect package or house overlay. This extends the
+existing test tooling exception without adding a TypeScript application runtime.
+LibXi is a development dependency only. No upstream code is copied into the
+fixture. A future Effect migration must retain server ownership, deadlines,
+desktop isolation, and the error-handling negative controls.
+
+## Source tooling recorded on 2026-11-16
+
+The bounded Bun quality/hook drivers compose established tools without changing
+the production supervisor. No installed Effect guidance/package or house overlay
+was present at the lookup. They reuse the existing process boundary exception.
+Ultracite supplies the Oxc presets and bundled anti-slop plugin; pre-commit owns
+temporary hiding/restoration of unstaged tracked files. There is no custom index
+or stash implementation. A future Effect rewrite must preserve these failure and
+ownership boundaries. TypeScript lint debt remains visible and blocks a clean
+full check; formatting and a passing compiler are not evidence of lint success.
+
+## Shell migration withdrawn on 2026-11-16
+
+The operator retained the original Bash launcher, watcher, and replay orchestration.
+The experimental Bun migration was reverted before publication of this tooling
+branch. ShellCheck and shfmt check the retained scripts. The bounded Bun quality
+and hook drivers remain development tooling; no new application supervisor is
+introduced. Existing Bun application and diagnostic code keeps the scopes above.
+
+## Rust host migration — 2026-11-16
+
+The Rust host replaces the production Bun configuration, launcher, input bridge,
+setup/status, journal and trace exporter, plus the C X11 helpers. Their earlier
+exception scopes above are historical. Bash retains watcher/service boundaries;
+Bun remains for development checks and test drivers. C# remains required inside
+HDT. See [the migration contract](specs/rust-host.md) for differential comparisons,
+replacement tests, and the separate live Steam/Hyprland acceptance still needed.
+This source migration does not activate a new package or modify a live prefix.

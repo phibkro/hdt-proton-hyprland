@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+trap 'echo "Replay failed at line $LINENO" >&2' ERR
 root=$1 run=$2 proton=$3 negative=$4 plugin=$5 level=$6 particles=$7
 snapshot=$run/source
 battlegrounds_tabs=${8:-false}
 diagnostics=${9:-false}
+canonical_events=${10:-false}
 export PATH=$HDT_REPLAY_TOOLS_PATH
 [[ "$run" == "$root/local/replay/runs/"* ]]
 jq -e --arg run "$run" '.kind=="hdt-ui-replay-run" and .run==$run' "$run/ownership.json" >/dev/null
@@ -17,8 +19,22 @@ export WINEDLLOVERRIDES='mscoree=n,b;d3d9=n' WINEDEBUG=-all
 export DXVK_CONFIG='d3d9.shaderModel = 1' DXVK_LOG_PATH=$run
 Xvfb -displayfd 3 -screen 0 2560x1440x24 -nolisten tcp -ac 3>"$run/display" >"$run/xvfb.log" 2>&1 &
 xvfb_pid=$!
-trap 'status=$?; if (( status )); then magick import -window root "$run/failure.png" 2>/dev/null || true; fi; kill "$xvfb_pid" 2>/dev/null || true' EXIT
-for ((i=0;i<50;i++)); do [[ -s "$run/display" ]] && break; sleep 0.1; done
+cleanup() {
+    local status=$?
+    trap - EXIT
+    if ((status)); then timeout 3 magick import -window root "$run/failure.png" 2>/dev/null || true; fi
+    if [[ -n ${journal_pid:-} ]]; then
+        kill -TERM "$journal_pid" 2>/dev/null || true
+        wait "$journal_pid" 2>/dev/null || true
+    fi
+    kill "$xvfb_pid" 2>/dev/null || true
+    exit "$status"
+}
+trap cleanup EXIT
+for ((i = 0; i < 50; i++)); do
+    [[ -s "$run/display" ]] && break
+    sleep 0.1
+done
 [[ -s "$run/display" ]]
 kill -0 "$xvfb_pid"
 DISPLAY=:$(cat "$run/display")
@@ -48,12 +64,12 @@ if [[ "$diagnostics" == true ]]; then
     timeout --kill-after=3s 10 "$proton/files/bin/wine" "$run/app/FlightRecorderChecks.exe" "$(winpath "$run/recorder-checks")" >"$run/recorder-checks.log" 2>&1
 fi
 timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
-    /nologo /target:winexe /platform:x64 /out:ReplayHost.exe /r:System.Xaml.dll /r:System.Web.Extensions.dll \
+    /nologo /target:winexe /platform:x64 /out:ReplayHost.exe /r:System.Xaml.dll /r:System.Web.Extensions.dll /r:Newtonsoft.Json.dll \
     /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
-    "$(winpath "$snapshot/src/replay/ReplayHost.cs")" >"$run/compile.log" 2>&1
+    "$(winpath "$snapshot/src/replay/ReplayHost.cs")" "$(winpath "$snapshot/src/replay/CanonicalReplay.cs")" >"$run/compile.log" 2>&1
 timeout 70 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" "$plugin" "$level" "$particles" >"$run/wine.log" 2>&1 &
 host_pid=$!
-for ((i=0;i<200;i++)); do
+for ((i = 0; i < 200; i++)); do
     [[ -s "$run/state.json" ]] && break
     kill -0 "$host_pid" 2>/dev/null || break
     sleep 0.1
@@ -64,10 +80,10 @@ magick import -window root "$run/startup.png"
 jq -e '.settingsButton!=null and .commandId==0' "$run/state.json" >/dev/null
 id=0
 send() {
-    id=$((id+1))
+    id=$((id + 1))
     jq -n --arg op "$1" --argjson id "$id" '{id:$id,op:$op}' >"$run/command.json.next"
     mv "$run/command.json.next" "$run/command.json"
-    for ((i=0;i<50;i++)); do
+    for ((i = 0; i < 50; i++)); do
         [[ -s "$run/state.json" ]] && jq -e --argjson id "$id" '.commandId==$id' "$run/state.json" >/dev/null && return
         sleep 0.1
     done
@@ -77,11 +93,80 @@ send() {
 settings() {
     read -r x y < <(jq -r '[.settingsButton.x,.settingsButton.y]|@tsv' "$run/state.json")
     xdotool mousemove --sync "$x" "$y" click 1
-    for ((i=0;i<30;i++)); do jq -e '.settingsOpen' "$run/state.json" >/dev/null && break; sleep 0.1; done
+    for ((i = 0; i < 30; i++)); do
+        jq -e '.settingsOpen' "$run/state.json" >/dev/null && break
+        sleep 0.1
+    done
     jq -e '.settingsOpen' "$run/state.json" >/dev/null
     cp "$run/state.json" "$run/settings-$id.json"
     send settings-close
 }
+if [[ "$canonical_events" == true ]]; then
+    # The native journal is independently owned by this supervisor. Its sources
+    # are the synthetic fixture and actual HDT publishers, not interpreted markers.
+    touch "$run/canonical-input.json"
+    "$snapshot/hdt-host" observe --output "$run/journal" --from start --max-bytes 8388608 \
+        --source "input=$run/canonical-input.json" --source "hdt=$run/canonical.jsonl" >"$run/journal.log" 2>&1 &
+    journal_pid=$!
+    send canonical-start
+    jq -n '["DRAFT","HUB","BACON","HUB"] | to_entries | map({ns:"LoadingScreen",line:("D 00:00:00.0000000 LoadingScreen.OnSceneLoaded() - prevMode=" + (if .key==0 then "HUB" else ["DRAFT","HUB","BACON"][.key-1] end) + " currMode=" + .value)})' >"$run/canonical-input.json"
+    send canonical-input
+    jq -se '[.[]|select(.kind=="hdt.event" and .data.name=="OnModeChanged")|.data.value]==["DRAFT","HUB","BACON","HUB"]' "$run/canonical.jsonl" >/dev/null
+    cp "$run/canonical.jsonl" "$run/canonical-first.jsonl"
+    send canonical-input
+    jq -se '([.[]|select(.kind=="hdt.event" and .data.name=="OnModeChanged")|.data.value]) as $events | ($events|length)==8 and $events[0:4]==$events[4:8] and ([.[]|select(.kind=="parser.return")]|length)==8 and all(.[];.kind!="parser.error" and .kind!="hdt.event.capture-failed")' "$run/canonical.jsonl" >/dev/null
+    # Freeze the actual application process in this isolated PID namespace.
+    replay_pid=$(pgrep -P "$host_pid")
+    [[ "$replay_pid" =~ ^[0-9]+$ ]]
+    tr '\0' '\n' <"/proc/$replay_pid/cmdline" | rg -q 'ReplayHost[.]exe'
+    kill -STOP "$replay_pid"
+    for ((i = 0; i < 30; i++)); do
+        [[ $(sed -n 's/^.*) \([A-Za-z]\) .*$/\1/p' "/proc/$replay_pid/stat") == T ]] && break
+        sleep 0.01
+    done
+    [[ $(sed -n 's/^.*) \([A-Za-z]\) .*$/\1/p' "/proc/$replay_pid/stat") == T ]]
+    before=$(wc -l <"$run/journal/journal.jsonl")
+    printf '\n' >>"$run/canonical-input.json"
+    sleep 1
+    after=$(wc -l <"$run/journal/journal.jsonl")
+    bun -e 'const fs=require("node:fs"),p=process.argv[1]; const rows=fs.readFileSync(p+"/journal/journal.jsonl","utf8").trim().split("\n").map(JSON.parse); const bytes=Buffer.concat(rows.filter(r=>r.kind==="source.bytes" && r.data.source==="input").map(r=>Buffer.from(r.data.base64,"base64"))); if(!bytes.equals(fs.readFileSync(p+"/canonical-input.json"))) throw Error("Input capture stalled with the HDT host");' "$run"
+    kill -CONT "$replay_pid"
+    ((after > before))
+    kill -KILL "$replay_pid"
+    if wait "$host_pid"; then
+        echo 'The deliberately killed replay host unexpectedly succeeded.' >&2
+        exit 1
+    else
+        first_status=$?
+        [[ "$first_status" != 124 && "$first_status" != 0 ]]
+        printf '%s\n' "$first_status" >"$run/canonical-killed-status.txt"
+    fi
+    [[ ! -d /proc/$replay_pid ]]
+    # A new application process must not own or restart the native journal.
+    mv "$run/canonical.jsonl" "$run/canonical-session1.jsonl"
+    rm "$run/command.json" "$run/state.json"
+    id=0
+    timeout 30 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host-second.log")" "$plugin" "$level" "$particles" >"$run/wine-second.log" 2>&1 &
+    host_pid=$!
+    for ((i = 0; i < 100; i++)); do
+        [[ -s "$run/state.json" ]] && break
+        sleep 0.1
+    done
+    [[ -s "$run/state.json" ]]
+    send canonical-start
+    send canonical-input
+    jq -se '[.[]|select(.kind=="hdt.event" and .data.name=="OnModeChanged")|.data.value]==["DRAFT","HUB","BACON","HUB"] and all(.[];.kind!="parser.error" and .kind!="hdt.event.capture-failed")' "$run/canonical.jsonl" >/dev/null
+    send finish
+    wait "$host_pid"
+    sleep 0.5
+    kill -TERM "$journal_pid"
+    wait "$journal_pid"
+    journal_pid=''
+    jq -se 'any(.[];.kind=="source.bytes" and .data.source=="input") and any(.[];.kind=="source.bytes" and .data.source=="hdt" and .data.generation==1) and any(.[];.kind=="source.replaced") and .[-1].kind=="journal.stop" and .[-1].data.reason=="signal"' "$run/journal/journal.jsonl" >/dev/null
+    bun -e 'const fs=require("node:fs"),p=process.argv[1]; const rows=fs.readFileSync(p+"/journal/journal.jsonl","utf8").trim().split("\n").map(JSON.parse); for(const [generation,file] of [[0,"canonical-session1.jsonl"],[1,"canonical.jsonl"]]) {const captured=Buffer.concat(rows.filter(r=>r.kind==="source.bytes" && r.data.source==="hdt" && r.data.generation===generation).map(r=>Buffer.from(r.data.base64,"base64"))); if(!captured.equals(fs.readFileSync(p+"/"+file))) throw Error("Canonical publisher bytes differ from independent journal");}' "$run"
+    echo 'Canonical installed-parser mode transitions and independent journal survival verified in isolation.'
+    exit 0
+fi
 settings
 if [[ "$diagnostics" == true ]]; then
     # Give the independent writer time to post a ping before blocking WPF.
@@ -96,11 +181,11 @@ if [[ "$diagnostics" == true ]]; then
 fi
 if [[ "$battlegrounds_tabs" == true ]]; then
     send bgs-start
-    for ((toggle=0;toggle<6;toggle++)); do
+    for ((toggle = 0; toggle < 6; toggle++)); do
         send bgs-minions-toggle
         sleep 0.5
         cp "$run/state.json" "$run/bgs-tab-$toggle.json"
-        if (( toggle % 2 == 0 )); then
+        if ((toggle % 2 == 0)); then
             jq -e '.battlegroundsActiveTab=="BattlegroundsMinionsViewModel" and .battlegroundsContent.visible and .battlegroundsContent.height>0 and .battlegroundsContent.minionViews==1 and .battlegroundsContent.groupViews>0' "$run/state.json" >/dev/null
         else
             jq -e '.battlegroundsActiveTab==null' "$run/state.json" >/dev/null
@@ -121,7 +206,8 @@ done
 jq -se '[.[] | select(.scene | startswith("draft-"))] | length==12' "$run/transitions.jsonl" >/dev/null
 levels='[1,3,5]' emitters=1
 if [[ "$level" != mixed ]]; then
-    levels="[$level,$level,$level]"; emitters=0
+    levels="[$level,$level,$level]"
+    emitters=0
     [[ "$level" != 5 ]] || emitters=3
 fi
 [[ "$particles" == true ]] || emitters=0
@@ -132,7 +218,7 @@ jq -e '.cards==[] and .arenaVisibility=="Collapsed" and .visibleScores==[]' "$ru
 if [[ "$plugin" == true ]]; then
     jq -e '.pluginUpdates>0' "$run/draft-2.json" >/dev/null
     jq -e '.state.arenaClientState=="None"' "$run/plugin-input.json" >/dev/null
-    if [[ "$particles" == true && ( "$level" == mixed || "$level" == 5 ) ]]; then
+    if [[ "$particles" == true && ("$level" == mixed || "$level" == 5) ]]; then
         jq -e '.state.arenaParticleEmittersSuppressed>=1' "$run/plugin-input.json" >/dev/null
     fi
 fi
@@ -163,7 +249,7 @@ if [[ "$diagnostics" == true ]]; then
     if [[ "$battlegrounds_tabs" == true ]]; then
         jq -se '([.[]|select(.name=="battlegrounds.tab.changed")]|length)==6 and ([.[]|select(.name=="battlegrounds.minions.pointer.down")]|length)==6' "${recorder_files[0]}" >/dev/null
     fi
-    bun "$snapshot/src/diagnostics/trace-export.ts" "$run/trace.json" "${recorder_files[0]}"
+    "$snapshot/hdt-host" trace-export "$run/trace.json" "${recorder_files[0]}"
 fi
 if rg -q '^(dispatcher|command|startup) ' "$run/host.log"; then
     echo 'The fixture host recorded an exception.' >&2

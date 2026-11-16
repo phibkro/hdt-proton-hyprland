@@ -1,10 +1,66 @@
 # HDT compatibility design
 
-Why does HDT need more than the same Wine prefix to work with Hearthstone on this desktop?
-
 HDT reads game logs, inspects live state through HearthMirror, and draws a separate WPF overlay. Each path has different dependencies. The fixes in this project address process discovery, rendering, geometry, and input separately.
 
+## The current execution path
+
+HDT remains a Windows .NET Framework WPF application. The compatibility plugin
+does not replace HDT with a Linux UI. Native Microsoft .NET Framework 4.8 runs
+inside Proton's Wine environment, which supplies the Windows API implementation.
+HDT's windows reach the Wayland desktop through XWayland:
+
+```text
+HDT main window, overlay, and popups
+                |
+       Microsoft .NET and WPF
+                |
+       Proton Experimental / Wine
+                |
+           X11 windows
+                |
+            XWayland
+                |
+      Hyprland Wayland compositor
+```
+
+Rendering also crosses WPF's composition and Direct3D paths. The current launcher
+applies an HDT-only DXVK shader-model setting, while the plugin requests WPF
+software rendering. These settings do not force Hearthstone to use software
+rendering. The faint overlay background and Arena particle workaround address
+separate rendering failures, described below.
+
+The launcher joins the running game's Steam namespace and Wine prefix, and uses
+that session's Proton executable. The plugin refreshes overlay geometry and
+exports clickable control bounds. Hyprland rules and the X11 transient link keep
+the overlay aligned, stacked with the game, and interactive only over exported
+controls. This compositor integration is specific to the tested Hyprland setup.
+
+Ordinary match tracking still consumes `Power.log`. Live Arena offers and state
+still come from HearthMirror. ArenaSmith ratings use HDT's HSReplay integration
+and require the relevant account entitlement. Working overlay rendering does
+not prove that any of these data paths is advancing.
+
+The current baseline is Experimental after a desktop comparison with Stable
+11.0-2. Stable showed submenu performance and responsiveness problems in that
+comparison. Experimental also retains unresolved freezes and fatal XInput
+errors. The [observed version comparison](COMPATIBILITY.md#proton-version-comparison)
+owns the test results and their limits.
+
 ## The Steam process namespace
+
+### Steam's overlay stays with the game
+
+The tracker inherits the game's Wine session so it can discover Hearthstone.
+The launcher removes `gameoverlayrenderer.so` from the tracker's `LD_PRELOAD`
+list. Other preloaded tools remain. The inherited game environment is unchanged.
+
+A captured HDT freeze stopped its UI thread in `GetAsyncKeyState` while X11
+waited on a mutex owned by that same thread. Steam's `XCheckIfEvent` hook appeared
+on the native call path. Excluding the hook removes an unnecessary component
+from that path. Repeated Settings animations on Stable Proton still caused
+temporary stalls without the library. This change does not fix every UI stall.
+[Valve's related overlay investigation](https://github.com/ValveSoftware/steam-for-linux/issues/11729)
+describes another input-event problem involving the same hook.
 
 A prefix identifies Wine's files and configuration. Steam also starts Wine inside its runtime namespaces.
 
@@ -52,7 +108,7 @@ The plugin calls HDT's own geometry update when the game rectangle changes. Hypr
 
 The first stacking workaround raised the overlay every 100 milliseconds. That restored visibility after clicks but caused flicker. Removing the timer left the overlay behind Hearthstone again.
 
-The pinned [Hyprland WindowState implementation](https://github.com/hyprwm/Hyprland/blob/efb50993780079460b0cbed1363e2166a2de1d9f/src/desktop/state/WindowState.cpp) raises X11 transient children with their parent. `src/hyprland/overlay-link.c` uses that behavior by setting the overlay's `WM_TRANSIENT_FOR` to the game window.
+The pinned [Hyprland WindowState implementation](https://github.com/hyprwm/Hyprland/blob/efb50993780079460b0cbed1363e2166a2de1d9f/src/desktop/state/WindowState.cpp) raises X11 transient children with their parent. `src/host/x11.rs` uses that behavior by setting the overlay's `WM_TRANSIENT_FOR` to the game window.
 
 The helper checks both windows' titles, classes, and process IDs before the change. It changes only the overlay property and verifies the result. The input bridge then disables repeated raising. The focus-change handler remains for Alt-Tab.
 
@@ -84,7 +140,7 @@ That ownership avoids a second watcher implementation. It also means that stoppi
 
 ## Language choices and prior art
 
-HDT's public plugin interface requires C#. The Xlib helpers use C. Bash composes host commands, and the existing launcher uses Bun. The [engineering exception](engineering-exception.md) records why the current implementation retains Bun instead of migrating to Effect during a working desktop session.
+HDT's public plugin interface requires C#. Rust now owns the Linux host, X11 protocol helpers, journal, and trace export. Bash retains service and Steam command boundaries; Hyprland executes Lua. Bun remains a development/test dependency. See [the Rust host](RUST.md) for tooling, migrated coverage, and the outstanding live acceptance boundary. The [engineering record](engineering-exception.md) preserves earlier language decisions.
 
 The investigation evaluated these sources:
 
@@ -100,6 +156,6 @@ No third-party implementation was copied into this repository. The inspected ups
 
 The Nix package stores source and native helpers in the Nix store. The launcher keeps the configuration, HDT installation, backups, and evidence in a separate mutable directory. The checkout workflow keeps its original directory defaults.
 
-Nix builds the X11 helpers before installation. Plugin compilation still uses the actual HDT assemblies and native .NET in the game prefix. The package therefore contains no HDT or Microsoft binaries.
+Nix builds the Rust host and its X11 helpers before installation. Plugin compilation still uses the actual HDT assemblies and native .NET in the game prefix. The package therefore contains no HDT or Microsoft binaries.
 
 The package and Home Manager module derive their application entry from one template. The service still owns the tracker lifecycle. The desktop Open action focuses the exact HDT window instead of matching the Steam class shared by Battle.net and Hearthstone.

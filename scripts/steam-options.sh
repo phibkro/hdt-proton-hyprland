@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if (( $# )); then echo 'Usage: hdt-steam-options' >&2; exit 2; fi
+if (($#)); then
+    echo 'Usage: hdt-steam-options' >&2
+    exit 2
+fi
 if [[ ${HDT_INSTALLED:-0} == 1 ]]; then
     printf '%s\n' 'hdt-proton steam-run %command%'
     exit 0

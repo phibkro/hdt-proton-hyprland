@@ -1,0 +1,11 @@
+minimum_pre_commit_version: "4.0.0"
+repos:
+  - repo: local
+    hooks:
+      - id: hdt-fast-source-checks
+        name: Fast source checks (staged content)
+        entry: devenv shell -- bun scripts/precommit.ts
+        language: system
+        pass_filenames: true
+        require_serial: true
+        stages: [pre-commit]

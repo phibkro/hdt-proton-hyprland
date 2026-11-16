@@ -67,3 +67,53 @@ The Battlegrounds test raises synthetic WPF pointer events at the actual bound c
 Existing HearthMirror reads, ArenaSmith request durations, native compositor acknowledgments, and graphics presentation completion do not yet have correlated traces. The recorder does not capture process dumps. Add observations to existing operations rather than polling the game or ratings service again.
 
 The implementation uses .NET Framework APIs and the project's existing Bun tooling. It adds no OpenTelemetry SDK or remote collector. The exporter uses Perfetto's documented trace-event format to keep the initial diagnostic path local.
+
+## Independent input journal
+
+`hdt-proton observe` is a native process outside HDT and Wine. It stores original
+bytes from explicit source paths in `journal.jsonl`. Each byte record includes
+the source name, file identity, generation, byte offset, acquisition time, and
+base64 payload. It does not parse or rename HDT's messages.
+
+The journal owns a new private directory and a mode-0600 file. It polls sources
+every 250 ms, reads at most 32 KiB per source per poll, and records its own
+heartbeat once per second. Existing files start at the selected `--from` offset.
+A source created after a missing-path observation starts at byte zero.
+Detected replacement, truncation, or rewrite starts a generation and marks
+continuity unknown. Rewrites between polls can escape detection if their checked
+bytes are unchanged. Backlogs remain visible in source offsets; acquisition time
+is not the time Hearthstone generated an event.
+
+An input that disappears or changes between the path check and descriptor open
+produces `source.open-raced` with unknown continuity. The collector resumes at
+byte zero of the next opened generation. Other sources continue. The opened
+descriptor supplies the authoritative file identity. Symlinks and nonregular
+files remain errors.
+
+The optional `--recorder-root DIRECTORY` discovers HDT's `flight-recorder-<Windows PID>-<session>`
+directories. The collector reads each session's `events.jsonl` as a separate
+source. Sessions present at startup follow `--from`. Sessions discovered later
+start at byte zero, including sessions created while HDT restarts. Discovery
+retains every observed session rather than selecting the newest directory.
+Older sessions continue to drain. Existing rotation handling applies to each
+session's `events.jsonl` path.
+
+`recorder.discovered` records the source path and initial offset policy.
+`recorder.root.unavailable` reports a missing root. Discovery resumes when the
+root appears and records `recorder.root.available`. Symlink roots, symlink
+session directories, and duplicate explicit source paths are errors. Names
+beginning with `recorder-` are reserved when this option is used. Discovery
+accepts at most 128 sessions per capture, then fails explicitly. The byte limit
+still bounds total journal storage. This option does not discover new
+Hearthstone log directories or recover events that the plugin never wrote.
+
+Storage capacity is explicit. Exhaustion stops collection with a failure record
+and nonzero exit status. The collector retains existing evidence. Disk errors
+can prevent a final record; stderr and the command's exit status remain the
+failure indicators. No automatic remote upload or tracker restart occurs.
+
+This collector preserves evidence independently; it does not prove HDT processed
+the captured input. The [canonical parser replay](UI-REPLAY.md#exercise-the-installed-event-pipeline)
+currently covers a small set of mode transitions, not a complete Arena match.
+See [capture instructions](CAPTURE-FREEZE.md) and the
+[independent-observer contract](specs/independent-observer.md).

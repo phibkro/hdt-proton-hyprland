@@ -1,6 +1,6 @@
 # Observed compatibility
 
-This record describes the desktop tests from 2026-11-15. It distinguishes user observations, process inspection, log inspection, and saved HDT records. A verified result covers the stated observation, not every combination of settings.
+This record describes desktop tests from 2026-11-15 through 2026-11-16. It distinguishes user observations, process inspection, log inspection, and saved HDT records. A verified result covers the stated observation, not every combination of settings.
 
 ## Tested environment
 
@@ -11,11 +11,65 @@ This record describes the desktop tests from 2026-11-15. It distinguishes user o
 | Display | One 3440 × 1440 monitor at scale 1 |
 | Window system | XWayland |
 | Game launcher | Battle.net through a non-store Steam shortcut |
-| Compatibility tool | Proton Experimental with Wine 11.0 |
+| Current compatibility tool | Proton Experimental `experimental-11.0-20261112-x86_64`, with Wine 11.0 |
+| Compared compatibility tool | Steam's Proton Stable 11.0-2, internal build `proton-11.0-2e-x86_64` |
 | HDT | Release 1.60.1, assembly version 1.60.1.9028 |
 | .NET | Native Microsoft .NET Framework 4.8 |
 
-Native Wayland, fractional scaling, mixed DPI, multiple monitors, other compositors, and stable Proton remain untested.
+Native Wayland, fractional scaling, mixed DPI, multiple monitors, and other compositors remain untested. The current path uses X11 windows through XWayland on a Wayland desktop. It is not a native Wayland port of HDT. See [the current execution path](EXPLANATION.md#the-current-execution-path).
+
+## Proton version comparison
+
+Experimental is the current desktop selection after the operator compared it
+with Stable 11.0-2 in the existing Steam shortcut. The launcher follows the
+running game's Proton version. Installing this project does not select
+Experimental for Steam.
+
+| Observation | Stable 11.0-2 | Experimental |
+|---|---|---|
+| Startup and menu overlay | The operator confirmed working HDT Settings, transparency, movement, resizing, Alt-Tab, controls, and click-through | These paths also worked in the desktop tests |
+| Repeated Settings transitions | The operator reported progressively slower animations and a temporary freeze after about two open/close cycles. HDT recovered after a delay, then stalled again on another cycle | After switching back, repeated Settings transitions worked with slight jitter and without the same progressive slowdown in that check |
+| Battlegrounds compositions submenu | Opening the panel made the overlay very slow and difficult to close, according to the operator | A controlled live comparison of this same panel remains untested |
+| Plugins and other main-window interaction | A Plugins click was followed by an unresponsive tracker. Captures also found UI stalls on native input and rendering paths | Intermittent freezes remain unresolved. Working Settings transitions do not establish that every submenu is reliable |
+| Isolated Settings comparison | Ten cycles completed with every open and close acknowledged | The same ten-cycle fixture also completed. Neither run reproduced the desktop slowdown |
+| Arena recording after the return to Experimental | Not the comparison used for these later records | One complete Arena match was saved with no dispatcher stall during the measured match interval. A later result was saved after tracker restarts, with incomplete match continuity |
+| Fatal X11 mapping errors | These two later exits were not observed in the Stable session | Two later HDT exits reported `XI_BadDevice` on `X_GetDeviceButtonMapping`, with exit status 1 |
+
+The observations suggest a version-dependent difference in submenu performance
+on this machine. They do not establish a general Proton 11.0-2 regression or
+identify animations, Wine input, DXVK, or another component as the sole cause.
+The isolated comparison used Xvfb and Openbox without normal HDT startup,
+live watchers, account services, or the Hyprland desktop. It cannot establish
+equivalent live performance between versions.
+
+The operator returned to Experimental because the Settings interaction behaved
+better there. Experimental is the current working baseline for this project,
+not a crash-free configuration. Complete acceptance across Standard matches,
+Arena matches and drafts, and Battlegrounds matches remains incomplete for
+Stable 11.0-2. The [test procedure](TESTING.md#test-stable-proton) covers a future
+comparison. The [XInput investigation](specs/xinput-device-race.md) describes
+the separate fatal-error reproduction and its limits.
+
+## Rust host acceptance, 2026-11-16
+
+The reviewed Rust package was activated through a temporary user-service override
+while Hearthstone kept running under Proton Experimental. Process inspection
+confirmed the native host, Microsoft CLR, and the shared Steam mount namespace.
+This test changes the launcher and Linux helpers; HDT remains the Windows WPF app.
+
+| Path | Result | Evidence and limits |
+|---|---|---|
+| HDT startup and game detection | Verified | Same-prefix launch completed; HDT selected the correct log directory, and the overlay matched the game client bounds |
+| Live Arena offers and picks | Verified | After the Rust-backed restart, the operator made another pick and confirmed the following offer updated |
+| ArenaSmith ratings | Verified | The operator confirmed ratings on the paused offer and updates after another pick |
+| Overlay alignment and input | Verified | The operator confirmed movement, resizing, Alt-Tab, preview clearing, transparent click-through, and working overlay controls |
+| Main-window menus | Verified | The operator confirmed Settings and other menus responded. Settings reportedly slid smoothly without jitter; this is an observation, not a performance benchmark |
+| Ordinary Arena and other match tracking | Untested in this acceptance session | Earlier saved-match results below remain separate evidence; the draft checks do not establish match recording with this package |
+| Long-session reliability | Untested | A later tracker restart was manual, as confirmed by the operator; these checks do not establish crash-free operation |
+
+The runtime override is temporary. Building or merging the package does not
+update the workstation's declarative Nix configuration. Other desktops and
+mixed-DPI layouts remain outside this acceptance result.
 
 ## Tracking results
 
@@ -63,7 +117,7 @@ The rendering and input mechanisms are described in [HDT compatibility design](E
 | Setup command order and failure handling | Verified in subprocess tests | Tests covered build, plugin installation, configuration order, and stopping after a failed step |
 | Plugin build in the real prefix | Verified | The native .NET compiler built the moved plugin against the installed HDT assemblies |
 | Setup applied to the live tracker | Untested | `hdt-setup` has not closed and reconfigured the accepted live tracker |
-| Stable Proton | Untested | Only Experimental was installed during the inspection. No version selection or prefix copy was changed |
+| Stable Proton 11.0-2 | Partially tested, with reported regressions | Baseline overlay checks worked. Repeated Settings transitions and the Battlegrounds compositions panel showed slowdowns or temporary freezes. See the [version comparison](#proton-version-comparison) |
 
 The source checks at commit `6bddf1e` passed from a clean worktree. They covered 10 tests with 33 assertions, shellcheck, seven TypeScript entry bundles, and both native helper builds. The checks are defined by `scripts/check.sh` and exposed as `hdt-check`.
 
@@ -94,4 +148,4 @@ Raw logs and saved game records remain private because they contain account or g
 
 The latest read-only inspection found native CLR, fresh control snapshots, matching game and overlay origins, and fresh `Power.log` output. HDT history contained the two Arena wins and the three Standard results.
 
-The [test procedures](TESTING.md) cover the remaining comparisons, including exact offer identities, a fresh initial draft, more controls, automatic startup, and stable Proton. A longer session is still needed to investigate the earlier UI stall.
+The [test procedures](TESTING.md) cover the remaining comparisons, including exact offer identities, a fresh initial draft, more controls, automatic startup, and a complete Stable Proton retest. Longer-session reliability remains unresolved on Experimental too.
