@@ -43,6 +43,9 @@
 !/tests/config.test.ts
 !/tests/steam-launch.test.ts
 !/tests/autostart.test.ts
+!/tests/xinput-race.c
+!/tests/xinput-race.ts
+!/scripts/check-xinput.sh
 !/docs/
 /docs/*
 !/docs/COMPATIBILITY.md
@@ -103,3 +106,4 @@
 !/src/runtime/tracker-environment.ts
 !/tests/tracker-environment.test.ts
 !/scripts/test-unit.sh
+!/docs/specs/xinput-device-race.md

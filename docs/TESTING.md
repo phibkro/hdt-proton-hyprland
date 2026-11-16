@@ -121,6 +121,22 @@ Compositor snapshots and time are simulated. The checks cover failed launches,
 retry delays, failure limits, normal exits, process identity, and lock ownership.
 They do not establish recovery of the real Wine process or overlay after a crash.
 
+## Reproduce the XInput device race without Hearthstone
+
+Run the isolated native check from the checkout:
+
+```sh
+devenv shell -- bash scripts/check-xinput.sh
+```
+
+Expect one result line per case and a final `Private XInput reproduction passed`
+message. The printed evidence directory contains each case's logs and
+`result.json`. The script retains the evidence and stops its private X server.
+
+Use the script rather than running the native fixture against your desktop.
+See [fatal XInput mapping errors](specs/xinput-device-race.md) for the demonstrated
+mechanism and the remaining gap to a tested Wine fix.
+
 ## Test stable Proton
 
 Stable Proton has not passed this project's desktop tests. The tested version remains Experimental. Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.

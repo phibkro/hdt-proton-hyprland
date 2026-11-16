@@ -83,3 +83,14 @@ No TypeScript supervisor or runtime dependency is added. The child launcher
 retains ownership of Proton and its helpers. Tests exercise the actual Bash
 watcher, process identities, child exits, and lock release with simulated
 compositor snapshots and time. Live Wine recovery remains unverified.
+
+## Native XInput reproduction
+
+The 2026-11-16 fixture uses C to exercise libXi's native protocol boundary.
+Bash reuses the existing Bubblewrap isolation pattern. The bounded Bun runner
+owns one Xvfb process, fixture deadlines, and private evidence files. The lookup
+still found no installed Effect package or house overlay. This extends the
+existing test tooling exception without adding a TypeScript application runtime.
+LibXi is a development dependency only. No upstream code is copied into the
+fixture. A future Effect migration must retain server ownership, deadlines,
+desktop isolation, and the error-handling negative controls.
