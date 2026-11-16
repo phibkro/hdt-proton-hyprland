@@ -233,3 +233,7 @@
 !/docs/investigations/libxi-open-device.md
 
 !/nix/libxi.nix
+!/docs/specs/portable-desktop-acceptance.md
+!/nix/desktop-acceptance.nix
+!/scripts/check-portable-desktop.sh
+!/tests/native/portable-desktop-doctor.sh

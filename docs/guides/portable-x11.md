@@ -62,3 +62,16 @@ The replay is an Xvfb/Openbox test. Passing it is a gate for this experimental
 implementation, not proof of KDE/GNOME usability, live game state, Premium access
 or long-session reliability. The existing Hyprland route remains the working
 installation while real desktop acceptance is outstanding.
+
+The optional [private compositor doctor](../specs/portable-desktop-acceptance.md)
+uses actual pinned KWin virtual/Xwayland components without host devices or
+session sockets:
+
+```sh
+bash scripts/check-portable-desktop.sh
+```
+
+It returns nonzero if compositor prerequisites fail and retains the reason in
+its printed evidence directory. The current device-free route reports no render
+device; no KWin HDT input acceptance has run. A successful doctor would still
+require the full Wine/WPF journey before claiming compositor fixture support.
