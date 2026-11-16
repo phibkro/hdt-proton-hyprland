@@ -32,10 +32,12 @@ RUNPATH and lets the existing process environment supply dependencies. The
 private replay confirms actual loading; it does not establish long-session
 desktop stability or protect against genuine device disappearance.
 
-2026-11-16: An additional portable-X11 input journey intermittently failed before
-WPF received pointer hover: native readiness alone did not establish a usable
-control. Retain an explicit control-hover assertion before the existing Click
-assertion. One original-library run and one patched run passed the complete
-journey, but other patched runs failed. A WPF synchronization experiment also
-failed and was removed. The trigger and any relationship to library selection
-remain unresolved; hold merge rather than retrying the gate into a pass.
+2026-11-16: The additional portable-X11 journey initially failed before WPF
+received pointer hover. The subsequent [input-ownership investigation](portable-input-delivery.md)
+identified competing Win32 click-through decisions and Wine's stale cursor
+cache outside its windows. [PR21](https://github.com/phibkro/hdt-proton-hyprland/pull/21)
+fixes those boundaries and retains the negative
+control and explicit hover/Click assertions. Both original and corrected libXi
+passed that corrected private journey. This supersedes the earlier unexplained
+portable-hover blocker; it does not establish compositor or long-session desktop
+acceptance, nor make libXi the cause of those pointer-delivery failures.

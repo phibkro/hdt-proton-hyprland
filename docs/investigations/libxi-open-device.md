@@ -98,13 +98,15 @@ process. Hearthstone retained its process identity and the same relevant
 library mappings. The packaged launcher build and private WPF replay passed;
 long-session crash prevention remains unverified.
 
-The additional portable-X11 input replay is not consistently passing: one
-patched run completed all six WPF clicks, while other runs timed out waiting for
-WPF pointer delivery. An original-library comparison passed once. Native focus
-acknowledgement alone does not establish WPF hover or Click delivery, so the
-journey now asserts those separately. The relationship to library selection is
-unresolved. Keep this integration in draft review until the failure is explained;
-do not interpret a later passing run as resolution of the earlier failures.
+The additional portable-X11 replay originally exposed a separate pointer-delivery
+failure. The [input-ownership investigation](../specs/portable-input-delivery.md)
+identified competing Win32 click-through owners and a stale Wine cursor cache;
+[PR21](https://github.com/phibkro/hdt-proton-hyprland/pull/21) corrects those
+boundaries without synthesizing product input. Its retained
+negative control specifically fails the ownership assertion, and the corrected
+journey passes with both library variants. This supersedes that unexplained
+hover blocker, rather than treating an unexplained retry as a resolution. Real
+compositor acceptance and long-session crash prevention remain separate gates.
 
 ## Upstream submission draft
 
