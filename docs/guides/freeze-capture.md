@@ -173,3 +173,10 @@ its new PID and use a new output directory.
 A debugger can change scheduling and make a race harder to reproduce. Keep the
 independent device capture alongside it; lack of a failure while debugging is
 not evidence that the bug is fixed.
+
+The hosted Ubuntu acceptance job grants `userns` to its pinned Bubblewrap
+executable with a runner-only AppArmor profile, following Ubuntu's
+[documented application profile mechanism](https://documentation.ubuntu.com/release-notes/24.04/).
+The fixture still runs as the normal runner user with a private network,
+process tree and display. This setup changes no operator-machine policy and
+does not disable the runner's global namespace restriction.
