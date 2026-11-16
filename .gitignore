@@ -197,3 +197,5 @@
 !/.cursor/skills/verify-hdt-proton/features/*.md
 
 !/docs/PR-REVIEW.md
+!/scripts/ci-scope.sh
+!/tests/ci-scope.test.ts
