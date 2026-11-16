@@ -1,15 +1,16 @@
 //! Real protocol acceptance. Run only inside the project's private PID/mount/network sandbox.
 use std::{
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
     process::{Child, Command, Stdio},
     sync::mpsc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use x11rb::{
     connection::Connection,
     protocol::{
         composite::{ConnectionExt as _, Redirect},
         render::{ConnectionExt as _, PictType},
+        shape::{ConnectionExt as _, SK},
         xproto::{
             AtomEnum, ColormapAlloc, ConnectionExt as _, CreateGCAux, CreateWindowAux, PropMode,
             Rectangle, WindowClass,
@@ -271,6 +272,18 @@ fn isolated_x11_relationship_and_argb_pixels() {
     .check()
     .unwrap();
     assert!(run(&display, &apply, false).contains("expected window not found"));
+    conn.change_property8(
+        PropMode::REPLACE,
+        overlay,
+        AtomEnum::WM_NAME,
+        AtomEnum::STRING,
+        &vec![b'x'; 20_000],
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    assert!(run(&display, &apply, false).contains("expected window not found"));
+    assert_eq!(property(&conn, overlay), Some(root.root));
     identity(&conn, overlay, pid_atom, 101, b"HearthstoneOverlay");
     assert!(run(&display, &apply, false).contains("expected window not found"));
     // A wrong PID makes restore a no-op, preserving someone else's relationship.
@@ -400,5 +413,231 @@ fn isolated_x11_relationship_and_argb_pixels() {
     conn.free_gc(gc).unwrap().check().unwrap();
     conn.destroy_window(argb).unwrap().check().unwrap();
     conn.free_colormap(colormap).unwrap().check().unwrap();
+    conn.destroy_window(game).unwrap().check().unwrap();
+    portable_bridge_acceptance(&conn, &display, root.root, pid_atom);
     conn.flush().unwrap();
+}
+
+fn portable_bridge_acceptance(conn: &RustConnection, display: &str, root: u32, pid_atom: u32) {
+    let screen = &conn.setup().roots[0];
+    let make = |pid, title: &[u8], x| {
+        let window = conn.generate_id().unwrap();
+        conn.create_window(
+            screen.root_depth,
+            window,
+            root,
+            x,
+            x,
+            32,
+            32,
+            0,
+            WindowClass::INPUT_OUTPUT,
+            screen.root_visual,
+            &CreateWindowAux::new(),
+        )
+        .unwrap()
+        .check()
+        .unwrap();
+        identity(conn, window, pid_atom, pid, title);
+        conn.map_window(window).unwrap().check().unwrap();
+        window
+    };
+    let game = make(400, b"Hearthstone", 0);
+    let overlay = make(500, b"HearthstoneOverlay", 0);
+    let main = make(500, b"Hearthstone Deck Tracker", 80);
+    let wrapper = make(600, b"WM frame", 0);
+    conn.reparent_window(game, wrapper, 0, 0)
+        .unwrap()
+        .check()
+        .unwrap();
+    conn.map_window(game).unwrap().check().unwrap();
+    let clients = conn
+        .intern_atom(false, b"_NET_CLIENT_LIST")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    conn.change_property32(
+        PropMode::REPLACE,
+        root,
+        clients,
+        AtomEnum::WINDOW,
+        &[game, overlay, main],
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    let inventory: serde_json::Value = serde_json::from_str(&run(
+        display,
+        &["x11-desktop".into(), "windows".into(), "hdt-fixture".into()],
+        true,
+    ))
+    .unwrap();
+    assert_eq!(
+        inventory.as_array().unwrap().len(),
+        3,
+        "managed reparented game and root overlay are both discoverable without duplicates"
+    );
+    let active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    conn.change_property32(PropMode::REPLACE, root, active, AtomEnum::WINDOW, &[game])
+        .unwrap()
+        .check()
+        .unwrap();
+    conn.set_input_focus(
+        x11rb::protocol::xproto::InputFocus::PARENT,
+        game,
+        x11rb::CURRENT_TIME,
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    conn.warp_pointer(x11rb::NONE, root, 0, 0, 0, 0, 20, 20)
+        .unwrap()
+        .check()
+        .unwrap();
+    let executable = std::env::var_os("HDT_TEST_HOST_BINARY").unwrap();
+    let mut owner = Server(
+        Command::new(&executable)
+            .args(["x11-desktop", "bridge", "500", "400", "hdt-fixture"])
+            .env("DISPLAY", display)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    let output = owner.0.stdout.take().unwrap();
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(output).lines() {
+            let value: serde_json::Value = serde_json::from_str(&line.unwrap()).unwrap();
+            if sender.send(value).is_err() {
+                break;
+            }
+        }
+    });
+    let ready = receiver.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!(ready["kind"], "ready");
+    assert_eq!(ready["overlay"], overlay);
+    assert_eq!(property(conn, overlay), Some(game));
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty()
+    );
+    let wait = |predicate: &dyn Fn(&serde_json::Value) -> bool| {
+        let deadline = Instant::now() + Duration::from_secs(4);
+        loop {
+            let remaining = deadline
+                .checked_duration_since(Instant::now())
+                .expect("native observation deadline");
+            let value = receiver.recv_timeout(remaining).unwrap();
+            if predicate(&value) {
+                break;
+            }
+        }
+    };
+    owner
+        .0
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"v1 32 32 1 8 8 8 8\n")
+        .unwrap();
+    wait(&|v| v["controls"] == 1);
+    let regions = conn
+        .shape_get_rectangles(overlay, SK::INPUT)
+        .unwrap()
+        .reply()
+        .unwrap()
+        .rectangles;
+    // A competing owner must fail before clearing the first owner's region.
+    let rejected = run(
+        display,
+        &[
+            "x11-desktop".into(),
+            "bridge".into(),
+            "500".into(),
+            "400".into(),
+            "hdt-fixture".into(),
+        ],
+        false,
+    );
+    assert!(rejected.contains("another portable input owner"));
+    assert_eq!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1
+    );
+    assert_eq!(regions.len(), 1);
+    assert_eq!(
+        (
+            regions[0].x,
+            regions[0].y,
+            regions[0].width,
+            regions[0].height
+        ),
+        (8, 8, 8, 8)
+    );
+    conn.warp_pointer(x11rb::NONE, root, 0, 0, 0, 0, 10, 10)
+        .unwrap()
+        .check()
+        .unwrap();
+    wait(&|v| v["focused"] == true && v["pointerOverControl"] == true);
+    wait(&|v| v["fresh"] == false && v["controls"] == 0);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty()
+    );
+    assert_eq!(
+        conn.get_input_focus().unwrap().reply().unwrap().focus,
+        game,
+        "expired lease returns owned focus to the game stand-in"
+    );
+    drop(owner.0.stdin.take());
+    assert!(owner.0.wait().unwrap().success());
+    assert_eq!(property(conn, overlay), None);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty()
+    );
+    run(
+        display,
+        &[
+            "x11-desktop".into(),
+            "bridge".into(),
+            "500".into(),
+            "401".into(),
+            "hdt-fixture".into(),
+        ],
+        false,
+    );
+    assert_eq!(
+        property(conn, overlay),
+        None,
+        "rejected game identity cannot alter the overlay"
+    );
+    for window in [overlay, game, main, wrapper] {
+        conn.destroy_window(window).unwrap().check().unwrap();
+    }
 }

@@ -34,3 +34,10 @@ particles enabled is a known rendering failure; keep suppression enabled for the
 normal acceptance path. Proton 11.0 replay success does not negate live Stable
 submenu stalls. A static screenshot or responsive diagnostic timer is not proof
 of changing game state, correct ratings or a responsive WPF command.
+
+Experimental portable route: run `bash scripts/replay.sh run --with-plugin
+--without-particles --desktop-input` from the prepared development shell. Require
+six real WPF control clicks, empty-space Win32 fixture clicks, invalid readiness
+rejection and controller-loss recovery in `desktop-input-result.json`, followed
+by the normal replay's successful exit. Keep source hashes and isolation evidence.
+This fixture proves the opt-in X11 owner, not KDE/GNOME or live-game support.

@@ -6,6 +6,7 @@ snapshot=$run/source
 battlegrounds_tabs=${8:-false}
 diagnostics=${9:-false}
 canonical_events=${10:-false}
+desktop_input=${11:-false}
 export PATH=$HDT_REPLAY_TOOLS_PATH
 [[ "$run" == "$root/local/replay/runs/"* ]]
 jq -e --arg run "$run" '.kind=="hdt-ui-replay-run" and .run==$run' "$run/ownership.json" >/dev/null
@@ -17,6 +18,11 @@ for tool in Xvfb openbox xcompmgr xdotool xwininfo magick; do command -v "$tool"
 export WINEPREFIX=$run/prefix XDG_RUNTIME_DIR=$run/runtime
 export WINEDLLOVERRIDES='mscoree=n,b;d3d9=n' WINEDEBUG=-all
 export DXVK_CONFIG='d3d9.shaderModel = 1' DXVK_LOG_PATH=$run
+if [[ "$desktop_input" == true ]]; then
+    export SteamAppId=1234567890 SteamGameId=1234567890 HDT_DESKTOP_BACKEND=x11
+    mkdir -p "$run/evidence"
+    ln -s "$run/evidence/input-region.json" "$run/plugin-input.json"
+fi
 Xvfb -displayfd 3 -screen 0 2560x1440x24 -nolisten tcp -ac 3>"$run/display" >"$run/xvfb.log" 2>&1 &
 xvfb_pid=$!
 cleanup() {
@@ -67,6 +73,11 @@ timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Fr
     /nologo /target:winexe /platform:x64 /out:ReplayHost.exe /r:System.Xaml.dll /r:System.Web.Extensions.dll /r:Newtonsoft.Json.dll \
     /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
     "$(winpath "$snapshot/src/replay/ReplayHost.cs")" "$(winpath "$snapshot/src/replay/CanonicalReplay.cs")" >"$run/compile.log" 2>&1
+if [[ "$desktop_input" == true ]]; then
+    timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
+        /nologo /target:winexe /platform:x64 /out:Hearthstone.exe "$(winpath "$snapshot/src/replay/GameWindow.cs")" >"$run/game-compile.log" 2>&1
+    timeout 70 "$proton/files/bin/wine" "$run/app/Hearthstone.exe" "$(winpath "$run/game-fixture.json")" >"$run/game-fixture.log" 2>&1 &
+fi
 timeout 70 "$proton/files/bin/wine" "$run/app/ReplayHost.exe" "$(winpath "$run/host.log")" "$plugin" "$level" "$particles" >"$run/wine.log" 2>&1 &
 host_pid=$!
 for ((i = 0; i < 200; i++)); do
@@ -168,6 +179,11 @@ if [[ "$canonical_events" == true ]]; then
     exit 0
 fi
 settings
+if [[ "$desktop_input" == true ]]; then
+    send desktop-control
+    bash "$snapshot/tests/portable-wpf.sh" "$root" "$run" >"$run/desktop-input.log" 2>&1
+    send desktop-control-hide
+fi
 if [[ "$diagnostics" == true ]]; then
     # Give the independent writer time to post a ping before blocking WPF.
     sleep 1.2

@@ -1,5 +1,5 @@
 // Local HDT plugin, using HDT's existing plugin lifecycle and layout APIs.
-// No game writes, injected game code, or window activation.
+// No game writes, injected game code, or synthetic input.
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -22,7 +22,7 @@ public sealed class ProtonCompatibility : IPlugin
     public string Description { get { return "Refresh overlay geometry, suppress incompatible Arena particles, and export input diagnostics."; } }
     public string ButtonText { get { return "No settings"; } }
     public string Author { get { return "Local investigation"; } }
-    public Version Version { get { return new Version(0, 5, 1); } }
+    public Version Version { get { return new Version(0, 6, 0); } }
     public MenuItem MenuItem { get { return null; } }
     FlightRecorder recorder;
     INotifyPropertyChanged battlegroundsTabs;
@@ -41,6 +41,7 @@ public sealed class ProtonCompatibility : IPlugin
     DateTime lastTooltipEvent = DateTime.MinValue;
     int[] lastPreviewBounds;
     bool alphaFloorApplied;
+    PortableOverlayInput portableInput;
     bool mouseDiagnosticsAttached;
     int overlayMouseDowns, overlayMouseUps;
     string lastMouseTargetType;
@@ -82,6 +83,7 @@ public sealed class ProtonCompatibility : IPlugin
     }
     public void OnUnload()
     {
+        if (portableInput != null) { portableInput.Stop(); portableInput = null; }
         CompositionTarget.Rendering -= ObserveRendering;
         if (battlegroundsTabs != null) battlegroundsTabs.PropertyChanged -= ObserveBattlegroundsTab;
         battlegroundsTabs = null;
@@ -228,6 +230,11 @@ public sealed class ProtonCompatibility : IPlugin
     void UpdateUi()
     {
         var overlay = Api.OverlayWindow;
+        if (overlay != null && Environment.GetEnvironmentVariable("HDT_DESKTOP_BACKEND") == "x11")
+        {
+            if (portableInput == null) portableInput = new PortableOverlayInput();
+            portableInput.Update(overlay);
+        }
         if (overlay != null && recorder != null)
         {
             var tabs = overlay.BattlegroundsGuidesTabsViewModel as INotifyPropertyChanged;
@@ -352,6 +359,7 @@ public sealed class ProtonCompatibility : IPlugin
                 var json = new JavaScriptSerializer().Serialize(new
                 {
                     session = Environment.GetEnvironmentVariable("HDT_INPUT_SESSION"),
+                    overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
                     observedMS = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     width = (int)Math.Round(clip.Width),
                     height = (int)Math.Round(clip.Height),

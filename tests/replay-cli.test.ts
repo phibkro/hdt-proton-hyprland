@@ -152,6 +152,7 @@ test("replay preserves namespace arguments and a failing supervisor result witho
       "false",
       "false",
       "false",
+      "false",
     ]);
     const runs = await readdir(nodePath.join(temp, "local/replay/runs"));
     expect(runs.length).toBe(1);

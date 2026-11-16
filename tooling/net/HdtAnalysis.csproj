@@ -15,7 +15,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
     <Compile Include="../../src/plugin/FlightRecorder.cs;../../src/diagnostics/*.cs;../../tests/*.cs" />
-    <Compile Condition="'$(AnalysisScope)' == 'full'" Include="../../src/plugin/ProtonCompatibility.cs;../../src/replay/*.cs" />
+    <Compile Condition="'$(AnalysisScope)' == 'full'" Include="../../src/plugin/ProtonCompatibility.cs;../../src/plugin/PortableOverlayInput.cs;../../src/replay/*.cs" />
     <Reference Include="System.Drawing;System.Xaml;System.Web.Extensions;PresentationCore;PresentationFramework;WindowsBase" />
   </ItemGroup>
   <ItemGroup Condition="'$(AnalysisScope)' == 'full'">

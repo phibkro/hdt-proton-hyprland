@@ -31,6 +31,10 @@ sealed class ReplayHost
     static object compatibilityPlugin;
     static CanonicalReplay canonical;
     static int pluginUpdates;
+    static Button desktopControl;
+    static int desktopClicks;
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd, int index);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool MoveFileEx(string source, string destination, int flags);
     static int? plaqueLevel;
     static JavaScriptSerializer serializer = new JavaScriptSerializer();
@@ -266,6 +270,28 @@ sealed class ReplayHost
                 ((FrameworkElement)overlay.FindName("BgsTopBar")).Visibility = Visibility.Collapsed;
                 scene = "menu";
                 break;
+            case "desktop-control":
+                if (desktopControl == null)
+                {
+                    desktopControl = new Button
+                    {
+                        Content = "Portable input test",
+                        Width = 160,
+                        Height = 40,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        VerticalAlignment = VerticalAlignment.Top
+                    };
+                    desktopControl.Click += (sender, e) => desktopClicks++;
+                    hdt.GetType("Hearthstone_Deck_Tracker.Utility.Extensions.OverlayExtensions").GetMethod("SetIsOverlayHitTestVisible")
+                        .Invoke(null, new object[] { desktopControl, true });
+                    Panel.SetZIndex(desktopControl, Int32.MaxValue);
+                    Canvas.SetLeft(desktopControl, 20); Canvas.SetTop(desktopControl, 20);
+                    // HDT's own hover detector transforms registered controls to
+                    // CanvasInfo; controls outside it never become clickable.
+                    ((Panel)overlay.FindName("CanvasInfo")).Children.Add(desktopControl);
+                }
+                desktopControl.Visibility = Visibility.Visible; break;
+            case "desktop-control-hide": if (desktopControl != null) desktopControl.Visibility = Visibility.Collapsed; break;
             case "popup-show":
                 popup = new Popup
                 {
@@ -309,6 +335,12 @@ sealed class ReplayHost
             ids.Add((string)Get(Get(card, "Card"), "Id"));
             plaqueLevels.Add((int)Get(Get(card, "PlaqueViewModel"), "Level"));
         }
+        object desktopBounds = null;
+        if (desktopControl != null && desktopControl.IsVisible)
+        {
+            var point = desktopControl.PointToScreen(new Point(desktopControl.ActualWidth / 2, desktopControl.ActualHeight / 2));
+            desktopBounds = new { x = (int)point.X, y = (int)point.Y };
+        }
         var bgsContent = (FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent");
         var data = new
         {
@@ -317,6 +349,12 @@ sealed class ReplayHost
             scene,
             mouseDowns,
             pluginUpdates,
+            desktopClicks,
+            desktopControl = desktopBounds,
+            overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
+            foregroundHwnd = GetForegroundWindow().ToInt64(),
+            overlayExtendedStyle = WindowStyle(new WindowInteropHelper(overlay).Handle, -20),
+            clickthrough = Get(overlay, "_clickthrough"),
             battlegroundsContent = new
             {
                 visible = bgsContent.IsVisible,

@@ -42,7 +42,7 @@ fn unsigned(value: &str, automatic_base: bool) -> Result<u32> {
     parsed.context("invalid argument")
 }
 
-fn atom(conn: &RustConnection, name: &[u8]) -> Result<u32> {
+pub(crate) fn atom(conn: &RustConnection, name: &[u8]) -> Result<u32> {
     Ok(conn.intern_atom(false, name)?.reply()?.atom)
 }
 
@@ -52,20 +52,22 @@ fn property(
     name: u32,
     kind: AtomEnum,
 ) -> Result<x11rb::protocol::xproto::GetPropertyReply> {
-    Ok(conn
-        .get_property(false, window, name, kind, 0, u32::MAX)?
-        .reply()?)
+    let value = conn
+        .get_property(false, window, name, kind, 0, 4096)?
+        .reply()?;
+    Ok(value)
 }
 
 fn owner(conn: &RustConnection, window: Window, pid_atom: u32, pid: u32) -> Result<bool> {
     let value = property(conn, window, pid_atom, AtomEnum::CARDINAL)?;
-    Ok(value.type_ == u32::from(AtomEnum::CARDINAL)
+    Ok(value.bytes_after == 0
+        && value.type_ == u32::from(AtomEnum::CARDINAL)
         && value.format == 32
         && value.value_len == 1
         && value.value32().and_then(|mut values| values.next()) == Some(pid))
 }
 
-fn identity(
+pub(crate) fn identity(
     conn: &RustConnection,
     window: Window,
     pid_atom: u32,
@@ -74,19 +76,19 @@ fn identity(
     class: &str,
 ) -> Result<bool> {
     let name = property(conn, window, AtomEnum::WM_NAME.into(), AtomEnum::STRING)?;
-    if name.format != 8 || name.value != title.as_bytes() {
+    if name.bytes_after != 0 || name.format != 8 || name.value != title.as_bytes() {
         return Ok(false);
     }
     let classes = property(conn, window, AtomEnum::WM_CLASS.into(), AtomEnum::STRING)?;
     let mut parts = classes.value.split(|byte| *byte == 0);
     let _instance = parts.next();
-    if classes.format != 8 || parts.next() != Some(class.as_bytes()) {
+    if classes.bytes_after != 0 || classes.format != 8 || parts.next() != Some(class.as_bytes()) {
         return Ok(false);
     }
     owner(conn, window, pid_atom, pid)
 }
 
-fn vanished(error: &anyhow::Error) -> bool {
+pub(crate) fn vanished(error: &anyhow::Error) -> bool {
     matches!(error.downcast_ref::<ReplyError>(), Some(ReplyError::X11Error(error)) if error.error_kind == ErrorKind::Window)
 }
 
@@ -120,11 +122,12 @@ fn transient(conn: &RustConnection, window: Window) -> Result<Option<Window>> {
         AtomEnum::WM_TRANSIENT_FOR.into(),
         AtomEnum::WINDOW,
     )?;
-    Ok(
-        (value.type_ == u32::from(AtomEnum::WINDOW) && value.format == 32 && value.value_len == 1)
-            .then(|| value.value32().and_then(|mut values| values.next()))
-            .flatten(),
-    )
+    Ok((value.bytes_after == 0
+        && value.type_ == u32::from(AtomEnum::WINDOW)
+        && value.format == 32
+        && value.value_len == 1)
+        .then(|| value.value32().and_then(|mut values| values.next()))
+        .flatten())
 }
 
 /// Apply or guardedly restore an HDT overlay's transient relationship.
@@ -291,7 +294,7 @@ pub fn surface_probe(args: &[OsString]) -> Result<()> {
         AtomEnum::STRING,
     )?;
     ensure!(
-        title.format == 8 && title.value == b"HearthstoneOverlay",
+        title.bytes_after == 0 && title.format == 8 && title.value == b"HearthstoneOverlay",
         "target is not HDT overlay"
     );
     ensure!(

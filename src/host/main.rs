@@ -22,6 +22,14 @@ fn run() -> Result<i32> {
             x11::surface_probe(&args)?;
             Ok(0)
         }
+        "x11-desktop" => {
+            hdt_host::desktop::run(&args)?;
+            Ok(0)
+        }
+        "x11-control" => {
+            hdt_host::desktop::control(&Config::from_env()?, &args)?;
+            Ok(0)
+        }
         "config" => {
             let cfg = Config::from_env()?;
             match args.as_slice() {
@@ -79,7 +87,7 @@ fn run() -> Result<i32> {
         }
         "help" | "--help" | "-h" => {
             println!(
-                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|observe|trace-export"
+                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export"
             );
             Ok(0)
         }

@@ -199,3 +199,8 @@
 !/docs/PR-REVIEW.md
 !/scripts/ci-scope.sh
 !/tests/ci-scope.test.ts
+!/src/plugin/PortableOverlayInput.cs
+
+!/src/replay/GameWindow.cs
+!/tests/portable-wpf.sh
+!/docs/PORTABLE-X11.md
