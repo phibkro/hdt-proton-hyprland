@@ -21,7 +21,6 @@ export DXVK_CONFIG='d3d9.shaderModel = 1' DXVK_LOG_PATH=$run
 if [[ "$desktop_input" == true ]]; then
     export SteamAppId=1234567890 SteamGameId=1234567890 HDT_DESKTOP_BACKEND=x11
     mkdir -p "$run/evidence"
-    ln -s "$run/evidence/input-region.json" "$run/plugin-input.json"
 fi
 Xvfb -displayfd 3 -screen 0 2560x1440x24 -nolisten tcp -ac 3>"$run/display" >"$run/xvfb.log" 2>&1 &
 xvfb_pid=$!
@@ -62,6 +61,7 @@ if [[ "$plugin" == true ]]; then
         /r:"$wpf\PresentationCore.dll" /r:"$wpf\PresentationFramework.dll" /r:"$wpf\WindowsBase.dll" \
         "${plugin_sources[@]}" >"$run/plugin-compile.log" 2>&1
     export HDT_ALPHA_FLOOR=1 HDT_INPUT_SESSION=isolated-replay HDT_INPUT_REGION_FILE=$run/plugin-input.json
+    if [[ "$desktop_input" == true ]]; then export HDT_INPUT_REGION_FILE=$run/evidence/input-region.json; fi
 fi
 if [[ "$diagnostics" == true ]]; then
     timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
