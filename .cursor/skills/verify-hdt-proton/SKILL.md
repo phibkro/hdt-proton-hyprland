@@ -22,13 +22,14 @@ replays. Build once with `CARGO_BUILD_JOBS=2 cargo build --locked`, then initial
 an empty verification session:
 
 ```sh
+mkdir -p evidence
 export HDT_HOST_BINARY="$CARGO_TARGET_DIR/debug/hdt-host"
 export HDT_VERIFY_ROOT="$(mktemp -d "$PWD/evidence/verification-XXXXXXXX")"
 chmod 700 "$HDT_VERIFY_ROOT"
 mkdir "$HDT_VERIFY_ROOT/data" "$HDT_VERIFY_ROOT/home"
 ```
 
-Create `evidence/` first if absent. Use a fresh CLI subprocess for each drive.
+Use a fresh CLI subprocess for each drive.
 Run the doctor below before its first drive and after a surprising result.
 For WPF, use the existing `hdt-replay` seed preparation in
 [UI-REPLAY.md](../../../docs/UI-REPLAY.md) (resolve repository docs from the

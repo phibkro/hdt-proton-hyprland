@@ -35,5 +35,5 @@ and base64 expansion. Host observation time and HDT event time are distinct.
 Collector liveness proves collection, not HDT consumption. Real log bytes can
 contain personal data; only synthetic fixtures are safe to commit unchanged.
 
-Canonical replay exits before diagnostics assertions. Do not combine
-`--canonical-events --diagnostics` and count the skipped recorder path as covered.
+The harness rejects `--canonical-events --diagnostics`. Run the canonical and
+recorder journeys separately; neither result substitutes for the other.
