@@ -36,6 +36,36 @@ Each run creates a fresh prefix and app directory from the seed. The sequence op
 
 The host checks card identities, displayed score text, actual plaque levels, visible particle emitters, panel visibility, Settings state, and dialog type. Screenshots support visual inspection. The test does not automatically prove pixel clearing after every popup.
 
+## Capture original views
+
+After preparing the private seed, run:
+
+```sh
+devenv shell -- hdt-replay run --with-plugin --without-particles --reference-views
+```
+
+This is a separate capture journey. It enumerates the installed HDT binary's
+actual settings tree, temporarily reveals advanced pages, and selects each leaf
+through the original `ShowPage` handler. It captures the rendered main-window
+settings viewport with overlapping scroll tiles, bounded to 32 tiles per page.
+Exceeding that bound fails the run rather than silently truncating a page.
+The native Settings button is exercised before capture; subsequent category and
+scene selections use the fixture protocol, not native pointer input.
+
+Open `reference/index.html` in the printed evidence directory for a local
+expandable screenshot gallery. The directory also contains `reference/index.json`, per-image
+state records, `reference-options-index.json`, source hashes and `result.json`.
+Require status zero, the expected page identities and visible original control
+types, and inspect the images. File existence alone does not prove correct
+pixels. Existing Arena/Battlegrounds scenes use synthetic state and ratings;
+no account session or game client runs. The New dialog is the original command's
+actual `DeckTypeDialog`.
+
+This captures reachable settings and selected fixture views, not every possible
+HDT screen or state. Consult the [view trees and coverage limits](../reference/wpf-view-map.md).
+Keep screenshots private: they contain upstream artwork/resources and are not
+new assets licensed for the native client. No application assets are committed.
+
 ## Compare the Arena particle workaround
 
 Run the current compatibility plugin with three level-five badges:

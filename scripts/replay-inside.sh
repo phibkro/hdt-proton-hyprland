@@ -7,6 +7,7 @@ battlegrounds_tabs=${8:-false}
 diagnostics=${9:-false}
 canonical_events=${10:-false}
 desktop_input=${11:-false}
+reference_views=${12:-false}
 export PATH=$HDT_REPLAY_TOOLS_PATH
 [[ "$run" == "$root/local/replay/runs/"* ]]
 jq -e --arg run "$run" '.kind=="hdt-ui-replay-run" and .run==$run' "$run/ownership.json" >/dev/null
@@ -92,7 +93,7 @@ jq -e '.settingsButton!=null and .commandId==0' "$run/state.json" >/dev/null
 id=0
 send() {
     id=$((id + 1))
-    jq -n --arg op "$1" --argjson id "$id" '{id:$id,op:$op}' >"$run/command.json.next"
+    jq -n --arg op "$1" --argjson id "$id" --arg page "${2:-}" --argjson offset "${3:-0}" '{id:$id,op:$op,page:$page,offset:$offset}' >"$run/command.json.next"
     mv "$run/command.json.next" "$run/command.json"
     for ((i = 0; i < 50; i++)); do
         [[ -s "$run/state.json" ]] && jq -e --argjson id "$id" '.commandId==$id' "$run/state.json" >/dev/null && return
@@ -179,6 +180,90 @@ if [[ "$canonical_events" == true ]]; then
     exit 0
 fi
 settings
+if [[ "$reference_views" == true ]]; then
+    mkdir "$run/reference"
+    mapfile -t mains < <(xdotool search --onlyvisible --name '^Hearthstone Deck Tracker$')
+    [[ ${#mains[@]} == 1 ]]
+    main_window=${mains[0]}
+    xdotool windowsize "$main_window" 1280 900
+    send reference-options-index
+    mapfile -t pages < <(jq -er '.[].name' "$run/reference-options-index.json")
+    ((${#pages[@]} > 0))
+    for page in "${pages[@]}"; do
+        [[ "$page" =~ ^TreeViewItem[A-Za-z0-9]+$ ]]
+        send reference-options-page "$page"
+        for ((attempt = 0; attempt < 30; attempt++)); do
+            jq -e --arg page "$page" '.settingsOpen and .settingsReference.page==$page and .settingsReference.visible and .settingsReference.width>0 and .settingsReference.viewportHeight>0' "$run/state.json" >/dev/null && break
+            sleep 0.1
+        done
+        jq -e --arg page "$page" '.settingsOpen and .settingsReference.page==$page and .settingsReference.visible and .settingsReference.viewportHeight>0' "$run/state.json" >/dev/null
+        offset=0 tile=0
+        while :; do
+            sleep 0.15
+            stem=$page-$tile
+            cp "$run/state.json" "$run/reference/$stem.json"
+            magick import -window "$main_window" "$run/reference/$stem.png"
+            jq -c --arg image "$stem.png" '{kind:"settings",image:$image,state:.settingsReference}' "$run/reference/$stem.json" >>"$run/reference/index.jsonl"
+            read -r extent viewport < <(jq -r '[.settingsReference.scrollableHeight,.settingsReference.viewportHeight]|map(floor)|@tsv' "$run/state.json")
+            ((offset < extent)) || break
+            ((tile < 31)) || {
+                echo 'Original settings page exceeds 32 reference tiles; capture incomplete.' >&2
+                exit 1
+            }
+            step=$((viewport * 4 / 5))
+            ((step > 0))
+            offset=$((offset + step))
+            ((offset <= extent)) || offset=$extent
+            send reference-options-scroll "$page" "$offset"
+            for ((attempt = 0; attempt < 30; attempt++)); do
+                jq -e --argjson offset "$offset" '.settingsReference.offset >= ($offset - 1)' "$run/state.json" >/dev/null && break
+                sleep 0.1
+            done
+            jq -e --argjson offset "$offset" '.settingsReference.offset >= ($offset - 1)' "$run/state.json" >/dev/null
+            tile=$((tile + 1))
+        done
+    done
+    send settings-close
+    for phase in menu arena-lobby draft-1 draft-2 bgs-start bgs-minions-toggle bgs-end; do
+        if [[ "$phase" == bgs-start ]]; then
+            send menu
+            for ((attempt = 0; attempt < 30; attempt++)); do
+                jq -e '.cards==[] and .arenaVisibility=="Collapsed" and .visibleScores==[]' "$run/state.json" >/dev/null && break
+                sleep 0.1
+            done
+            jq -e '.cards==[] and .arenaVisibility=="Collapsed" and .visibleScores==[]' "$run/state.json" >/dev/null
+        fi
+        send "$phase"
+        sleep 0.4
+        cp "$run/state.json" "$run/reference/$phase.json"
+        magick import -window root "$run/reference/$phase.png"
+        jq -c --arg image "$phase.png" '{kind:"synthetic-scene",image:$image,scene,cards,arenaVisibility,battlegroundsActiveTab}' "$run/state.json" >>"$run/reference/index.jsonl"
+    done
+    send new
+    sleep 0.5
+    jq -e '.visibleDialogTypes|any(endswith("DeckTypeDialog"))' "$run/state.json" >/dev/null
+    magick import -window "$main_window" "$run/reference/new-deck-dialog.png"
+    jq -c '{kind:"dialog",image:"new-deck-dialog.png",types:.visibleDialogTypes}' "$run/state.json" >>"$run/reference/index.jsonl"
+    jq -s '.' "$run/reference/index.jsonl" >"$run/reference/index.json"
+    jq -r '
+        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Original HDT reference atlas</title>" +
+        "<style>body{font:16px system-ui;background:#151b21;color:#eef3f7;max-width:1320px;margin:auto;padding:24px}a{color:#71caff}details{background:#20262d;margin:12px 0;padding:14px}summary{cursor:pointer}img{display:block;max-width:100%;height:auto;margin-top:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>" +
+        "<h1>Original HDT reference atlas</h1><p>Private original-WPF captures; synthetic game models; no account session. Not every HDT state.</p>" +
+        "<p>" + (length|tostring) + " images; " + ([.[]|select(.kind=="settings")|.state.page]|unique|length|tostring) +
+        " settings pages. <a href=\"index.json\">View manifest</a> · <a href=\"../result.json\">Run identity and outcome</a></p>" +
+        (map("<details><summary>" + ((.state.title // .scene // .kind)|@html) + " — " + (.image|@html) +
+            "</summary><a href=\"" + (.image|@html) + "\"><img loading=\"lazy\" src=\"" + (.image|@html) +
+            "\" alt=\"Original HDT reference\"></a><pre>" + (tojson|@html) + "</pre></details>")|join("\n")) + "</html>"
+    ' "$run/reference/index.json" >"$run/reference/index.html"
+    send finish
+    wait "$host_pid"
+    if rg -q '^(dispatcher|command|startup) ' "$run/host.log"; then
+        echo 'Reference capture recorded an original WPF exception; atlas incomplete.' >&2
+        exit 1
+    fi
+    echo "Captured ${#pages[@]} original settings pages, scroll tiles, synthetic scenes and New dialog. This is not every HDT state."
+    exit 0
+fi
 if [[ "$desktop_input" == true ]]; then
     send desktop-control
     bash "$snapshot/tests/replay/portable-wpf.sh" "$root" "$run" >"$run/desktop-input.log" 2>&1

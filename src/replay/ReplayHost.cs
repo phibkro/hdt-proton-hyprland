@@ -33,6 +33,7 @@ sealed class ReplayHost
     static int pluginUpdates;
     static Button desktopControl;
     static int desktopClicks;
+    static bool referenceSettings;
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool MoveFileEx(string source, string destination, int flags);
@@ -223,6 +224,31 @@ sealed class ReplayHost
         string op = (string)command["op"];
         switch (op)
         {
+            case "reference-options-index":
+                var advanced = hdt.GetType("Hearthstone_Deck_Tracker.FlyoutControls.Options.AdvancedOptions", true);
+                Set(advanced.GetProperty("Instance").GetValue(null, null), "Revealed", true);
+                var pages = ReferencePages().Select(page => new { name = page.Name, title = Convert.ToString(page.Header) }).ToArray();
+                if (pages.Length == 0) throw new InvalidOperationException("No original HDT settings pages found");
+                File.WriteAllText(Path.Combine(directory, "reference-options-index.json"), serializer.Serialize(pages));
+                referenceSettings = true;
+                break;
+            case "reference-options-page":
+                var selectedPage = ReferencePages().Single(page => page.Name == (string)command["page"]);
+                var options = (FrameworkElement)main.FindName("Options");
+                Set(main.FindName("FlyoutOptions"), "IsOpen", true);
+                options.GetType().GetMethod("ShowPage").Invoke(options, new object[] { selectedPage });
+                ReferenceScroll().ScrollToTop();
+                break;
+            case "reference-options-scroll":
+                var selected = (TreeViewItem)ReferenceTree().SelectedItem;
+                if (selected == null || selected.Name != (string)command["page"])
+                    throw new InvalidOperationException("Reference scroll page identity mismatch");
+                var offset = Convert.ToDouble(command["offset"], System.Globalization.CultureInfo.InvariantCulture);
+                var scroll = ReferenceScroll();
+                if (offset < 0 || offset > scroll.ScrollableHeight)
+                    throw new InvalidOperationException("Reference scroll is outside the original page");
+                scroll.ScrollToVerticalOffset(offset);
+                break;
             case "canonical-start":
                 if (canonical != null) throw new InvalidOperationException("Canonical replay already initialized");
                 canonical = new CanonicalReplay(hdt, directory); break;
@@ -316,6 +342,37 @@ sealed class ReplayHost
         }
         commandId = id;
     }
+    static TreeView ReferenceTree()
+    {
+        return (TreeView)((FrameworkElement)main.FindName("Options")).FindName("TreeViewOptions");
+    }
+    static IEnumerable<TreeViewItem> ReferencePages()
+    {
+        return ReferenceTree().Items.Cast<TreeViewItem>().SelectMany(category => category.Items.Cast<TreeViewItem>());
+    }
+    static ScrollViewer ReferenceScroll()
+    {
+        return (ScrollViewer)((FrameworkElement)main.FindName("Options")).FindName("ScrollViewerContent");
+    }
+    static object ReferenceState()
+    {
+        var options = (FrameworkElement)main.FindName("Options");
+        var content = Get(options, "OptionsContent") as FrameworkElement;
+        var page = ReferenceTree().SelectedItem as TreeViewItem;
+        var scroll = ReferenceScroll();
+        return new
+        {
+            page = page == null ? null : page.Name,
+            title = page == null ? null : Convert.ToString(page.Header),
+            contentType = content == null ? null : content.GetType().FullName,
+            visible = content != null && content.IsVisible,
+            width = content == null ? 0 : content.ActualWidth,
+            height = content == null ? 0 : content.ActualHeight,
+            offset = scroll.VerticalOffset,
+            scrollableHeight = scroll.ScrollableHeight,
+            viewportHeight = scroll.ViewportHeight
+        };
+    }
     static void Snapshot()
     {
         main.UpdateLayout();
@@ -369,6 +426,7 @@ sealed class ReplayHost
             mainHeight = main.ActualHeight,
             settingsButton = bounds,
             settingsOpen = (bool)Get(main.FindName("FlyoutOptions"), "IsOpen"),
+            settingsReference = referenceSettings ? ReferenceState() : null,
             arenaVisibility = view.Visibility.ToString(),
             arenaOpacity = view.Opacity,
             cards = ids,
