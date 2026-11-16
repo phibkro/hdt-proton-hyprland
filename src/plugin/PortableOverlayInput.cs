@@ -47,6 +47,13 @@ sealed class PortableOverlayInput
             (ExtendedStyle(hwnd, -20) & (OwnedMask | Transparent)) == AppWindow;
     }
 
+    public string InputState(Window overlay)
+    {
+        var hwnd = new WindowInteropHelper(overlay).Handle;
+        if (!PreparedFor(hwnd)) return "Unprepared";
+        return overlay.IsActive && Hearthstone_Deck_Tracker.User32.GetForegroundWindow() == hwnd ? "Active" : "Prepared";
+    }
+
     static Acknowledgement Read(string path, string session, IntPtr hwnd)
     {
         try
@@ -105,7 +112,7 @@ sealed class PortableOverlayInput
             // published. Make Wine receptive before X11 delivers pointer entry.
             setClickthrough.Invoke(overlay, new object[] { false });
             var foreground = Hearthstone_Deck_Tracker.User32.GetForegroundWindow();
-            if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl && foreground != hwnd)
+            if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl && (foreground != hwnd || !overlay.IsActive))
                 focusOwned = overlay.Activate();
             else if (focusOwned && ack.active && !ack.pointerOverControl && foreground == hwnd)
             {

@@ -401,6 +401,7 @@ sealed class ReplayHost
             desktopControlHovered = desktopControl != null && desktopControl.IsMouseOver,
             desktopPointer,
             overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
+            overlayActive = overlay.IsActive,
             foregroundHwnd = GetForegroundWindow().ToInt64(),
             overlayExtendedStyle = WindowStyle(new WindowInteropHelper(overlay).Handle, -20),
             clickthrough = Get(overlay, "_clickthrough"),

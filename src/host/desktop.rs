@@ -471,6 +471,7 @@ impl Bridge {
         &mut self,
         frame: Option<&(Frame, Instant)>,
         previous: &mut Option<(bool, bool)>,
+        win32_input: Option<Win32Input>,
     ) -> Result<Value> {
         self.validate()?;
         let attr = self
@@ -489,7 +490,6 @@ impl Bridge {
         let rectangles = frame
             .filter(|_| fresh && active)
             .map_or(&[][..], |(f, _)| f.rectangles.as_slice());
-        self.display.shape(self.overlay, rectangles)?;
         let pointer = self.display.conn.query_pointer(self.overlay)?.reply()?;
         let hit = pointer.same_screen
             && rectangles.iter().any(|r| {
@@ -499,6 +499,14 @@ impl Bridge {
                     && i32::from(pointer.win_y) < i32::from(r.y) + i32::from(r.height)
             });
         self.focus(active, hit)?;
+        // Generic X11 clients own their readiness. Wine requires an explicit
+        // Win32 activation acknowledgement before pointer entry is admitted.
+        let admitted = match win32_input {
+            None => rectangles,
+            Some(Win32Input::Active) if hit => rectangles,
+            _ => &[],
+        };
+        self.display.shape(self.overlay, admitted)?;
         if *previous != Some((active, attr.override_redirect)) {
             if attr.override_redirect {
                 self.display
@@ -522,7 +530,7 @@ impl Bridge {
         Ok(
             json!({"kind":"state","observedMS":SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
             "fresh":fresh,"active":active,"focused":self.display.focused_within(self.overlay)?,
-            "pointerOverControl":hit,"controls":rectangles.len()}),
+            "pointerOverControl":hit,"controls":rectangles.len(),"inputControls":admitted.len()}),
         )
     }
     fn cleanup(&mut self) -> Result<()> {
@@ -640,7 +648,10 @@ fn bridge(mut owner: Bridge) -> Result<()> {
                     pending.drain(..=end);
                 }
             }
-            emit(&mut output, &owner.tick(frame.as_ref(), &mut previous)?)?;
+            emit(
+                &mut output,
+                &owner.tick(frame.as_ref(), &mut previous, None)?,
+            )?;
         }
         Ok(())
     })();
@@ -650,6 +661,13 @@ fn bridge(mut owner: Bridge) -> Result<()> {
     result
 }
 
+#[derive(Clone, Copy, Deserialize)]
+enum Win32Input {
+    Unprepared,
+    Prepared,
+    Active,
+}
+
 #[derive(Deserialize)]
 struct Producer {
     session: String,
@@ -657,8 +675,8 @@ struct Producer {
     observed_ms: i64,
     #[serde(rename = "overlayHwnd")]
     hwnd: u32,
-    #[serde(rename = "win32InputReady")]
-    win32_input_ready: bool,
+    #[serde(rename = "win32Input")]
+    win32_input: Win32Input,
     width: u16,
     height: u16,
     rectangles: Vec<[u16; 4]>,
@@ -789,10 +807,18 @@ pub fn control(cfg: &crate::config::Config, args: &[OsString]) -> Result<()> {
                     geometry.height,
                     producer
                         .as_ref()
-                        .filter(|p| fresh && p.win32_input_ready)
+                        .filter(|p| fresh && !matches!(p.win32_input, Win32Input::Unprepared))
                         .map_or(&[][..], |p| p.rectangles.as_slice()),
                 )?;
-                let mut state = bridge.tick(Some(&(frame, Instant::now())), &mut previous)?;
+                let mut state = bridge.tick(
+                    Some(&(frame, Instant::now())),
+                    &mut previous,
+                    Some(
+                        producer
+                            .as_ref()
+                            .map_or(Win32Input::Unprepared, |p| p.win32_input),
+                    ),
+                )?;
                 state["fresh"] = json!(fresh && state["fresh"] == true);
                 state["session"] = json!(session);
                 state["backend"] = json!("x11");
@@ -940,7 +966,7 @@ mod tests {
             let mut published_width = 100u16;
             let mut published_time = now;
             let mut has_handle = true;
-            let mut producer = Producer {session:"0".into(), observed_ms:now, win32_input_ready:false,
+            let mut producer = Producer {session:"0".into(), observed_ms:now, win32_input:Win32Input::Unprepared,
                 hwnd:1,width,height:80,rectangles:vec![]};
             for (operation, delta) in operations {
                 match operation {
@@ -950,7 +976,7 @@ mod tests {
                     3 => {
                         published_generation = generation; published_width = width;
                         published_time = now; has_handle = true;
-                        producer = Producer {session:generation.to_string(),observed_ms:now,win32_input_ready:false,
+                        producer = Producer {session:generation.to_string(),observed_ms:now,win32_input:Win32Input::Unprepared,
                             hwnd:1,width,height:80,rectangles:vec![]};
                     },
                     4 => { has_handle = false; producer.hwnd = 0; },
@@ -968,7 +994,7 @@ mod tests {
             session: "owned".into(),
             observed_ms: 10000,
             hwnd: 1,
-            win32_input_ready: false,
+            win32_input: Win32Input::Unprepared,
             width: 100,
             height: 80,
             rectangles: vec![],
