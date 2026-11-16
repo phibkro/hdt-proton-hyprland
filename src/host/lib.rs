@@ -1,5 +1,6 @@
 pub mod config;
 pub mod control;
+pub mod desktop;
 pub mod journal;
 pub mod launch;
 pub mod setup;

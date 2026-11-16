@@ -8,6 +8,7 @@ with pkgs;
   clippy
   rust-analyzer
   cargo-nextest
+  cargo-fuzz
   cargo-deny
   cargo-machete
   clang-tools

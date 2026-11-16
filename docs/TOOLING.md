@@ -211,3 +211,9 @@ uses luacheck; it would not preserve the current Selene host declarations withou
 an explicit integration. The project currently has one dependency-free Lua
 template, so Lux dependency management adds no demonstrated capability yet.
 StyLua and Selene remain active; Lux adoption is untested.
+
+Generated Rust cases, bounded fuzzing and statistical parser benchmarks are
+covered in [the testing strategy](TEST-STRATEGY.md). Nextest remains the test
+runner; Proptest and Criterion are development dependencies. Cargo-fuzz is a
+pinned shell tool with a separate locked target manifest. No test dependency is
+added to the installed HDT process.

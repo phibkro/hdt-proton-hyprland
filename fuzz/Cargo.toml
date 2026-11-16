@@ -1,0 +1,30 @@
+[package]
+name = "hdt-host-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "MIT"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+hdt-host = { path = ".." }
+
+[[bin]]
+name = "input_frame"
+path = "fuzz_targets/input_frame.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "recorder_event"
+path = "fuzz_targets/recorder_event.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

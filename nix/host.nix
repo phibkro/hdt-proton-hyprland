@@ -6,9 +6,10 @@ rustPlatform.buildRustPackage {
     src = ../.;
     filter = path: type:
       let relative = lib.removePrefix ((toString ../.) + "/") (toString path);
-      in type == "directory" && (relative == "src" || relative == "src/host" || relative == "tests")
+      in type == "directory" && (relative == "src" || relative == "src/host" || relative == "tests" || relative == "benches")
         || type == "regular" && (lib.hasPrefix "src/host/" relative
           || relative == "Cargo.toml" || relative == "Cargo.lock" || relative == "LICENSE"
+          || (lib.hasPrefix "benches/" relative && lib.hasSuffix ".rs" relative)
           || (lib.hasPrefix "tests/rust-" relative && lib.hasSuffix ".rs" relative));
   };
   cargoLock.lockFile = ../Cargo.lock;

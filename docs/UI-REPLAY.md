@@ -101,3 +101,10 @@ must remain alive throughout. Its retained publisher bytes must match both
 application sessions exactly. These checks do not establish complete game-state
 equivalence, per-handler completion, or reproduction of the intermittent freeze
 after Arena battles. Live HearthMirror and remote ratings are outside the test.
+
+## Experimental portable input
+
+`--desktop-input` requires `--with-plugin` and a separate run from
+`--canonical-events`. It drives the native Rust controller and actual WPF button
+through private X11 mouse input. See [portable X11 input](PORTABLE-X11.md) for the
+journey, failure behavior and desktop-acceptance limits.
