@@ -52,7 +52,9 @@ window_for_color() {
     for ((attempt=0;attempt<300;attempt++)); do
         kill -0 "$watcher" || { cat /capture/watch.log >&2; return 1; }
         windows=$(xdotool search --onlyvisible --name '^Hearthstone Deck Tracker' 2>/dev/null || true)
+        printf '%(%s)T color=%s attempt=%d windows=%q\n' -1 "$color" "$attempt" "$windows" >>/capture/window-search.log
         if [[ $windows =~ ^[0-9]+$ ]]; then
+            xdotool getwindowpid "$windows" >>/capture/window-search.log 2>&1 || true
             if magick import -window "$windows" "$image" 2>/dev/null; then
                 magick "$image" -depth 8 -format %c histogram:info:- >/capture/palette.txt
                 if rg -qi -- "$color" /capture/palette.txt; then
@@ -82,7 +84,7 @@ printf '%s\n' "$second_pid" >/capture/after-pid.txt
 sha256sum avalonia/Hdt.Views/bin/Debug/net10.0/Hdt.Views.dll >/capture/after-assembly.txt
 [[ $first_pid != "$second_pid" ]]
 ! cmp -s /capture/before-assembly.txt /capture/after-assembly.txt
-if xdotool getwindowname "$first" >/dev/null 2>&1; then
+if [[ $(xdotool getwindowpid "$first" 2>/dev/null || true) == "$first_pid" ]]; then
     echo 'Previous development window survived the restart.' >&2
     exit 1
 fi
