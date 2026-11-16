@@ -203,6 +203,7 @@
 /tests/replay/*
 !/tests/replay/FlightRecorderChecks.cs
 !/tests/replay/portable-wpf.sh
+!/tests/replay/pointer-observer.c
 !/tooling/
 /tooling/*
 !/tooling/net/

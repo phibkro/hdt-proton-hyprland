@@ -52,13 +52,24 @@ for variant in wrong-session stale future wrong-hwnd fractional not-ready; do
 done
 HS_APP_ID=1234567890 HDT_PROJECT_DIR="$run" "$host" x11-control isolated-replay >"$run/portable-controller.log" 2>&1 &
 controller=$!
+observer=''
 cleanup() {
+    if [[ -n "$observer" ]]; then
+        kill -TERM "$observer" 2>/dev/null || true
+        wait "$observer" || true
+    fi
     kill -TERM "$controller" 2>/dev/null || true
     wait "$controller" || true
 }
 trap cleanup EXIT
 "$host" x11-desktop windows steam_app_1234567890 >"$run/portable-windows.json"
 game=$(jq -er '.[]|select(.title=="Hearthstone")|.address' "$run/portable-windows.json")
+overlay=$(jq -er '.[]|select(.title=="HearthstoneOverlay")|.address' "$run/portable-windows.json")
+read -r -a observer_flags <<<"$(pkg-config --cflags --libs x11)"
+cc -std=c11 -Wall -Wextra -Werror "$run/source/tests/replay/pointer-observer.c" -o "$run/pointer-observer" "${observer_flags[@]}"
+HDT_REPLAY_OBSERVER=1 timeout 30 "$run/pointer-observer" "$overlay" >"$run/x11-pointer-events.jsonl" 2>"$run/x11-pointer-events.stderr" &
+observer=$!
+wait_for 'X11 pointer observer ready' 'select(has("ready")) | .ready==true' "$run/x11-pointer-events.jsonl"
 # Retain property types/terminators when Wine's native identity differs.
 xwininfo -root -tree | awk '/"HearthstoneOverlay"|"Hearthstone Deck Tracker"/ {print $1}' | while read -r xid; do
     xprop -id "$xid" WM_NAME WM_CLASS _NET_WM_PID
@@ -87,6 +98,8 @@ for ((expected = 1; expected <= 6; expected++)); do
 done
 kill -TERM "$controller"
 wait "$controller"
+kill -TERM "$observer" 2>/dev/null || true
+wait "$observer" || true
 trap - EXIT
 jq -e '.nativeReady==false' "$ack" >/dev/null
 wait_for 'controller loss releases Win32 focus and activation style' '.foregroundHwnd!=.overlayHwnd and (.overlayExtendedStyle / 134217728 | floor % 2 == 1)' "$state"
