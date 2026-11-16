@@ -33,6 +33,7 @@ umask 077
 mkdir -m 700 -- "$output"
 cp "$source_root/src/diagnostics/xlib-fatal.gdb" "$output/capture.gdb"
 cat "/proc/$tracker_pid/stat" >"$output/target-start-stat.txt"
+cat "/proc/$tracker_pid/maps" >"$output/target-maps.txt"
 printf '%s\n' "$executable" >"$output/target-exe.txt"
 sha256sum "$output/capture.gdb" "$gdb" >"$output/capture-sha256.txt"
 printf 'Watching HDT PID %s for up to %s seconds. Private evidence: %s\n' "$tracker_pid" "$duration" "$output"
@@ -45,6 +46,9 @@ timeout --signal=TERM --kill-after=5 "$duration" "$gdb" -nx -nh -batch \
 printf '%s\n' "$status" >"$output/debugger-exit.txt"
 if grep -q '^HDT_NATIVE_XLIB_FATAL_END$' "$output/gdb.log"; then
     echo 'Captured a native Xlib fatal-error stack; debugger detached.'
+elif grep -q '^HDT_NATIVE_XLIB_FATAL_BEGIN$' "$output/gdb.log"; then
+    echo "Partial native stack retained; debugger failed before completing capture (status $status)." >&2
+    exit 1
 elif ((status == 124)); then
     echo 'Capture deadline reached; no complete fatal-error stack was recorded.'
 else

@@ -158,7 +158,7 @@ The exact-entry hardware breakpoint avoids that prologue selection.
 Routine Wine/CLR signals pass through to their existing handlers. At Xlib's
 default fatal-error handler, the capture saves three numeric error fields,
 register addresses, up to 24 current-thread stack frames without arguments,
-and the loaded-library list. It detaches without suppressing the error. On
+and preserves a pre-attachment `/proc` mapping snapshot. It detaches without suppressing the error. On
 the explicit deadline it terminates the debugger; the private lifetime test
 verified that an attached target remains running and untraced after this path.
 The exit status and incomplete-capture message distinguish a deadline or
@@ -180,3 +180,16 @@ executable with a runner-only AppArmor profile, following Ubuntu's
 The fixture still runs as the normal runner user with a private network,
 process tree and display. This setup changes no operator-machine policy and
 does not disable the runner's global namespace restriction.
+
+On 16 November, the live capture reached the fatal handler and saved the Wine
+`update_device_mapping` caller stack, then GDB 17.2 aborted in its optional
+`info sharedlibrary` command (`find_debug_base_for_solib` assertion). The capture
+now omits that command and retains `/proc` mappings outside GDB instead. A
+partial stack remains useful evidence, but the command reports it as incomplete.
+
+The capture also traces the numeric device ID passed to
+`XGetDeviceButtonMapping`, with the debugger thread identity. After 1,000
+queries it disables that query breakpoint; the fatal-handler breakpoint stays
+armed. No button values are recorded. This is more intrusive than the independent
+observer, so it is bounded diagnostic instrumentation rather than a default
+launcher setting.

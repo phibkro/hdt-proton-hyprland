@@ -86,3 +86,38 @@ journey adds/removes devices through the existing project-owned C fixture,
 then lets that separate client exit through Xlib's default fatal handler. The
 observer must remain alive, retain the device events and end normally.
 See [capture instructions](../guides/freeze-capture.md#native-xinput-exits).
+
+## Observed Wine caller stack
+
+The 16 November 2026 19:04:44 Europe/Oslo exit has a native caller stack,
+captured before Xlib terminated HDT. The recorded path is:
+
+```text
+X11DRV_GenericEvent
+  → update_device_mapping
+  → XGetDeviceButtonMapping
+  → _XReply / _XError
+  → Wine error_handler
+  → _XDefaultError
+```
+
+This directly identifies the failing Wine function, rather than inferring it
+from the standalone fixture. The loaded `winex11.so` hash matches the inspected
+ELF above. Installed version metadata reads
+`experimental-11.0-20261112-x86_64`. Matching that build to a source revision
+remains separate work.
+
+Independent observation near the failure recorded `DeviceChanged` source
+switches between two device IDs. No nearby hierarchy-removal event was observed
+by that capture. The recorder's clock is userspace receipt time, and the native
+error journal is written after debugger handling: adjacency alone does not prove
+which event caused the request. Device removal is therefore still a possible
+fixture mechanism, not the established live cause.
+
+After saving the stack, GDB 17.2 itself aborted while printing shared libraries,
+with `find_debug_base_for_solib: solib->objfile != nullptr`. The stack and GDB
+core are preserved privately. This debugger assertion is separate from the
+already intercepted Wine/Xlib error; no complete-capture marker was reached.
+The capture now avoids `info sharedlibrary` and saves `/proc` mappings outside
+the debugger. A matching-driver private reproducer and a scoped Wine fix are
+still unverified.

@@ -44,6 +44,7 @@ if [[ ${1:-} == --inside ]]; then
         --args ./xinput-race "$DISPLAY" fatal >fatal-gdb.log 2>&1
     grep -q '^HDT_NATIVE_XLIB_FATAL_BEGIN$' fatal-gdb.log
     grep -q 'XGetDeviceButtonMapping' fatal-gdb.log
+    grep -q '^HDT_MAPPING_QUERY .*device=[0-9]' fatal-gdb.log
     grep -q '^HDT_NATIVE_XLIB_FATAL_END$' fatal-gdb.log
     HDT_XINPUT_REPRO=1 "$4" -nx -nh -batch -iex 'set auto-load off' -iex 'set debuginfod enabled off' \
         -ex start -x xlib-fatal.gdb -ex continue \
@@ -53,6 +54,14 @@ if [[ ${1:-} == --inside ]]; then
         exit 1
     fi
     grep -q 'exited normally' guarded-gdb.log
+    # Reaching the trace quota must retain the independent fatal breakpoint.
+    # shellcheck disable=SC2016 # The variable belongs to GDB, not the shell.
+    HDT_XINPUT_REPRO=1 "$4" -nx -nh -batch -iex 'set auto-load off' -iex 'set debuginfod enabled off' \
+        -ex start -x xlib-fatal.gdb -ex 'set $hdt_mapping_queries = 999' -ex continue \
+        --args ./xinput-race "$DISPLAY" fatal >quota-gdb.log 2>&1
+    [[ $(grep -c '^HDT_MAPPING_QUERY ' quota-gdb.log) == 1 ]]
+    grep -q '^HDT_MAPPING_QUERY count=1000 ' quota-gdb.log
+    grep -q '^HDT_NATIVE_XLIB_FATAL_END$' quota-gdb.log
     wait "$observer_pid"
     observer_pid=''
     "$3" -se '
