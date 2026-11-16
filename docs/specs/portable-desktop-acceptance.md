@@ -32,6 +32,8 @@ that may silently replace KWin. No upstream implementation is copied.
 2. Record KWin version, selected package identity, parent and child display
    identities, compositor process and X11 window-manager identity. Prove clients
    connect to KWin's Xwayland, not the parent Xvfb or Openbox.
+   Require KWin's public `org.kde.kwin.Compositing.active` property as well:
+   Xwayland connectivity alone is not evidence of a working renderer.
    If that prerequisite fails, retain the nonzero doctor result and stop before
    HDT/WPF execution. Do not weaken software/device isolation to obtain a pass.
 3. Run the existing real Wine/WPF portable journey unchanged: six actual control
@@ -76,6 +78,15 @@ The first exact-head doctor retained the renderer failure and timed out without
 a usable client. Its missing explicit Xwayland executable dependency was then
 declared in the optional shell; it must not be confused with a successful render
 device prerequisite. All owned processes remained bounded by the PID namespace.
+
+That dependency correction exposed a rejected false positive: KWin could start
+Xwayland and let the client connect despite reporting a fatal renderer failure.
+The final doctor also reads the compositor's public `active` property via its
+private D-Bus session, based on the upstream
+[interface contract](https://github.com/KDE/kwin/blob/v6.8.1/src/dbusinterface.h).
+Missing/inactive compositing remains a nonzero result even if an X11 window
+manager property exists. The false-positive artifacts are retained privately;
+no HDT input acceptance followed them.
 
 The separate libXi regression rerun satisfied all six race assertions but failed
 Nix output reproducibility: the original library's failing iteration changed

@@ -6,6 +6,12 @@ if [[ ${1:-} == --client ]]; then
     [[ -n ${DISPLAY:-} && -n ${WAYLAND_DISPLAY:-} ]]
     # The real compositor supplies these client variables. Never inherit a display.
     xprop -root _NET_SUPPORTING_WM_CHECK >/capture/window-manager.txt
+    # An Xwayland connection can succeed while KWin queues a fatal renderer
+    # shutdown. Require its own public compositor state, not just an X11 window.
+    dbus-send --session --print-reply --reply-timeout=2000 --dest=org.kde.KWin \
+        /Compositor org.freedesktop.DBus.Properties.Get \
+        string:org.kde.kwin.Compositing string:active >/capture/compositing-active.txt
+    grep -Eq 'variant[[:space:]]+boolean true[[:space:]]*$' /capture/compositing-active.txt
     jq -n --arg display "$DISPLAY" --arg wayland "$WAYLAND_DISPLAY" \
         '{xwaylandDisplay:$display,waylandDisplay:$wayland}' >/capture/client.json
     exit 0
@@ -47,9 +53,11 @@ timeout --kill-after=3s 25 bwrap --unshare-all --die-with-parent --new-session \
     bash /capture/doctor.sh --inside >"$run/compositor.log" 2>&1 || status=$?
 ready=false
 if ((status == 0)) && [[ -s $run/client.json ]] && grep -q 'WINDOW' "$run/window-manager.txt"; then ready=true; fi
-jq -n --argjson status "$status" --argjson ready "$ready" \
+compositing=false
+if [[ -s $run/compositing-active.txt ]] && grep -Eq 'variant[[:space:]]+boolean true[[:space:]]*$' "$run/compositing-active.txt"; then compositing=true; fi
+jq -n --argjson status "$status" --argjson ready "$ready" --argjson compositing "$compositing" \
     '{kind:"kwin-virtual-prerequisite-doctor",exitStatus:$status,clientReady:$ready,
-      desktopAcceptance:false,physicalDevicesExposed:false,hostDesktopExposed:false}' >"$run/result.json"
+      compositingActive:$compositing,desktopAcceptance:false,physicalDevicesExposed:false,hostDesktopExposed:false}' >"$run/result.json"
 echo "KWin prerequisite evidence: $run"
 if [[ $ready != true ]]; then
     echo 'KWin prerequisite unavailable; inspect compositor.log. No desktop acceptance ran.' >&2
