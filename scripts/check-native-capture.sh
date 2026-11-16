@@ -55,16 +55,21 @@ case "$HDT_TEST_RESULT" in
         exit 1
         ;;
     partial) echo HDT_NATIVE_XLIB_FATAL_BEGIN; exit 0 ;;
+    partial-deadline) echo HDT_NATIVE_XLIB_FATAL_BEGIN; exec sleep 5 ;;
     unexpected) exit 0 ;;
 esac
 SH
 chmod +x mock-bin/gdb
 start_target
-for result in failed-after-end partial unexpected mismatch; do
+for result in failed-after-end partial partial-deadline unexpected mismatch; do
     status=0
     HDT_TEST_RESULT=$result PATH="$PWD/mock-bin:$PATH" bash scripts/capture-native-error.sh \
         "$owned_pid" "wrapper-$result" 2 >"wrapper-$result.log" 2>&1 || status=$?
-    [[ $status == 1 ]]
+    if [[ $result == partial-deadline ]]; then
+        [[ $status == 124 ]]
+    else
+        [[ $status == 1 ]]
+    fi
     assert_released
 done
 grep -q '^HDT_NATIVE_CAPTURE_IDENTITY_MISMATCH$' wrapper-mismatch/gdb.log
