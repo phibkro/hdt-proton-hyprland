@@ -41,7 +41,7 @@ and switcher presence on target desktops remain untested.
 
 ## Reproduce without a game
 
-Use the prepared account-free environment described in [UI replay](UI-REPLAY.md).
+Use the prepared account-free environment described in [UI replay](ui-replay.md).
 From the development shell, build the native host and run:
 
 ```sh

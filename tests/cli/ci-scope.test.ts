@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-const script = path.resolve(import.meta.dir, "../scripts/ci-scope.sh");
+const script = path.resolve(import.meta.dir, "../../scripts/ci-scope.sh");
 
 const git = (cwd: string, ...args: string[]) => {
   const result = Bun.spawnSync(

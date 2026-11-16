@@ -25,7 +25,7 @@ The failure can appear after several successful decisions. In the isolated repro
 
 Enable both **Enable Arenasmith** and **Show Arenasmith Scores**. Enter an Arena draft with an eligible Premium account. Continue making picks until a level-five badge appears. Observe offer updates and try opening HDT Settings.
 
-The [UI replay procedure](UI-REPLAY.md) also reproduces the failure using the original HDT assembly and synthetic card models. It requires a local HDT installation. The repository does not distribute HDT or Microsoft binaries.
+The [UI replay procedure](../guides/ui-replay.md) also reproduces the failure using the original HDT assembly and synthetic card models. It requires a local HDT installation. The repository does not distribute HDT or Microsoft binaries.
 
 Run the negative comparison in the isolated environment:
 
@@ -55,4 +55,4 @@ An upstream option to disable these cosmetic particles would provide a compatibi
 
 ## Supporting evidence
 
-The [compatibility record](COMPATIBILITY.md) separates replay results from live observations. The [rendering explanation](EXPLANATION.md) describes the Linux compatibility changes. Raw logs remain private because they contain account and game data.
+The [compatibility record](../reference/compatibility.md) separates replay results from live observations. The [rendering explanation](../reference/architecture.md) describes the Linux compatibility changes. Raw logs remain private because they contain account and game data.

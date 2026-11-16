@@ -11,4 +11,4 @@ bun run format:ts:check
 bun run typecheck
 mkdir -p evidence
 read -r -a xi_flags <<<"$(pkg-config --cflags --libs x11 xi)"
-cc -Wall -Wextra -Werror tests/xinput-race.c -o evidence/xinput-race-check "${xi_flags[@]}"
+cc -Wall -Wextra -Werror tests/native/xinput-race.c -o evidence/xinput-race-check "${xi_flags[@]}"

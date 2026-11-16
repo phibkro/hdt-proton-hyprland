@@ -43,3 +43,23 @@ strip = "debuginfo"
 [[bench]]
 name = "input_protocol"
 harness = false
+
+[[test]]
+name = "rust-config"
+path = "tests/host/rust-config.rs"
+
+[[test]]
+name = "rust-diagnostics"
+path = "tests/host/rust-diagnostics.rs"
+
+[[test]]
+name = "rust-launcher"
+path = "tests/host/rust-launcher.rs"
+
+[[test]]
+name = "rust-x11-isolated"
+path = "tests/host/rust-x11-isolated.rs"
+
+[[test]]
+name = "rust-x11"
+path = "tests/host/rust-x11.rs"

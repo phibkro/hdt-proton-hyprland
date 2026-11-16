@@ -1,7 +1,7 @@
 # Verify and merge a pull request
 
 Use this workflow for HDT integration changes. Its project-specific journeys live
-in [.cursor/skills/verify-hdt-proton](../.cursor/skills/verify-hdt-proton/SKILL.md).
+in [.cursor/skills/verify-hdt-proton](../../.cursor/skills/verify-hdt-proton/SKILL.md).
 Static analysis, source review, isolated runtime tests and live game acceptance
 provide different evidence. Keep their results separate.
 
@@ -55,7 +55,7 @@ proof of its corrected paths; a blocked pass does not authorize a merge.
 ## Required checks
 
 Pre-commit runs fast staged checks. GitHub classifies the complete base-to-head
-change using [ci-scope.sh](../scripts/ci-scope.sh), which owns the documentation
+change using [ci-scope.sh](../../scripts/ci-scope.sh), which owns the documentation
 allowlist. Documentation-only changes skip builds and source analysis. Every
 other change requires successful source-quality, rust-quality and nix-check jobs.
 Manual runs and changes without a comparable base run all checks. An unreadable
@@ -68,7 +68,7 @@ not make that PR documentation-only. Rename detection is disabled so a move from
 production code into documentation still includes the deleted production path.
 This uses [job conditions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions)
 rather than workflow path filters, which can leave required checks pending.
-See [tooling](TOOLING.md) for the maintained command definitions. Check the
+See [tooling](tooling.md) for the maintained command definitions. Check the
 statuses for the current PR head, not a previous successful revision.
 
 For runtime changes, retain the relevant native X11 and real WPF replay results.

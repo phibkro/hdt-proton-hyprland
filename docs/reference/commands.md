@@ -30,7 +30,7 @@ The Nix package provides `hdt-proton`. Its subcommands reuse the same scripts as
 | `watch` | Runs the existing automatic-start watcher |
 | `setup` | Applies the compatibility plugin and settings |
 | `status` | Reports the filtered runtime status |
-| `observe` | Collects exact bytes from explicit log paths in a separate native process; see [capture instructions](CAPTURE-FREEZE.md) |
+| `observe` | Collects exact bytes from explicit log paths in a separate native process; see [capture instructions](../guides/freeze-capture.md) |
 | `trace-export` | Converts local flight-recorder files to Perfetto trace-event JSON |
 | `overlay-launch` | Starts HDT with the compatibility defaults |
 | `raw-launch` | Starts the namespace launcher with its supplied arguments |
@@ -143,4 +143,4 @@ Root `autostart.sh` forwards to `scripts/autostart.sh` for existing service decl
 
 The checkout root also contains private installation, configuration, and investigation files. Git excludes `app`, `managed`, `hdt.local.json`, `backups`, `evidence`, `cache`, `reference`, and `local`. Runtime helper paths remain under `evidence/`.
 
-See [freeze diagnostics](DIAGNOSTICS.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.
+See [freeze diagnostics](../guides/diagnostics.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.

@@ -4,7 +4,7 @@ import { mkdtemp, chmod, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 
-const root = nodePath.resolve(import.meta.dir, "..");
+const root = nodePath.resolve(import.meta.dir, "../..");
 
 for (const scenario of [
   "restart",

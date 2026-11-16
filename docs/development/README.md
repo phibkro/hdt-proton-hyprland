@@ -1,9 +1,9 @@
 # Check and diagnose HDT
 
-Run these procedures from the repository checkout. For command behavior and options, see the [command reference](REFERENCE.md).
+Run these procedures from the repository checkout. For command behavior and options, see the [command reference](../reference/commands.md).
 
 For formatters, static analysis, and fast commit versus full PR checks, see
-[Source tooling](TOOLING.md). Rust and retained test drivers have separate analysis and runtime checks.
+[Source tooling](tooling.md). Rust and retained test drivers have separate analysis and runtime checks.
 
 ## Run the source checks
 
@@ -13,7 +13,7 @@ Run the selected checks:
 devenv shell -- hdt-check
 ```
 
-Confirm that the command exits with status zero. The command runs `scripts/check.sh`: a Rust build and format/Clippy checks, selected subprocess tests, ShellCheck/shfmt, TypeScript lint/format/types, and the native XInput fixture build. Run the full Rust checks from [Rust tooling](RUST.md) as well.
+Confirm that the command exits with status zero. The command runs `scripts/check.sh`: a Rust build and format/Clippy checks, selected subprocess tests, ShellCheck/shfmt, TypeScript lint/format/types, and the native XInput fixture build. Run the full Rust checks from [Rust tooling](rust.md) as well.
 
 Do not run unbounded test discovery in a checkout that contains private prefix backups. Those backups can contain unrelated test files.
 
@@ -25,9 +25,9 @@ Run the same check that GitHub Actions runs:
 nix flake check --print-build-logs --no-write-lock-file --max-jobs 1 --cores 2
 ```
 
-Confirm that the command exits with status zero. The flake builds the package and runs its declared tests, shellcheck, and workflow lint. The [workflow](../.github/workflows/check.yml) runs for pull requests and pushes to `main`.
+Confirm that the command exits with status zero. The flake builds the package and runs its declared tests, shellcheck, and workflow lint. The [workflow](../../.github/workflows/check.yml) runs for pull requests and pushes to `main`.
 
-CI does not launch HDT or Hearthstone. Use the [isolated replay](UI-REPLAY.md) and [desktop tests](TESTING.md) to check rendering and live state updates.
+CI does not launch HDT or Hearthstone. Use the [isolated replay](../guides/ui-replay.md) and [desktop tests](../guides/testing.md) to check rendering and live state updates.
 
 ## Compile the plugin against HDT
 
@@ -41,7 +41,7 @@ This procedure requires a complete HDT installation and native .NET in the runni
    ```
 
 3. Confirm that the compiler exits with status zero.
-4. When HDT can close normally, follow [Apply the plugin](INSTALL.md#apply-the-plugin).
+4. When HDT can close normally, follow [Apply the plugin](../guides/installation.md#apply-the-plugin).
 
 Compilation writes `evidence/ProtonCompatibility.dll`. It does not install the DLL or restart HDT.
 
@@ -53,11 +53,11 @@ Run the status command:
 devenv shell -- hdt-status
 ```
 
-Inspect `trackerRuntime`, `controlInput`, the window positions, the log timestamps, and `savedMatchSummary`. Compare the results with the [desktop test procedures](TESTING.md).
+Inspect `trackerRuntime`, `controlInput`, the window positions, the log timestamps, and `savedMatchSummary`. Compare the results with the [desktop test procedures](../guides/testing.md).
 
 Keep raw HDT logs and account data out of commits. `hdt-status` filters its output to selected diagnostic fields. It does not print the inherited process environment, account names, or card choices.
 
-For repeatable tests without account activity, use [Replay HDT UI transitions in isolation](UI-REPLAY.md). That procedure tests real WPF controls with synthetic state. It does not exercise live HearthMirror or ArenaSmith requests.
+For repeatable tests without account activity, use [Replay HDT UI transitions in isolation](../guides/ui-replay.md). That procedure tests real WPF controls with synthetic state. It does not exercise live HearthMirror or ArenaSmith requests.
 
 ## Inspect window geometry
 
@@ -98,21 +98,21 @@ Finish the current tracking test before you restart HDT with diagnostics.
 
 The sampler rejects stale state. If the sampler reports stale state, repeat the hover before you sample again. The probe reads the identified overlay's backing pixmap, not game pixels or root-window pixels.
 
-For the limits of this measurement, see [Preview clearing](EXPLANATION.md#preview-clearing).
+For the limits of this measurement, see [Preview clearing](../reference/architecture.md#preview-clearing).
 
 ## Compare an overlay option
 
 Finish play before you change launch options. Keep the original setting available for recovery.
 
 1. Close HDT normally.
-2. Select one variable from the [overlay options](REFERENCE.md#overlay-options).
+2. Select one variable from the [overlay options](../reference/commands.md#overlay-options).
 3. Start HDT with that variable. For example, omit the faint background with this command:
 
    ```sh
    HDT_ALPHA_FLOOR=0 devenv shell -- hdt-overlay-launch
    ```
 
-4. Repeat the same [overlay test](TESTING.md#test-the-overlay).
+4. Repeat the same [overlay test](../guides/testing.md#test-the-overlay).
 5. Close HDT normally.
 6. Restore the compatibility defaults:
 
@@ -150,5 +150,5 @@ Plugin removal does not undo .NET installation. Do not terminate the shared wine
 3. Give each page one purpose. Separate procedures, reference facts, and explanations.
 4. Compare each documented command, option, and path with the source.
 5. Check local links and heading anchors.
-6. Keep failed and untested results explicit in `docs/COMPATIBILITY.md`.
+6. Keep failed and untested results explicit in `docs/reference/compatibility.md`.
 7. Preserve frozen feature specs as historical records.

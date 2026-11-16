@@ -37,4 +37,4 @@ The Nix package and its checks passed. The project checks passed 21 tests and 68
 
 - 2026-11-15: Separated diagnostics into plugin 0.5.1 on the released Hyprland baseline. Removed experimental portable input code. Added writer-failure status and a real CLI file-preservation test.
 
-Usage, event meanings, retention limits, and remaining gaps are maintained in [freeze diagnostics](../DIAGNOSTICS.md).
+Usage, event meanings, retention limits, and remaining gaps are maintained in [freeze diagnostics](../guides/diagnostics.md).

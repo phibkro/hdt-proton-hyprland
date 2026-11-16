@@ -2,7 +2,7 @@
 
 Run the native journal alongside HDT. The journal keeps collecting selected log
 files when HDT stops responding or exits. It does not restart HDT or control
-Hearthstone. See [diagnostic boundaries](DIAGNOSTICS.md#independent-input-journal)
+Hearthstone. See [diagnostic boundaries](diagnostics.md#independent-input-journal)
 for the distinction between collected bytes and processed game events.
 
 ## Start a capture
@@ -19,7 +19,7 @@ for the distinction between collected bytes and processed game events.
 
    Set `RECORDER_ROOT` to the directory that contains `flight-recorder-*`
    directories. For an installed package, use your data directory's `evidence`
-   directory. See [recorder locations](DIAGNOSTICS.md#read-a-recording).
+   directory. See [recorder locations](diagnostics.md#read-a-recording).
 
 3. Start the journal:
 

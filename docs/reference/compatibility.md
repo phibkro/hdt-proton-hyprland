@@ -16,7 +16,7 @@ This record describes desktop tests from 2026-11-15 through 2026-11-16. It disti
 | HDT | Release 1.60.1, assembly version 1.60.1.9028 |
 | .NET | Native Microsoft .NET Framework 4.8 |
 
-Native Wayland, fractional scaling, mixed DPI, multiple monitors, and other compositors remain untested. The current path uses X11 windows through XWayland on a Wayland desktop. It is not a native Wayland port of HDT. See [the current execution path](EXPLANATION.md#the-current-execution-path).
+Native Wayland, fractional scaling, mixed DPI, multiple monitors, and other compositors remain untested. The current path uses X11 windows through XWayland on a Wayland desktop. It is not a native Wayland port of HDT. See [the current execution path](architecture.md#the-current-execution-path).
 
 ## Proton version comparison
 
@@ -46,8 +46,8 @@ The operator returned to Experimental because the Settings interaction behaved
 better there. Experimental is the current working baseline for this project,
 not a crash-free configuration. Complete acceptance across Standard matches,
 Arena matches and drafts, and Battlegrounds matches remains incomplete for
-Stable 11.0-2. The [test procedure](TESTING.md#test-stable-proton) covers a future
-comparison. The [XInput investigation](specs/xinput-device-race.md) describes
+Stable 11.0-2. The [test procedure](../guides/testing.md#test-stable-proton) covers a future
+comparison. The [XInput investigation](../specs/xinput-device-race.md) describes
 the separate fatal-error reproduction and its limits.
 
 ## Rust host acceptance, 2026-11-16
@@ -105,7 +105,7 @@ The later saved Arena wins establish successful recording after the earlier fail
 | Arena score particle path | Verified workaround in replay and the completed live draft | Actual level-five badges reproduced `88980406`, stale pixels, and white window regions without the compatibility plugin. Version 0.5.0 prevented particle initialization and passed 12 simulated decisions with native Settings clicks. After an HDT-only restart, the operator confirmed offer updates, responsive main-window controls, and successful completion of the current draft |
 | Battlegrounds menu and match | Verified by user observation | The operator reports working main-window interaction in both contexts and a working in-game overlay. This comparison did not instrument every Battlegrounds update |
 
-The rendering and input mechanisms are described in [HDT compatibility design](EXPLANATION.md).
+The rendering and input mechanisms are described in [HDT compatibility design](architecture.md).
 
 ## Setup and startup results
 
@@ -133,7 +133,7 @@ The source checks at commit `6bddf1e` passed from a clean worktree. They covered
 | Packaged tracker startup | Verified | The generated service started the Nix-packaged watcher and launcher. HDT loaded native CLR and exported fresh controls with matching game and overlay origins |
 | Restart action command | Verified | `hdt-proton restart`, the desktop action's target, restarted the isolated tracker service. HDT's UI updates advanced afterward. Hearthstone's process stayed unchanged. The action was not clicked through Vicinae's menu |
 
-The [Nix installation guide](NIX.md) covers the package, module, and desktop actions. These results do not extend the earlier visual tests to every control or monitor configuration.
+The [Nix installation guide](../guides/nix.md) covers the package, module, and desktop actions. These results do not extend the earlier visual tests to every control or monitor configuration.
 
 ## Evidence limits
 
@@ -143,10 +143,10 @@ Two fresh replay runs on 2026-11-15 passed synthetic lobby → first offer → s
 
 Those initial runs covered level-zero badges: HDT preferred the fixture's default dynamic-score object. The corrected fixture asserts actual plaque levels and particle visibility. With native Direct3D 9 selected and the HDT-only DXVK shader-model setting applied, level-five particles reproduced `88980406` without the plugin. Version 0.5.0 passed 12 decisions with three level-five badges and zero active emitters. Direct3D selection and the shader setting were confirmed in DXVK's log. The private Xvfb environment used Vulkan llvmpipe, so this does not identify a hardware-driver defect.
 
-The replay bypasses normal HDT startup, HearthMirror, watcher dispatch, and ArenaSmith requests. Plugin coverage requires `--with-plugin`. It uses Xvfb with Openbox rather than Hyprland. Separate live acceptance followed: the installed plugin suppressed Arena emitters, and the operator confirmed offer updates, responsive main-window controls, and successful completion of the current draft. A fresh draft from initial hero selection and long-session reliability remain untested. See [Replay HDT UI transitions in isolation](UI-REPLAY.md) for the procedure.
+The replay bypasses normal HDT startup, HearthMirror, watcher dispatch, and ArenaSmith requests. Plugin coverage requires `--with-plugin`. It uses Xvfb with Openbox rather than Hyprland. Separate live acceptance followed: the installed plugin suppressed Arena emitters, and the operator confirmed offer updates, responsive main-window controls, and successful completion of the current draft. A fresh draft from initial hero selection and long-session reliability remain untested. See [Replay HDT UI transitions in isolation](../guides/ui-replay.md) for the procedure.
 
 Raw logs and saved game records remain private because they contain account or game data. The public record contains selected facts rather than the raw files.
 
 The latest read-only inspection found native CLR, fresh control snapshots, matching game and overlay origins, and fresh `Power.log` output. HDT history contained the two Arena wins and the three Standard results.
 
-The [test procedures](TESTING.md) cover the remaining comparisons, including exact offer identities, a fresh initial draft, more controls, automatic startup, and a complete Stable Proton retest. Longer-session reliability remains unresolved on Experimental too.
+The [test procedures](../guides/testing.md) cover the remaining comparisons, including exact offer identities, a fresh initial draft, more controls, automatic startup, and a complete Stable Proton retest. Longer-session reliability remains unresolved on Experimental too.

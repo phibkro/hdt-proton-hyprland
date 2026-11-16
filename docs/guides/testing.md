@@ -94,13 +94,13 @@ Begin with windowed Hearthstone on one monitor at scale 1. Leave the overlay its
 14. Repeat the empty-space and control clicks.
 15. Confirm that the overlay stays aligned and does not flicker during those interactions.
 
-If a check fails, record the first failing step. Use [Check and diagnose HDT](DEVELOPMENT.md) before changing another option.
+If a check fails, record the first failing step. Use [Check and diagnose HDT](../development/README.md) before changing another option.
 
 ## Test automatic startup
 
 Finish play before you close the current game session.
 
-1. Add the generated Steam option with [Start HDT from the Steam shortcut](INSTALL.md#start-hdt-from-the-steam-shortcut).
+1. Add the generated Steam option with [Start HDT from the Steam shortcut](installation.md#start-hdt-from-the-steam-shortcut).
 2. Close HDT, Hearthstone, and Battle.net normally.
 3. Start the same Battle.net shortcut through Steam.
 4. Start Hearthstone from Battle.net.
@@ -113,7 +113,7 @@ To test the manual-close behavior, close HDT normally while the game remains ope
 Run the isolated recovery checks without opening Hearthstone:
 
 ```sh
-devenv shell -- bun test ./tests/autostart.test.ts
+devenv shell -- bun test ./tests/cli/autostart.test.ts
 ```
 
 These checks run the watcher and launcher stand-ins as separate processes.
@@ -134,12 +134,12 @@ message. The printed evidence directory contains each case's logs and
 `result.json`. The script retains the evidence and stops its private X server.
 
 Use the script rather than running the native fixture against your desktop.
-See [fatal XInput mapping errors](specs/xinput-device-race.md) for the demonstrated
+See [fatal XInput mapping errors](../specs/xinput-device-race.md) for the demonstrated
 mechanism and the remaining gap to a tested Wine fix.
 
 ## Test stable Proton
 
-Stable 11.0-2 passed baseline desktop checks but showed submenu slowdowns and temporary freezes. Experimental remains the current selection. Read the [observed comparison](COMPATIBILITY.md#proton-version-comparison) before repeating the test. Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.
+Stable 11.0-2 passed baseline desktop checks but showed submenu slowdowns and temporary freezes. Experimental remains the current selection. Read the [observed comparison](../reference/compatibility.md#proton-version-comparison) before repeating the test. Valve describes [stable, Next, and Experimental](https://github.com/ValveSoftware/Proton/wiki/Proton-Versions) separately.
 
 1. Finish play.
 2. Close HDT, Hearthstone, and Battle.net normally.

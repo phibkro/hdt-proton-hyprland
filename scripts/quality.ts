@@ -147,7 +147,7 @@ switch (language) {
     }
 
     mkdirSync("local/analysis", { recursive: true });
-    const probe = "tests/reference/x-surface-probe.c";
+    const probe = "tests/native/reference/x-surface-probe.c";
     const probePath = path.resolve("local/analysis/surface-probe");
     run([
       "clang",
@@ -160,7 +160,7 @@ switch (language) {
       probePath,
       ...cFlags(probe, true),
     ]);
-    run([process.execPath, "tests/surface-arguments.ts", probePath]);
+    run([process.execPath, "tests/native/surface-arguments.ts", probePath]);
 
     break;
   }

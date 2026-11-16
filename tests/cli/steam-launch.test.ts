@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, chmod, rm, symlink, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 
-const root = nodePath.resolve(import.meta.dir, "..");
+const root = nodePath.resolve(import.meta.dir, "../..");
 
 for (const serviceExit of [0, 1]) {
   test(`Steam argv and exit status survive service status ${serviceExit}`, async () => {

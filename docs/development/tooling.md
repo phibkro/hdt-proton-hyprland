@@ -1,7 +1,7 @@
 # Format and analyze source
 
 The migration branch now includes a native Rust host. See [Rust tooling and
-execution boundaries](RUST.md) for the Cargo, Clippy, nextest, dependency, and
+execution boundaries](rust.md) for the Cargo, Clippy, nextest, dependency, and
 isolated X11 checks. The tables below also describe retained differential sources.
 
 Use the pinned development environment. These commands do not start HDT or
@@ -51,8 +51,8 @@ not private HDT installations, logs, backups, or downloaded reference source.
 The replaced TypeScript runtime was retired after its regression coverage moved
 to Rust. The remaining TypeScript test and check drivers pass strict lint,
 formatting, and type checking. Historical findings remain recorded in the
-[tooling contract](specs/ecosystem-tooling.md); the
-[Rust migration contract](specs/rust-host.md) records the replacement coverage.
+[tooling contract](../specs/ecosystem-tooling.md); the
+[Rust migration contract](../specs/rust-host.md) records the replacement coverage.
 
 Run one category when working through a finding:
 
@@ -179,8 +179,8 @@ the root where their tools expect them. Nix copies native configurations from
 their authoritative paths so relative discovery links cannot dangle in a build.
 
 Tests have the same static analysis rules as source. Oxlint and TypeScript
-include tests/; Clang-Tidy includes tests/xinput-race.c; both Roslyn scopes
-include tests/*.cs. No test directory is excluded to make checks pass. Runtime
+include tests/; Clang-Tidy includes tests/native/xinput-race.c; both Roslyn scopes
+include tests/replay/*.cs. No test directory is excluded to make checks pass. Runtime
 tests and static analysis are separate commands and evidence.
 
 Bash implementations remain Bash. Bun runs the retained TypeScript tests and development check drivers; the installed host uses Rust. [ShellCheck](https://github.com/koalaman/shellcheck)
@@ -213,7 +213,7 @@ template, so Lux dependency management adds no demonstrated capability yet.
 StyLua and Selene remain active; Lux adoption is untested.
 
 Generated Rust cases, bounded fuzzing and statistical parser benchmarks are
-covered in [the testing strategy](TEST-STRATEGY.md). Nextest remains the test
+covered in [the testing strategy](testing-strategy.md). Nextest remains the test
 runner; Proptest and Criterion are development dependencies. Cargo-fuzz is a
 pinned shell tool with a separate locked target manifest. No test dependency is
 added to the installed HDT process.

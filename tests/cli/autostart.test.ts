@@ -99,7 +99,7 @@ esac`,
 
   const start = () => {
     const p = Bun.spawn(
-      ["bash", path.resolve(import.meta.dir, "../scripts/autostart.sh")],
+      ["bash", path.resolve(import.meta.dir, "../../scripts/autostart.sh")],
       { env, stdin: "ignore", stdout: "pipe", stderr: "pipe" }
     );
 

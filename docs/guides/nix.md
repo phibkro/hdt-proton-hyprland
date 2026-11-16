@@ -80,7 +80,7 @@ For a user-profile installation without Home Manager, configure `hdt-proton-auto
 3. Apply your Home Manager configuration through your normal deployment process.
 4. Follow [Apply the plugin](#apply-the-plugin) to compile and install the updated plugin against your HDT installation.
 
-Update the package before rebuilding the plugin. An older pinned package contains older plugin source and can overwrite a manually installed fix. Plugin version 0.5.0 includes the Arena particle workaround. See the [compatibility record](COMPATIBILITY.md) for its verification limits.
+Update the package before rebuilding the plugin. An older pinned package contains older plugin source and can overwrite a manually installed fix. Plugin version 0.5.0 includes the Arena particle workaround. See the [compatibility record](../reference/compatibility.md) for its verification limits.
 
 ## Apply the plugin
 
@@ -132,7 +132,7 @@ If Hearthstone is closed, Open starts the watcher and asks you to open the game 
 2. Paste the line into the existing Battle.net shortcut's Steam **Launch Options**.
 3. Keep `%command%`, the shortcut target, and the selected Proton version unchanged.
 4. Confirm that Steam's environment can find `hdt-proton` from your user profile.
-5. Run [Test automatic startup](TESTING.md#test-automatic-startup) on the next launch.
+5. Run [Test automatic startup](testing.md#test-automatic-startup) on the next launch.
 
 The installed option invokes `hdt-proton steam-run %command%`. It starts the existing service and executes Steam's original arguments.
 

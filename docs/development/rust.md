@@ -95,11 +95,11 @@ devenv shell -- bash scripts/check-rust-x11.sh
 The default Rust suite deliberately excludes that explicitly isolated test; its
 separate result is required evidence. It does not establish real Hyprland,
 Steam namespace, Wine, HearthMirror or ArenaSmith behavior. Live end-to-end
-acceptance was subsequently recorded in [Observed compatibility](COMPATIBILITY.md#rust-host-acceptance-2026-11-16).
+acceptance was subsequently recorded in [Observed compatibility](../reference/compatibility.md#rust-host-acceptance-2026-11-16).
 Building and isolated testing do not change the installed service or live prefix;
 the desktop acceptance used an explicit temporary service override.
 
-See [the migration contract](specs/rust-host.md) for recorded results and limits.
+See [the migration contract](../specs/rust-host.md) for recorded results and limits.
 Tier-five particles remain suppressed; a language migration does not fix the
 underlying WPF rendering path or native Wine XInput failures.
 

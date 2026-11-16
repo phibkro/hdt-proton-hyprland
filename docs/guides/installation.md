@@ -1,6 +1,6 @@
 # Apply HDT compatibility fixes
 
-Use this guide for the devenv checkout workflow. For an installed package and desktop entry, use [Install the compatibility tools with Nix](NIX.md).
+Use this guide for the devenv checkout workflow. For an installed package and desktop entry, use [Install the compatibility tools with Nix](nix.md).
 
 ## Prepare the installation
 
@@ -12,9 +12,9 @@ Before you start, confirm that you have these prerequisites:
 - Native Microsoft .NET Framework 4.8 in the game's prefix.
 - A complete HDT installation with its companion files and Velopack updater.
 
-Keep the existing Steam shortcut and Proton selection. The [tested environment](COMPATIBILITY.md#tested-environment) uses Proton Experimental. For a version comparison, use [Test stable Proton](TESTING.md#test-stable-proton).
+Keep the existing Steam shortcut and Proton selection. The [tested environment](../reference/compatibility.md#tested-environment) uses Proton Experimental. For a version comparison, use [Test stable Proton](testing.md#test-stable-proton).
 
-This guide starts after HDT and .NET installation. For the installation requirements, see the [HDT installation reference](REFERENCE.md#hdt-installation).
+This guide starts after HDT and .NET installation. For the installation requirements, see the [HDT installation reference](../reference/commands.md#hdt-installation).
 
 1. Open a terminal in the repository checkout.
 2. Build the native host, then create the local configuration if it does not exist:
@@ -30,7 +30,7 @@ This guide starts after HDT and .NET installation. For the installation requirem
    ```
 
 3. Set `steamAppId` in `hdt.local.json` to the numeric ID of the existing Battle.net Steam shortcut.
-4. If Steam uses another directory, set `steamRoot` to its absolute path. See [Configuration](REFERENCE.md#configuration).
+4. If Steam uses another directory, set `steamRoot` to its absolute path. See [Configuration](../reference/commands.md#configuration).
 5. If `app` already points to the complete HDT installation, keep that link. Otherwise, set `HDT_APP_DIR` to its `current/` directory before each command:
 
    ```sh
@@ -66,7 +66,7 @@ Setup can close HDT. Finish any tracking test before you run setup.
    ```
 
 6. Start Hearthstone from Battle.net when you are ready.
-7. Run the [desktop checks](TESTING.md#test-the-overlay).
+7. Run the [desktop checks](testing.md#test-the-overlay).
 
 ## Start HDT from the Steam shortcut
 
@@ -90,7 +90,7 @@ This procedure requires `hdt-proton-autostart.service` in your desktop session. 
 4. Paste the generated line into **Launch Options**. Keep `%command%` in the line.
 5. If you already use a wrapper, preserve that wrapper around `%command%`.
 6. Keep the shortcut target, app ID, and compatibility selection unchanged.
-7. On the next launch, run [Test automatic startup](TESTING.md#test-automatic-startup).
+7. On the next launch, run [Test automatic startup](testing.md#test-automatic-startup).
 
 Use Steam's **Launch Options** field. Battle.net's per-game arguments go to Hearthstone and cannot start the host service.
 
@@ -109,4 +109,4 @@ To stop desktop startup, follow these steps outside play:
 
 The service can own HDT's processes. Stopping the service can close HDT.
 
-For plugin removal, see [Remove the compatibility plugin](DEVELOPMENT.md#remove-the-compatibility-plugin).
+For plugin removal, see [Remove the compatibility plugin](../development/README.md#remove-the-compatibility-plugin).

@@ -1,6 +1,6 @@
 # HDT windows, state, and failure observations
 
-This map describes the components relevant to the white-window investigation. It is not a complete state space of HDT. Runtime observations apply to the tested configuration in the [compatibility record](COMPATIBILITY.md#tested-environment).
+This map describes the components relevant to the white-window investigation. It is not a complete state space of HDT. Runtime observations apply to the tested configuration in the [compatibility record](compatibility.md#tested-environment).
 
 ## Component relationships
 
@@ -40,8 +40,8 @@ The diagram combines live observations, project source, and inspected upstream s
 | Arena watchers | Cached draft state and emitted changes | Installed `HearthWatcher.dll` contains `PollingWatcher.RunLoopAsync` and `Dispatch`. Method inventory alone does not prove a running watcher remains healthy |
 | Arena view model | Detected choices, availability, ratings, and visibility | Exported state can show the view model and visual as active. That does not establish that choices or ratings match the current offer |
 | Arena score particles | Cosmetic 3D particle systems on level-five badges | Isolated replay reproduced `88980406` with particles and passed when their initialization was suppressed. Plugin 0.5.0 applies that workaround. Scores and badge artwork remain enabled |
-| Compatibility plugin | Geometry refresh, input rectangles, and diagnostic observations | [Plugin source](../src/plugin/ProtonCompatibility.cs). The plugin does not make additional HearthMirror queries |
-| Input bridge and Hyprland rules | Validated rectangles, overlay focus permission, and stacking | [Bridge](../src/host/control.rs) and [rules](../src/hyprland/overlay-rules.lua). Game state is not their source of truth |
+| Compatibility plugin | Geometry refresh, input rectangles, and diagnostic observations | [Plugin source](../../src/plugin/ProtonCompatibility.cs). The plugin does not make additional HearthMirror queries |
+| Input bridge and Hyprland rules | Validated rectangles, overlay focus permission, and stacking | [Bridge](../../src/host/control.rs) and [rules](../../src/hyprland/overlay-rules.lua). Game state is not their source of truth |
 | Proton presentation | Windows graphics and window calls | The tested HDT process loaded native CLR and Direct3D components. Component loading does not identify the defective call |
 
 ## Independent state dimensions
@@ -102,4 +102,4 @@ The existing `input-region.json` describes cached HDT state and control rectangl
 
 All diagnostic files remain in the private `evidence` directory. Neither a missing exception record nor a static overlay establishes healthy rendering. Visual repainting, input handling, choice detection, and rating responses require separate observations.
 
-See [freeze diagnostics](DIAGNOSTICS.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.
+See [freeze diagnostics](../guides/diagnostics.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.

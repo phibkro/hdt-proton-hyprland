@@ -13,7 +13,7 @@ observations remain separate evidence.
 | WPF journey | `bash scripts/replay.sh run --with-plugin --without-particles --desktop-input` | Native clicks through Rust, Wine and the actual HDT overlay |
 | Parser fuzzing | `bash scripts/check-fuzz.sh` | Two bounded, coverage-guided smoke runs with retained corpus/artifacts |
 | Rust performance | `bash scripts/bench-host.sh` | Criterion distributions for 1–2048 control regions |
-| Live acceptance | [Verification workflow](PR-REVIEW.md) | Real game subscriptions, ratings, match saves and desktop behavior |
+| Live acceptance | [Verification workflow](pr-review.md) | Real game subscriptions, ratings, match saves and desktop behavior |
 
 Run commands from the pinned development shell. Measure headroom before builds,
 replays, fuzzing and benchmarks. The coordinator owns runtime execution; limit

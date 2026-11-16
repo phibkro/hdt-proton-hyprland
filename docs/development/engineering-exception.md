@@ -12,7 +12,7 @@ This decision does not claim that Effect lacks process or filesystem capabilitie
 
 ## Verification
 
-The recorded checks cover configuration rejection, TypeScript bundles from a clean checkout, native probe compilation, and plugin compilation against the installed HDT and .NET assemblies. Desktop observations are recorded separately in [Observed compatibility](COMPATIBILITY.md).
+The recorded checks cover configuration rejection, TypeScript bundles from a clean checkout, native probe compilation, and plugin compilation against the installed HDT and .NET assemblies. Desktop observations are recorded separately in [Observed compatibility](../reference/compatibility.md).
 
 Bun 1.4.4 was the observed runtime. `devenv.lock` pins the toolchain. `scripts/check.sh` selects test files explicitly because the private prefix backups contain unrelated files. An earlier unbounded test run was stopped.
 
@@ -38,7 +38,7 @@ Source relocation retained the existing Bun process boundaries. The setup script
 
 No new TypeScript runtime layer or dependency was added. The plugin installer gained support for an already-stopped tracker. It refuses writes while an accessible tracker process remains.
 
-Subprocess tests cover argument handling and exit behavior. The [compatibility record](COMPATIBILITY.md#setup-and-startup-results) distinguishes those tests from actual desktop activation.
+Subprocess tests cover argument handling and exit behavior. The [compatibility record](../reference/compatibility.md#setup-and-startup-results) distinguishes those tests from actual desktop activation.
 
 ## Nix package recorded on 2026-11-15
 
@@ -120,6 +120,6 @@ The Rust host replaces the production Bun configuration, launcher, input bridge,
 setup/status, journal and trace exporter, plus the C X11 helpers. Their earlier
 exception scopes above are historical. Bash retains watcher/service boundaries;
 Bun remains for development checks and test drivers. C# remains required inside
-HDT. See [the migration contract](specs/rust-host.md) for differential comparisons,
+HDT. See [the migration contract](../specs/rust-host.md) for differential comparisons,
 replacement tests, and the separate live Steam/Hyprland acceptance still needed.
 This source migration does not activate a new package or modify a live prefix.

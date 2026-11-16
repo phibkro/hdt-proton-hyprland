@@ -43,7 +43,7 @@ not prove that any of these data paths is advancing.
 The current baseline is Experimental after a desktop comparison with Stable
 11.0-2. Stable showed submenu performance and responsiveness problems in that
 comparison. Experimental also retains unresolved freezes and fatal XInput
-errors. The [observed version comparison](COMPATIBILITY.md#proton-version-comparison)
+errors. The [observed version comparison](compatibility.md#proton-version-comparison)
 owns the test results and their limits.
 
 ## The Steam process namespace
@@ -128,7 +128,7 @@ The earlier XShape experiment did not establish working control input and was re
 
 Ordinary match tracking reads `Power.log`. Live draft choices and Arena state use HearthMirror. ArenaSmith ratings require a separate HSReplay integration and account entitlement.
 
-A saved match therefore does not establish live draft detection. A detected offer does not establish access to ratings. The [compatibility record](COMPATIBILITY.md) reports those results separately.
+A saved match therefore does not establish live draft detection. A detected offer does not establish access to ratings. The [compatibility record](compatibility.md) reports those results separately.
 
 HDT's selected deck is also separate from Hearthstone's menu selection. Choosing the intended deck in HDT resolved the reported stale list. No speculative deck-selection patch was added.
 
@@ -140,7 +140,7 @@ That ownership avoids a second watcher implementation. It also means that stoppi
 
 ## Language choices and prior art
 
-HDT's public plugin interface requires C#. Rust now owns the Linux host, X11 protocol helpers, journal, and trace export. Bash retains service and Steam command boundaries; Hyprland executes Lua. Bun remains a development/test dependency. See [the Rust host](RUST.md) for tooling, migrated coverage, and the outstanding live acceptance boundary. The [engineering record](engineering-exception.md) preserves earlier language decisions.
+HDT's public plugin interface requires C#. Rust now owns the Linux host, X11 protocol helpers, journal, and trace export. Bash retains service and Steam command boundaries; Hyprland executes Lua. Bun remains a development/test dependency. See [the Rust host](../development/rust.md) for tooling, migrated coverage, and the outstanding live acceptance boundary. The [engineering record](../development/engineering-exception.md) preserves earlier language decisions.
 
 The investigation evaluated these sources:
 

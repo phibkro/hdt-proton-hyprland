@@ -10,7 +10,7 @@ CARGO_BUILD_JOBS=2 cargo build --locked
 cp "$executable" "$run/acceptance"
 cp "${CARGO_TARGET_DIR:-target}/debug/hdt-host" "$run/hdt-host"
 read -r -a flags <<<"$(pkg-config --cflags --libs x11 xcomposite xrender)"
-cc -Wall -Wextra -Werror tests/reference/x-surface-probe.c -o "$run/c-surface" "${flags[@]}"
+cc -Wall -Wextra -Werror tests/native/reference/x-surface-probe.c -o "$run/c-surface" "${flags[@]}"
 (
     cd "$run"
     sha256sum acceptance hdt-host c-surface >source-sha256.txt

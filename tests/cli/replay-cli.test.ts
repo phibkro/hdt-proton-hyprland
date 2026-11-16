@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 
-const root = nodePath.resolve(import.meta.dir, "..");
+const root = nodePath.resolve(import.meta.dir, "../..");
 
 test("replay preserves namespace arguments and a failing supervisor result without touching a game", async () => {
   const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-replay-boundary-"));

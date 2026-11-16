@@ -1,12 +1,12 @@
 # Replay HDT UI transitions in isolation
 
-Run the real HDT main window and Arena controls on a private X11 desktop. These tests leave the running game and tracker alone. See [component boundaries](COMPONENTS.md) for the distinction between draft updates, match tracking, and presentation.
+Run the real HDT main window and Arena controls on a private X11 desktop. These tests leave the running game and tracker alone. See [component boundaries](../reference/components.md) for the distinction between draft updates, match tracking, and presentation.
 
 ## Prepare the private seed
 
 Use a complete HDT installation and an existing Proton prefix with native .NET. Run commands from this checkout.
 
-1. Set the project configuration to the HDT installation and Steam shortcut you want to copy. Follow the [configuration reference](REFERENCE.md).
+1. Set the project configuration to the HDT installation and Steam shortcut you want to copy. Follow the [configuration reference](../reference/commands.md).
 2. Select the installed Proton and Steam runtime directories. For the tested Steam layout, run:
 
    ```sh
@@ -74,7 +74,7 @@ The run owns a separate PID namespace, network namespace, home directory, prefix
 
 A passing replay establishes that the exercised WPF path works under the isolated X11 configuration. It does not establish a fix for the live Arena failure. HearthMirror polling, watcher dispatch, ArenaSmith requests, real picks, and Hyprland composition are outside this fixture's coverage. The compatibility plugin runs only with `--with-plugin`; its updates run on the fixture's UI timer rather than HDT's plugin scheduler. The generic popup is not HDT's card-preview implementation.
 
-See [freeze diagnostics](DIAGNOSTICS.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.
+See [freeze diagnostics](diagnostics.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.
 
 ## Exercise the installed event pipeline
 
@@ -106,5 +106,5 @@ after Arena battles. Live HearthMirror and remote ratings are outside the test.
 
 `--desktop-input` requires `--with-plugin` and a separate run from
 `--canonical-events`. It drives the native Rust controller and actual WPF button
-through private X11 mouse input. See [portable X11 input](PORTABLE-X11.md) for the
+through private X11 mouse input. See [portable X11 input](portable-x11.md) for the
 journey, failure behavior and desktop-acceptance limits.

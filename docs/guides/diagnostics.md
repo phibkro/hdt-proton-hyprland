@@ -6,7 +6,7 @@ Plugin 0.5.1 contains the recorder. An existing 0.5.0 tracker must be upgraded s
 
 ## Activate the recorder
 
-Upgrade the package or checkout, then follow the existing [setup procedure](INSTALL.md). Setup rebuilds and installs the plugin. Run setup when HDT can close. A normal tracker restart preserves its installed plugin and does not rebuild it. The development and release checks leave the running tracker unchanged.
+Upgrade the package or checkout, then follow the existing [setup procedure](installation.md). Setup rebuilds and installs the plugin. Run setup when HDT can close. A normal tracker restart preserves its installed plugin and does not rebuild it. The development and release checks leave the running tracker unchanged.
 
 ## Read a recording
 
@@ -60,7 +60,7 @@ The check blocks only the isolated replay UI for 3.5 seconds. It requires a stal
 
 Each run copies its source, tests, and scripts into a private directory before compilation. The namespace mounts that copy read-only. `source-sha256.txt` records individual file hashes. `result.json` records the hash of that manifest and whether the original checkout was dirty. The fixture uses this captured source rather than reading later edits from the checkout.
 
-The Battlegrounds test raises synthetic WPF pointer events at the actual bound card-back control, executes its stored command, and checks six view changes. It does not establish native desktop input delivery or reproduce a live combat freeze. The normal replay also exercises twelve Arena offers, Settings, resize, a popup, and the New dialog. See [replay boundaries](UI-REPLAY.md).
+The Battlegrounds test raises synthetic WPF pointer events at the actual bound card-back control, executes its stored command, and checks six view changes. It does not establish native desktop input delivery or reproduce a live combat freeze. The normal replay also exercises twelve Arena offers, Settings, resize, a popup, and the New dialog. See [replay boundaries](ui-replay.md).
 
 ## Remaining gaps
 
@@ -113,7 +113,7 @@ can prevent a final record; stderr and the command's exit status remain the
 failure indicators. No automatic remote upload or tracker restart occurs.
 
 This collector preserves evidence independently; it does not prove HDT processed
-the captured input. The [canonical parser replay](UI-REPLAY.md#exercise-the-installed-event-pipeline)
+the captured input. The [canonical parser replay](ui-replay.md#exercise-the-installed-event-pipeline)
 currently covers a small set of mode transitions, not a complete Arena match.
-See [capture instructions](CAPTURE-FREEZE.md) and the
-[independent-observer contract](specs/independent-observer.md).
+See [capture instructions](freeze-capture.md) and the
+[independent-observer contract](../specs/independent-observer.md).
