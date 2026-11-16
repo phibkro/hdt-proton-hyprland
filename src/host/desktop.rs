@@ -657,6 +657,8 @@ struct Producer {
     observed_ms: i64,
     #[serde(rename = "overlayHwnd")]
     hwnd: u32,
+    #[serde(rename = "win32InputReady")]
+    win32_input_ready: bool,
     width: u16,
     height: u16,
     rectangles: Vec<[u16; 4]>,
@@ -787,7 +789,7 @@ pub fn control(cfg: &crate::config::Config, args: &[OsString]) -> Result<()> {
                     geometry.height,
                     producer
                         .as_ref()
-                        .filter(|_| fresh)
+                        .filter(|p| fresh && p.win32_input_ready)
                         .map_or(&[][..], |p| p.rectangles.as_slice()),
                 )?;
                 let mut state = bridge.tick(Some(&(frame, Instant::now())), &mut previous)?;
@@ -938,7 +940,7 @@ mod tests {
             let mut published_width = 100u16;
             let mut published_time = now;
             let mut has_handle = true;
-            let mut producer = Producer {session:"0".into(), observed_ms:now,
+            let mut producer = Producer {session:"0".into(), observed_ms:now, win32_input_ready:false,
                 hwnd:1,width,height:80,rectangles:vec![]};
             for (operation, delta) in operations {
                 match operation {
@@ -948,7 +950,7 @@ mod tests {
                     3 => {
                         published_generation = generation; published_width = width;
                         published_time = now; has_handle = true;
-                        producer = Producer {session:generation.to_string(),observed_ms:now,
+                        producer = Producer {session:generation.to_string(),observed_ms:now,win32_input_ready:false,
                             hwnd:1,width,height:80,rectangles:vec![]};
                     },
                     4 => { has_handle = false; producer.hwnd = 0; },
@@ -966,6 +968,7 @@ mod tests {
             session: "owned".into(),
             observed_ms: 10000,
             hwnd: 1,
+            win32_input_ready: false,
             width: 100,
             height: 80,
             rectangles: vec![],

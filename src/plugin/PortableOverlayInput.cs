@@ -13,6 +13,7 @@ sealed class PortableOverlayInput
 {
     const int NoActivate = 0x08000000;
     const int AppWindow = 0x00040000;
+    const int Transparent = 0x20;
     const int OwnedMask = NoActivate | AppWindow;
     const uint RefreshWithoutActivation = 0x0037;
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
@@ -35,9 +36,16 @@ sealed class PortableOverlayInput
     int originalBits;
     int appliedBits;
     bool stylesOwned;
+    bool originalClickthrough;
     bool focusOwned;
     bool disabled;
     MethodInfo setClickthrough;
+
+    public bool PreparedFor(IntPtr hwnd)
+    {
+        return !disabled && stylesOwned && window == hwnd &&
+            (ExtendedStyle(hwnd, -20) & (OwnedMask | Transparent)) == AppWindow;
+    }
 
     static Acknowledgement Read(string path, string session, IntPtr hwnd)
     {
@@ -80,6 +88,7 @@ sealed class PortableOverlayInput
                     null, new[] { typeof(bool) }, null);
                 if (setClickthrough == null) throw new MissingMethodException("HDT SetClickthrough(bool) unavailable");
                 originalBits = ExtendedStyle(hwnd, -20) & OwnedMask;
+                originalClickthrough = (ExtendedStyle(hwnd, -20) & Transparent) != 0;
                 appliedBits = originalBits;
                 stylesOwned = true;
                 // Native readiness means the owner has already installed empty
@@ -92,8 +101,9 @@ sealed class PortableOverlayInput
                 appliedBits = ExtendedStyle(hwnd, -20) & OwnedMask;
                 if (appliedBits != AppWindow) throw new InvalidOperationException("Portable activation styles were not applied");
             }
-            if (ack.fresh && ack.active && ack.pointerOverControl)
-                setClickthrough.Invoke(overlay, new object[] { false });
+            // The native owner keeps input empty until this preparation is
+            // published. Make Wine receptive before X11 delivers pointer entry.
+            setClickthrough.Invoke(overlay, new object[] { false });
             var foreground = Hearthstone_Deck_Tracker.User32.GetForegroundWindow();
             if (ack.fresh && ack.active && ack.focused && ack.pointerOverControl && foreground != hwnd)
                 focusOwned = overlay.Activate();
@@ -124,6 +134,13 @@ sealed class PortableOverlayInput
         }
         if (stylesOwned && window != IntPtr.Zero)
         {
+            var overlay = Hearthstone_Deck_Tracker.API.Core.OverlayWindow;
+            try
+            {
+                if (overlay != null && new WindowInteropHelper(overlay).Handle == window && setClickthrough != null)
+                    setClickthrough.Invoke(overlay, new object[] { originalClickthrough });
+            }
+            catch (Exception error) { Log.Warn("Portable click-through restoration failed: " + error.GetType().Name); }
             var unchanged = ~(ExtendedStyle(window, -20) ^ appliedBits) & OwnedMask;
             Hearthstone_Deck_Tracker.User32.RemoveWindowExStyle(window, appliedBits & ~originalBits & unchanged);
             Hearthstone_Deck_Tracker.User32.SetWindowExStyle(window, originalBits & ~appliedBits & unchanged);

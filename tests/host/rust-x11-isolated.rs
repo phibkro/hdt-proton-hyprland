@@ -663,7 +663,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
     std::fs::create_dir(&evidence).unwrap();
     let region = evidence.join("input-region.json");
     let ack = evidence.join("control-input.json");
-    let publish = |session: &str, age: i64| {
+    let publish = |session: &str, age: i64, win32_ready: bool| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -671,7 +671,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
         std::fs::write(
             &region,
             serde_json::to_vec(&json!({"session":session,"observedMS":now-age,
-            "overlayHwnd":123,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
+            "overlayHwnd":123,"win32InputReady":win32_ready,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
             .unwrap(),
         )
         .unwrap();
@@ -726,7 +726,31 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             std::thread::sleep(Duration::from_millis(10));
         }
     };
-    publish("owned", 0);
+    publish("owned", 0, false);
+    wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == true && v["controls"] == 0);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty(),
+        "native input stays empty until Win32 is prepared"
+    );
+    publish("owned", 0, true);
+    wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
+    publish("owned", 0, false);
+    wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == true && v["controls"] == 0);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty(),
+        "losing Win32 preparation removes native input immediately"
+    );
+    publish("owned", 0, true);
     wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
     let second = command().output().unwrap();
     assert!(!second.status.success());
@@ -752,7 +776,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .is_empty()
     );
     for (session, age) in [("other", 0), ("owned", 5000), ("owned", -5000)] {
-        publish("owned", 0);
+        publish("owned", 0, true);
         wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
         assert_eq!(
             conn.shape_get_rectangles(overlay, SK::INPUT)
@@ -763,7 +787,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
                 .len(),
             1
         );
-        publish(session, age);
+        publish(session, age, true);
         wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == false && v["controls"] == 0);
         assert!(
             conn.shape_get_rectangles(overlay, SK::INPUT)
@@ -774,7 +798,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
                 .is_empty()
         );
     }
-    publish("owned", 0);
+    publish("owned", 0, true);
     wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
     assert_eq!(
         conn.shape_get_rectangles(overlay, SK::INPUT)
