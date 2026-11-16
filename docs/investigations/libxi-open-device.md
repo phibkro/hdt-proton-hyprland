@@ -68,8 +68,8 @@ unchanged. The patched library is used only by the isolated check.
 Target: [libXi merge requests](https://gitlab.freedesktop.org/xorg/lib/libXi/-/merge_requests),
 following [X.Org's patch workflow](https://www.x.org/wiki/Development/Documentation/SubmittingPatches/).
 The source repository was read successfully through Git. A GitLab submission
-has not been made. The patch has no `Signed-off-by` certification; the submitting
-contributor must review the Developer Certificate of Origin before adding it.
+has not been made. The author reviewed the Developer Certificate of Origin and
+authorized the patch's `Signed-off-by` certification on 16 November 2026.
 
 Suggested title: **XOpenDevice: retain the requested ID across the reply wait**.
 

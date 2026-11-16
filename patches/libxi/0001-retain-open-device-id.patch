@@ -1,4 +1,4 @@
-From 88ad2fd281fb7cd5b2c04d9d05c10a8b171932cc Mon Sep 17 00:00:00 2001
+From 2ce5dabda68b4945340525f7bac151f78dda43cf Mon Sep 17 00:00:00 2001
 From: "Philip B. Krogh" <71797726+phibkro@users.noreply.github.com>
 Date: Mon, 16 Nov 2026 19:24:41 +0100
 Subject: [PATCH] XOpenDevice: retain the requested ID across the reply wait
@@ -13,6 +13,8 @@ sends XNoOp requests on the same display. Three unpatched libXi 1.8.4
 runs returned device 127 for requested device 4. With this change, three
 runs completed 50000 open/map/close cycles each without an ID mismatch.
 No devices are removed and no input events are injected.
+
+Signed-off-by: Philip B. Krogh <71797726+phibkro@users.noreply.github.com>
 ---
  src/XOpenDev.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
