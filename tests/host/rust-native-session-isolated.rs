@@ -403,7 +403,50 @@ fn independent_ui_processes_and_real_pixels() {
     place_main(&conn, window(&state, "main"));
     assert_ne!(main, renderer);
     assert_input_empty(&conn, overlay);
-    publish(&first, 101);
+    let heroes: Value =
+        serde_json::from_slice(&fs::read("native-overlay-heroes.json").unwrap()).unwrap();
+    let cards: Value =
+        serde_json::from_slice(&fs::read("native-overlay-cards.json").unwrap()).unwrap();
+    let menu: Value =
+        serde_json::from_slice(&fs::read("native-overlay-menu.json").unwrap()).unwrap();
+    click(&conn, &display, root, window(&state, "main"), 150, 87);
+    session.until("actual pointer opens Arena", |s| {
+        role(s, "main")["last"]["mainPage"] == 1
+    });
+    publish(&heroes, 101);
+    expect_pixels(
+        &conn,
+        overlay,
+        &reference(),
+        "explicit hero phase reaches real independent overlay pixels",
+    );
+    screenshot(&conn, overlay, "hero-selection-overlay");
+    std::thread::sleep(Duration::from_millis(1100));
+    screenshot(&conn, window(&state, "main"), "hero-selection-main");
+    publish(&cards, 102);
+    expect_pixels(
+        &conn,
+        overlay,
+        &reference(),
+        "hero choices replaced by actual card phase",
+    );
+    screenshot(&conn, overlay, "card-draft-overlay");
+    publish(&first, 103);
+    expect_pixels(
+        &conn,
+        overlay,
+        &reference(),
+        "next card offer replaces previous pixels",
+    );
+    publish(&menu, 104);
+    session.until("explicit menu clears overlay choices", |s| {
+        role(s, "overlay")["last"]["projection"] == "inactive" && !mapped(&conn, overlay)
+    });
+    assert!(
+        !mapped(&conn, overlay),
+        "menu transition unmaps previous hero/card advice"
+    );
+    publish(&first, 105);
     expect_pixels(&conn, overlay, &reference(), "initial real source");
     screenshot(&conn, overlay, "initial-overlay");
     // STOP the real Main process, not a mocked actor or setter. Source remains directly consumed.
@@ -411,7 +454,7 @@ fn independent_ui_processes_and_real_pixels() {
     session.until("Main frozen while renderer stays responsive", |s| {
         role(s, "main")["health"] == "unresponsive" && role(s, "overlay")["health"] == "responsive"
     });
-    publish(&second, 102);
+    publish(&second, 106);
     expect_pixels(
         &conn,
         overlay,
@@ -423,7 +466,7 @@ fn independent_ui_processes_and_real_pixels() {
     session.until("Main dead, renderer alive", |s| {
         role(s, "main")["health"] == "exited" && pid(s, "overlay") == renderer
     });
-    publish(&first, 103);
+    publish(&first, 107);
     expect_pixels(
         &conn,
         overlay,
@@ -443,7 +486,7 @@ fn independent_ui_processes_and_real_pixels() {
         role(s, "main")["last"]["mainPage"] == 3
     });
     screenshot(&conn, main_window, "options-before");
-    publish(&first, 104);
+    publish(&first, 108);
     click(&conn, &display, root, main_window, 231, 223);
     session.until("Main persisted score preference", |s| {
         role(s, "main")["last"]["scores"] == false && role(s, "overlay")["last"]["scores"] == false
@@ -482,7 +525,7 @@ fn independent_ui_processes_and_real_pixels() {
             .is_err(),
         "dead renderer's native child was reaped"
     );
-    publish(&first, 105);
+    publish(&first, 109);
     session.restart("overlay");
     let state = session.until("explicit renderer recovery", |s| {
         role(s, "overlay")["health"] == "responsive" && pid(s, "overlay") != renderer
@@ -518,7 +561,7 @@ fn independent_ui_processes_and_real_pixels() {
         &notice,
         "malformed retains explicit unavailable visual",
     );
-    publish(&first, 104);
+    publish(&first, 108);
     std::thread::sleep(Duration::from_millis(400));
     expect_pixels(
         &conn,
@@ -526,7 +569,7 @@ fn independent_ui_processes_and_real_pixels() {
         &notice,
         "notice never resets fact high-water",
     );
-    publish(&first, 106);
+    publish(&first, 110);
     expect_pixels(
         &conn,
         overlay,
@@ -537,7 +580,7 @@ fn independent_ui_processes_and_real_pixels() {
     std::thread::sleep(Duration::from_millis(250));
     assert!(!mapped(&conn, overlay), "game focus loss hides overlay");
     activate(game);
-    publish(&first, 107);
+    publish(&first, 111);
     expect_pixels(&conn, overlay, &reference(), "focus recovery");
     conn.configure_window(
         game,

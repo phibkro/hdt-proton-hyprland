@@ -393,6 +393,63 @@ try
     Check(window.Library.State.Decks.Last().Name == "Catalog-built native deck" && window.Library.State.Decks.Last().Content.Cards.Single() == new CardCount(777, 2)
         && window.Library.State.Decks.Last().Content.HeroDbfId == 637, "catalog-built deck persists through real Rust library transaction");
     window.Close();
+    var heroFrame = frames[0] with
+    {
+        SchemaVersion = 2,
+        Sequence = 1,
+        Offers = [],
+        Selection = new ArenaHeroSelection([new("FIXTURE_HERO_A", "Illustrative Mage", "Mage"), new("FIXTURE_HERO_B", "Illustrative Warrior", "Warrior")])
+    };
+    var cardFrame = frames[0] with { SchemaVersion = 2, Sequence = 2, Offers = [], Selection = new ArenaCardDraft(frames[0].Offers) };
+    var replacementFrame = frames[1] with { SchemaVersion = 2, Sequence = 3, Offers = [], Selection = new ArenaCardDraft(frames[1].Offers) };
+    var unsupportedFrame = replacementFrame with { Sequence = 4, Selection = new ArenaUnavailable(ArenaUnavailableKind.Redraft, "Redraft fixture has no supported native suggestions.") };
+    var menuFrame = frames[2] with { SchemaVersion = 2, Sequence = 5, PickedDeck = [], PickIndex = 0, SelectedCardId = null, Selection = new ArenaInactive() };
+    ArenaObservation[] phaseFrames = [heroFrame, cardFrame, replacementFrame, unsupportedFrame, menuFrame];
+    Check(frames[0].ViewSelection is ArenaCardDraft && frames[2].ViewSelection is ArenaInactive, "schema 1 adapter remains explicitly card-only");
+    foreach (var invalidPhase in new[] { heroFrame with { Offers = frames[0].Offers }, heroFrame with { PickedDeck = frames[1].PickedDeck, PickIndex = 1 },
+        heroFrame with { Selection = null }, menuFrame with { PickIndex = 1, PickedDeck = frames[1].PickedDeck }, cardFrame with { Mode = ArenaMode.Inactive }, frames[0] with { Selection = new ArenaHeroSelection([]) } })
+    {
+        try { ReplaySource.Validate([invalidPhase]); throw new InvalidOperationException("Mixed or contradictory Arena payload accepted."); }
+        catch (InvalidDataException) { Check(true, "contradictory phase/choice payload fails closed"); }
+    }
+    var phaseFile = Path.Combine(evidence, "arena-phases.json");
+    File.WriteAllText(phaseFile, System.Text.Json.JsonSerializer.Serialize(phaseFrames, ReplaySource.JsonOptions));
+    Check(Result(new ReplaySource(phaseFile).ReadAsync())[0].ViewSelection is ArenaHeroSelection, "bounded source reader preserves tagged hero choices through JSON");
+    var mixedJson = System.Text.Json.JsonSerializer.Serialize(heroFrame, ReplaySource.JsonOptions).Replace("\"phase\": \"HeroSelection\"", "\"phase\": \"HeroSelection\", \"CardChoices\": []");
+    try { System.Text.Json.JsonSerializer.Deserialize<ArenaObservation>(mixedJson, ReplaySource.JsonOptions); throw new InvalidOperationException("Unknown hero/card mixture accepted."); }
+    catch (System.Text.Json.JsonException) { Check(true, "tagged hero payload rejects fields from other choice shapes"); }
+    var missingKindJson = System.Text.Json.JsonSerializer.Serialize(unsupportedFrame, ReplaySource.JsonOptions).Replace("\"Kind\": \"Redraft\",", "");
+    try { System.Text.Json.JsonSerializer.Deserialize<ArenaObservation>(missingKindJson, ReplaySource.JsonOptions); throw new InvalidOperationException("Unavailable variant kind was guessed."); }
+    catch (System.Text.Json.JsonException) { Check(true, "unsupported selection requires explicit choice kind instead of defaulting omitted kind"); }
+    var missingPhaseFile = Path.Combine(evidence, "arena-missing-phase.json");
+    File.WriteAllText(missingPhaseFile, System.Text.Json.JsonSerializer.Serialize(phaseFrames, ReplaySource.JsonOptions).Replace("\"phase\": \"HeroSelection\",", ""));
+    try { Result(new ReplaySource(missingPhaseFile).ReadAsync()); throw new InvalidOperationException("Missing selection phase accepted."); }
+    catch (InvalidDataException) { Check(true, "actual bounded JSON boundary normalizes missing polymorphic tag to controlled input failure"); }
+    window = CreateWindow(new(phaseFile, Path.Combine(evidence, "phase-settings.json")));
+    window.Show(); Wait(window.Initialization);
+    var phaseTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+    bool HasText(string text) => window.GetVisualDescendants().OfType<TextBlock>().Any(label => label.IsEffectivelyVisible && label.Text?.Contains(text, StringComparison.OrdinalIgnoreCase) == true);
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height;
+        Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
+        Check(window.Summary.Contains("Choose a hero") && window.OfferCount == 2 && HasText("Illustrative Mage") && !HasText("mana") && !HasText("Deck synergies:"), "hero phase renders identities without card mana, scores or synergy advice");
+        Fits(window.NextButton, $"{size.Width}: phase navigation is reachable without scrolling");
+        foreach (var pane in ((Grid)((TabItem)phaseTabs.Items[1]!).Content!).Children) Fits(pane, $"{size.Width}: hero and deck panels stay inside viewport");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"arena-hero-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Click(window.NextButton);
+        Check(window.Summary.Contains("Card draft") && window.OfferCount == 3 && !HasText("Illustrative Mage") && HasText("mana"), "pointer next replaces hero controls with card controls");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"arena-cards-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Click(window.NextButton);
+        Check(window.OfferCount == 2 && window.PickedCount == 1 && window.Scores[0] == "10", "pointer next replaces the actual card offer and picked-deck facts");
+        Click(window.NextButton);
+        Check(window.OfferCount == 0 && window.Scores.Count == 0 && HasText("Redraft choices unavailable") && !HasText("Arenasmith "), "unsupported phase clears card advice and visibly reports unavailable");
+        Click(window.NextButton);
+        Check(window.OfferCount == 0 && window.PickedCount == 0 && window.Summary.Contains("Arena menu") && !HasText("Redraft choices unavailable"), "menu transition clears obsolete unsupported status and choices");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"arena-menu-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Click(window.ResetButton);
+    }
+    window.Close();
     var nativeFile = Path.Combine(evidence, $"native-observation-{Guid.NewGuid():N}.json");
     var nativeLibraryFile = Path.Combine(evidence, $"observed-library-{Guid.NewGuid():N}.json");
     var nativeLibrary = new ClientLibrary(nativeLibraryFile);
@@ -410,7 +467,8 @@ try
             ObservedAt = time,
             Sequence = sequence,
             Mode = mode == "Arena" ? ArenaMode.Drafting : ArenaMode.Inactive,
-            Offers = mode == "Arena" ? (arenaFrame ?? frames[0]).Offers : []
+            Offers = mode == "Arena" ? (arenaFrame ?? frames[0]).Offers : [],
+            Selection = (arenaFrame ?? frames[2]).SchemaVersion == 2 ? mode == "Arena" ? arenaFrame!.Selection : new ArenaInactive() : null
         };
         ObservedCard[] card = menu ? [] : [new("fixture-card", 77, "Illustrative observed card", 2, 1, null)];
         return new(1, nativeSession, sequence, time, NativeAvailability.Available, null, Enum.Parse<NativeMode>(mode), mode == "Arena" ? "DRAFT" : "GAMEPLAY", mode,
@@ -475,6 +533,35 @@ try
     Check(window.GameView.CardCount == 0 && window.OfferCount == 0, "explicit producer capture failure never renders partial game facts");
     nativePublisher.Offer(NativeFrame("Menu", 5));
     PumpUntil(() => window.GameView.ModeText.StartsWith("Menu"), "capture failure recovers on fresh complete publication");
+    Click((TabItem)nativeTabs.Items[1]!);
+    nativePublisher.Offer(NativeFrame("Arena", 6, heroFrame));
+    PumpUntil(() => window.Summary.Contains("Choose a hero") && window.OfferCount == 2, "native source independently publishes explicit hero phase");
+    Check(!window.NextButton.IsEnabled && HasText("Illustrative Mage"), "observed hero choices are read-only with no game-selection control");
+    window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-observed-heroes.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    nativePublisher.Offer(NativeFrame("Arena", 7, cardFrame));
+    PumpUntil(() => window.Summary.Contains("Card draft") && window.OfferCount == 3, "native source hero-to-card transition replaces choice kind");
+    nativePublisher.Offer(NativeFrame("Arena", 8, replacementFrame));
+    PumpUntil(() => window.OfferCount == 2 && window.PickedCount == 1, "native source replaces next offered cards without replay input");
+    nativePublisher.Offer(NativeFrame("Menu", 9, menuFrame));
+    PumpUntil(() => window.Summary.Contains("Arena menu") && window.OfferCount == 0, "native menu envelope clears current draft choices");
+    nativePublisher.Offer(NativeFrame("Arena", 10, heroFrame));
+    PumpUntil(() => window.Summary.Contains("Choose a hero"), "hero source resumes before fault");
+    nativePublisher.Offer(new { schemaVersion = 1, sessionId = nativeSession, sequence = 11, observedAt = DateTimeOffset.UtcNow, availability = "Available", arena = new { schemaVersion = 2, selection = new { phase = "CardDraft", choices = "malformed" } } });
+    PumpUntil(() => window.Summary.Contains("unavailable") && window.OfferCount == 0, "malformed source clears hero controls immediately");
+    nativePublisher.Offer(NativeFrame("Arena", 12, heroFrame));
+    PumpUntil(() => window.Summary.Contains("Choose a hero") && window.OfferCount == 2, "fresh valid tagged source recovers after malformed selection");
+    var staleHero = NativeFrame("Arena", 13, heroFrame);
+    var staleHeroTime = DateTimeOffset.UtcNow.AddSeconds(-10);
+    nativePublisher.Offer(staleHero with { ObservedAt = staleHeroTime, Arena = staleHero.Arena! with { ObservedAt = staleHeroTime } });
+    PumpUntil(() => window.Summary.Contains("unavailable") && window.OfferCount == 0, "stale source clears hero controls and keeps no prior advice");
+    nativePublisher.Offer(NativeFrame("Arena", 14, cardFrame));
+    PumpUntil(() => window.Summary.Contains("Card draft") && window.OfferCount == 3, "fresh source recovers into the explicitly supplied card phase");
+    var missingPhaseSource = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(NativeFrame("Arena", 15, heroFrame), ReplaySource.JsonOptions))!;
+    missingPhaseSource["Arena"]!["Selection"]!.AsObject().Remove("phase");
+    nativePublisher.Offer(missingPhaseSource);
+    PumpUntil(() => window.Summary.Contains("unavailable") && window.OfferCount == 0, "complete source with missing phase tag clears controls without escaping dispatcher");
+    nativePublisher.Offer(NativeFrame("Arena", 16, heroFrame));
+    PumpUntil(() => window.Summary.Contains("Choose a hero") && window.OfferCount == 2, "controlled unsupported-shape failure recovers on a fresh complete source");
     window.Close(); nativePublisher.Dispose(); Wait(nativePublisher.Completion);
     Check(nativePublisher.Completion.IsCompletedSuccessfully, "owned optional publisher worker exits after native window closes");
     var failedOutput = Path.Combine(evidence, $"publisher-block-{Guid.NewGuid():N}", "state.json");
@@ -529,6 +616,12 @@ try
     var overlayRaster = OverlayRendering.Render(overlayObservation, new TrackerSettings(), overlaySpec, Path.Combine(evidence, "native-overlay-render.png"));
     Check(overlayRaster.Pixels.Length == overlaySpec.Width * overlaySpec.Height * 4
         && Enumerable.Range(0, overlayRaster.Pixels.Length / 4).All(index => overlayRaster.Pixels[index * 4 + 3] == 255), "actual Avalonia renderer produces a complete opaque bounded raster for Rust-owned overlay");
+    var phaseOverlayJson = new System.Text.Json.JsonSerializerOptions(ReplaySource.JsonOptions) { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+    File.WriteAllText(Path.Combine(evidence, "native-overlay-cards.json"), System.Text.Json.JsonSerializer.Serialize(NativeFrame("Arena", 24, cardFrame), phaseOverlayJson));
+    File.WriteAllText(Path.Combine(evidence, "native-overlay-heroes.json"), System.Text.Json.JsonSerializer.Serialize(NativeFrame("Arena", 22, heroFrame), phaseOverlayJson));
+    File.WriteAllText(Path.Combine(evidence, "native-overlay-menu.json"), System.Text.Json.JsonSerializer.Serialize(NativeFrame("Menu", 23, menuFrame), phaseOverlayJson));
+    var heroRaster = OverlayRendering.Render(NativeFrame("Arena", 22, heroFrame), new TrackerSettings(), overlaySpec, Path.Combine(evidence, "native-overlay-heroes.png"));
+    Check(!overlayRaster.Pixels.SequenceEqual(heroRaster.Pixels), "same production overlay renderer distinguishes typed hero choices from cards in actual pixels");
     var alternateRaster = OverlayRendering.Render(NativeFrame("Arena", 21, frames[0]), new TrackerSettings(), overlaySpec);
     File.WriteAllText(Path.Combine(evidence, "native-overlay-alternate.json"), System.Text.Json.JsonSerializer.Serialize(NativeFrame("Arena", 21, frames[0]),
         new System.Text.Json.JsonSerializerOptions(ReplaySource.JsonOptions) { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));

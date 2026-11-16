@@ -5,7 +5,7 @@ not a replacement for HDT. It opens a native window with deck management, deckst
 match-history view, an Arena replay view and local Arena preferences. It never reads game memory or sends game input.
 
 ```
-Arena observation replay ──validated v1 contract──▶ native draft view
+Arena observation replay ──validated v1/v2 contract──▶ native draft view
 Native deck editor ────────Rust transactions─────▶ private native library
 MIT Proton status export ──read-only status──────▶ connection/status text
 Optional observation export ──validated v1───────▶ native game / Arena / history
@@ -178,7 +178,8 @@ regular-file/fault acceptance.
 | Live card offers / picked deck / scores | Native consumer + optional source-only Proton producer | Real public-model reference compile and owned publication/polling journey; actual game acquisition remains unverified |
 | HSReplay login, entitlement and rating requests | Absent | No claim that upstream acquisition is a public/free API |
 | HearthMirror / game memory / log watcher | Retained Proton acquisition when optional producer is used | No native memory/log acquisition port; bridge reads public observed models only |
-| Hero/hero-power/package selection, redraft, related tooltips | Absent | Separate observation variants and views required |
+| Hero selection | Native phase/identity rendering | Typed source + replay journey; public-model bridge lacks offered hero IDs; hero statistics unavailable |
+| Hero-power/dual-class/package selection, redraft, related tooltips | Unavailable | Explicit unsupported phase clears previous advice; no inferred variants |
 | Native overlay placement/input pass-through | Native X11 preview | Rust-owned opaque panel; private-display pixels/shape/focus/stale checks pass; real-game/compositor acceptance pending |
 | Deck editing / notes / archive / restore / selection | Native | Real private library, revision conflicts, stable IDs, atomic persistence; no game write |
 | Card-name search / deck building | Native, optional local catalog | Read-only localized HearthstoneJSON projection, exact DBF identities, add/remove copies and explicit hero choice; no ownership/legality inference |
@@ -189,7 +190,7 @@ regular-file/fault acceptance.
 
 ## Observation boundary
 
-`ArenaObservation` in `Hdt.Avalonia/Arena.cs` is the authoritative v1 schema;
+`ArenaObservation` and its tagged `ArenaSelection` union in `Hdt.Avalonia/Arena.cs` are the authoritative schemas;
 `fixtures/draft.json` is a runnable complete example. A replay is an ordered array
 of complete observations, not a sequence of UI commands. Each observation declares
 schema version, source session, observed UTC time, increasing sequence, mode,
@@ -199,6 +200,39 @@ match the complete picked-deck length; a selected card must exist in that deck;
 `Inactive` must contain no offers. Unknown ratings are null, never fabricated zero.
 The snapshot is fully validated before the previous view is replaced. Replay time
 is historical and intentionally does not use the live status freshness gate.
+
+Schema 2 moves choices into one tagged `Selection` payload: `HeroSelection` owns
+hero ID/name/nullable class choices, `CardDraft` owns card offers, `Inactive` owns
+no choices, and `Unavailable` owns a variant and reason. Its legacy `Offers`
+array must be empty. Mixed payload fields and contradictory mode/pick state are
+rejected before projection. JSON member order is irrelevant, including when Rust
+sorts fields; a missing phase tag becomes a controlled input failure. Schema 2 inactive/hero phases clear previous card picks;
+legacy schema 1 inactive observations retain their original picked-deck semantics.
+`ArenaV1Adapter` explicitly maps schema 1 to card
+choices or inactive; it never guesses heroes from names, counts or zero picks.
+Hero views omit card mana/synergy/score controls. Hero statistics are unavailable.
+
+The source-only bridge publishes Arena schema 2 inside the unchanged native
+schema 1 envelope. It uses explicit cached `HeroStats`/`CardStats` presence and
+`IsRedraft`/`IsPackageSelectOpen`. Public hero statistics do not provide offered identities, so its hero
+phase has no identities and an explicit unavailable reason. Ambiguous cached
+collections and unsupported choices show unavailable. No private-field reflection,
+new HearthMirror access or HSReplay requests were added. This remains dependent
+on the existing Wine/HDT producer and has no live hero-acquisition acceptance.
+
+Reference behavior: upstream HDT `2698623`, `ArenaPickHelperViewModel.cs`
+`UpdateChoices` clears separate hero/card collections before replacing them;
+`ArenaPickHelper.xaml` has separate hero/card/hero-power regions. The local
+reference excerpts are read-only evidence; no upstream code, XAML or assets were
+copied. Existing all-rights-reserved provenance applies.
+
+The rendered acceptance runner creates clearly illustrative schema 2 observations
+in its private evidence directory and drives actual **Next observation**/**Rewind**
+controls through hero → cards → replacement → unsupported → menu at 1120×760 and
+800×600. Screenshots `arena-hero-*`, `arena-cards-*`, `arena-menu-*` show those
+views. A separate real optional writer → bounded Rust reader → dispatcher poll
+journey validates hero/card/menu replacement and malformed/stale recovery.
+These are native rendering/source-boundary checks, not a live game or account test.
 
 `IArenaObservationSource` is the acquisition seam. Only `ReplaySource` currently
 implements card acquisition. `ProtonStateReader` is a separate status contract,
