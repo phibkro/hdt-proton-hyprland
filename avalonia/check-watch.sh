@@ -51,7 +51,9 @@ cat > NuGet.Config <<'CONFIG'
 <configuration><packageSources><clear /></packageSources><auditSources><clear /></auditSources></configuration>
 CONFIG
 export NuGetAudit=false
+export RestoreLockedMode=true
 dotnet --version >/capture/sdk-version.txt 2>&1
+dotnet restore avalonia/Hdt.Development/Hdt.Development.csproj --locked-mode >/capture/restore.log 2>&1
 bash avalonia/dev.sh watch >/capture/watch.log 2>&1 &
 watcher=$!
 window_for_color() {
