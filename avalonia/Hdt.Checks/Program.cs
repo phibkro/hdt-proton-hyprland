@@ -339,7 +339,9 @@ try
     Check(!window.Library.State.Decks[1].Archived && window.Library.State.Decks[1].Notes == "Edited persistent notes"
         && window.Library.State.SelectedDeckId is null && window.Library.State.Matches.Single().DeckId == record.DeckId,
         "pointer restore preserves identity, notes and historical association without silently selecting the deck");
+    Fill(editor.SearchBox, "filter that must not hide the new deck");
     Click(editor.NewButton);
+    Check(editor.SearchBox.Text == "", "New clears an active browser search so a newly saved deck cannot remain hidden");
     Fits(editor.NameBox, "New from archived browsing exposes name in one action before helper scrolling");
     Check(editor.ShowArchived.IsChecked == false && !editor.NameBox.IsReadOnly && editor.NameBox.Text == "" && editor.SaveButton.IsEnabled && editor.EditorPane.IsExpanded,
         "new deck leaves archive-only browsing so newly saved decks cannot disappear into a hidden active list");

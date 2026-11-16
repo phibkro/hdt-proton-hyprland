@@ -173,6 +173,7 @@ public sealed class LibraryView : UserControl
     {
         if (_working || _library.Busy) return;
         if (ShowArchived.IsChecked == true) ShowArchived.IsChecked = false;
+        SearchBox.Text = "";
         ClearEditor(); OpenEditor(NameBox);
     }
     private void OpenEditor(Control target)
