@@ -9,6 +9,9 @@
   </ItemGroup>
   <PropertyGroup Condition="'$(WatcherAcceptance)' == 'true'">
     <DefineConstants>$(DefineConstants);WATCHER_ACCEPTANCE</DefineConstants>
+    <IntermediateOutputPath>obj/$(Configuration)/$(TargetFramework)/watcher/</IntermediateOutputPath>
+    <OutputPath>bin/$(Configuration)/$(TargetFramework)/watcher/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
   <ItemGroup Condition="'$(WatcherAcceptance)' == 'true'">
     <Compile Include="../../src/plugin/NativeArenaEventBridge.cs" Link="NativeArenaEventBridge.cs" />

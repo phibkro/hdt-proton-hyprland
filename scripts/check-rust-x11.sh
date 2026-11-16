@@ -39,7 +39,12 @@ if [[ -n $frame ]]; then
     native_env=(--setenv HDT_TEST_AVALONIA_FRAME /capture/native-frame.json)
 fi
 if [[ $native_ui == true ]]; then
-    cp -R avalonia/Hdt.Checks/bin/Debug/net10.0 "$run/managed"
+    managed=$(dotnet msbuild avalonia/Hdt.Checks/Hdt.Checks.csproj -getProperty:TargetDir "-p:WatcherAcceptance=$watcher_events")
+    [[ -f "$managed/Hdt.Checks.dll" ]] || {
+        echo 'Build the selected native checks variant first.' >&2
+        exit 2
+    }
+    cp -R "$managed" "$run/managed"
     cp -- "$(dirname -- "$frame")/native-overlay-observation.json" "$run/ui-observation.json"
     native_env+=(--setenv HDT_TEST_NATIVE_UI_DLL /capture/managed/Hdt.Checks.dll
         --setenv HDT_TEST_UI_DOTNET "$(readlink -f "$(command -v dotnet)")"

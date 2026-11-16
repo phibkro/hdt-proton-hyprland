@@ -89,8 +89,9 @@ committed. In the pinned `nix-shell avalonia/shell.nix` environment:
 dotnet build avalonia/Hdt.Checks/Hdt.Checks.csproj -m:2 \
   -p:RestoreLockedMode=true -p:UseSharedCompilation=false \
   -p:WatcherAcceptance=true -p:HdtAppDir="$HDT_APP_DIR"
-timeout --kill-after=3s 65 dotnet avalonia/Hdt.Checks/bin/Debug/net10.0/Hdt.Checks.dll \
-  --watcher-events local/watcher-evidence
+watcher_checks=$(dotnet msbuild avalonia/Hdt.Checks/Hdt.Checks.csproj \
+  -p:WatcherAcceptance=true -getProperty:TargetPath)
+timeout --kill-after=3s 65 dotnet "$watcher_checks" --watcher-events local/watcher-evidence
 ```
 
 The actual DLL SHA256/MVIDs and runtime are printed. Output includes native Main
@@ -103,8 +104,22 @@ opt-in executes the actual watcher on its owned source dispatcher and is the
 sole file publisher during its hero/card/replacement/menu/stale/recovery journey.
 It compares actual X11 overlay pixels against the production renderer and checks
 empty input shape; it never injects input into the fake game. The usual independent
-Main/overlay failure-domain suite remains a separate regression. Before publishing,
-build the ordinary project without `WatcherAcceptance` again so its output does
-not include optional vendor references. Run ordinary rendered regression and
+Main/overlay failure-domain suite remains a separate regression. The optional watcher variant has separate intermediate/output directories; switching
+build variants must not reuse dependency manifests or copy vendor references into
+the ordinary output. The private X11 driver resolves the chosen target directory
+from MSBuild. Before publishing, verify the ordinary output excludes optional
+vendor references. Run ordinary rendered regression and
 failure cleanup checks separately. The Framework full-scope compilation against
 original assemblies is API evidence, not a WPF runtime scheduling check.
+
+
+## Review follow-up: repeatable build variants
+
+A repeated ordinary→watcher build reproduced a stale ordinary dependency manifest
+beside copied watcher DLLs, causing FileNotFoundException before the test began.
+The optional variant now has separate compiler/dependency outputs. Acceptance
+must exercise ordinary→watcher→ordinary without cleaning, resolve the requested
+variant through MSBuild, run the actual watcher and private X11 path, and verify
+that ordinary dependencies exclude the optional assemblies. A full Roslyn check
+also replaces unnecessary empty-array allocations and names null constructor
+parameters; API-only compilation is not a substitute for that analysis.
