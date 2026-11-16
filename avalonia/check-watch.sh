@@ -38,6 +38,12 @@ done
 [[ -s /capture/display-number ]]
 export DISPLAY=":$(cat /capture/display-number)"
 cd /capture/source
+# Dependencies were restored explicitly before the network-free drive. NuGet's
+# vulnerability-feed lookup is not a source of facts for this offline UI test.
+cat > NuGet.Config <<'CONFIG'
+<configuration><packageSources><clear /></packageSources><auditSources><clear /></auditSources></configuration>
+CONFIG
+export NuGetAudit=false
 dotnet --version >/capture/sdk-version.txt 2>&1
 bash avalonia/dev.sh watch >/capture/watch.log 2>&1 &
 watcher=$!
@@ -97,7 +103,7 @@ timeout --kill-after=5s 150 bwrap --unshare-all --die-with-parent --new-session 
     --setenv LD_LIBRARY_PATH "$LD_LIBRARY_PATH" --setenv DOTNET_PROCESSOR_COUNT 2 \
     --setenv DOTNET_CLI_TELEMETRY_OPTOUT 1 --setenv DOTNET_NOLOGO 1 \
     --setenv DOTNET_SKIP_FIRST_TIME_EXPERIENCE 1 --setenv DOTNET_SYSTEM_GLOBALIZATION_INVARIANT 0 \
-    --setenv DOTNET_CLI_USE_MSBUILD_SERVER 0 --setenv DOTNET_WATCH_SUPPRESS_EMOJIS 1 \
+    --setenv NuGetAudit false --setenv DOTNET_CLI_USE_MSBUILD_SERVER 0 --setenv DOTNET_WATCH_SUPPRESS_EMOJIS 1 \
     --setenv DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER 1 \
     "$shell" /capture/drive.sh >"$run/result.txt" 2>&1 || status=$?
 cat "$run/result.txt"

@@ -36,3 +36,8 @@ synthetic run-owned passwd/group identity; do not bind the host account database
 - 2026-11-16: Initial isolated attempt stalled before GenerateWatchList completed.
   Owned-process syscall evidence showed repeated missing passwd lookups; add the
   synthetic identity prerequisite rather than changing SDK or allowing network.
+
+- 2026-11-16: With identity resolved, restore attempted vulnerability-feed access
+  despite complete local dependencies. The network-free drive now clears remote
+  package/audit sources and disables NuGet audit only in its owned test process.
+  Normal development and CI audit policy is unchanged.
