@@ -35,6 +35,9 @@ sealed class ReplayHost
     static int desktopClicks;
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out NativePoint point);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(NativePoint point);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool MoveFileEx(string source, string destination, int flags);
     static int? plaqueLevel;
     static JavaScriptSerializer serializer = new JavaScriptSerializer();
@@ -335,11 +338,29 @@ sealed class ReplayHost
             ids.Add((string)Get(Get(card, "Card"), "Id"));
             plaqueLevels.Add((int)Get(Get(card, "PlaqueViewModel"), "Level"));
         }
-        object desktopBounds = null;
+        object desktopBounds = null, desktopPointer = null;
         if (desktopControl != null && desktopControl.IsVisible)
         {
             var point = desktopControl.PointToScreen(new Point(desktopControl.ActualWidth / 2, desktopControl.ActualHeight / 2));
             desktopBounds = new { x = (int)point.X, y = (int)point.Y };
+            NativePoint cursor;
+            if (GetCursorPos(out cursor))
+            {
+                var position = Mouse.GetPosition(desktopControl);
+                var hit = overlay.InputHitTest(overlay.PointFromScreen(new Point(cursor.X, cursor.Y)));
+                desktopPointer = new
+                {
+                    screenX = cursor.X,
+                    screenY = cursor.Y,
+                    windowFromPoint = WindowFromPoint(cursor).ToInt64(),
+                    wpfX = position.X,
+                    wpfY = position.Y,
+                    directlyOver = Mouse.DirectlyOver == null ? null : Mouse.DirectlyOver.GetType().FullName,
+                    hitTest = hit == null ? null : hit.GetType().FullName,
+                    enabled = desktopControl.IsEnabled,
+                    hitTestVisible = desktopControl.IsHitTestVisible
+                };
+            }
         }
         var bgsContent = (FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent");
         var data = new
@@ -352,6 +373,7 @@ sealed class ReplayHost
             desktopClicks,
             desktopControl = desktopBounds,
             desktopControlHovered = desktopControl != null && desktopControl.IsMouseOver,
+            desktopPointer,
             overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
             foregroundHwnd = GetForegroundWindow().ToInt64(),
             overlayExtendedStyle = WindowStyle(new WindowInteropHelper(overlay).Handle, -20),

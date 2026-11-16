@@ -13,10 +13,20 @@ ack=$run/evidence/control-input.json
 wait_for() {
     local label=$1 filter=$2 file=$3
     for ((attempt = 0; attempt < 70; attempt++)); do
+        if [[ -s "$state" && -s "$ack" ]]; then
+            jq -cn --arg label "$label" --slurpfile state "$state" --slurpfile ack "$ack" \
+                '{label:$label,state:($state[0]|{observedUTC,foregroundHwnd,overlayHwnd,clickthrough,desktopControlHovered,desktopPointer,desktopClicks}),ack:$ack[0]}' \
+                >>"$run/input-poll.jsonl"
+        fi
         if [[ -s "$file" ]] && jq -e "$filter" "$file" >/dev/null; then return; fi
         sleep 0.1
     done
     echo "Timed out: $label" >&2
+    cp "$state" "$run/failed-input-state.json"
+    cp "$ack" "$run/failed-input-ack.json"
+    xwininfo -root -tree >"$run/failed-input-tree.txt"
+    xprop -root _NET_ACTIVE_WINDOW >"$run/failed-input-active.txt"
+    xdotool getmouselocation --shell >"$run/failed-input-pointer.txt"
     return 1
 }
 move() {

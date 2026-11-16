@@ -79,6 +79,7 @@
 !/docs/specs/ecosystem-tooling.md
 !/docs/specs/independent-observer.md
 !/docs/specs/hdt-libxi-runtime.md
+!/docs/specs/portable-input-delivery.md
 !/docs/specs/local-flight-recorder.md
 !/docs/specs/maintenance-ci.md
 !/docs/specs/nix-desktop.md
