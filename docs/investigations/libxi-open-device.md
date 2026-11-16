@@ -55,13 +55,42 @@ The desktop native stack identifies Wine's `update_device_mapping` calling
 query for ID 18, absent from the independent device inventory, after repeated
 queries for IDs 6 and 7. The libXi defect can explain an unexpected ID without
 any device removal. However, a live requested-ID/returned-ID comparison and a
-private patched Proton/HDT run are still needed to establish that it caused
-that particular desktop exit.
+patched desktop acceptance are still needed to establish that it caused that
+particular desktop exit. A private Wine/WPF replay has loaded the corrected
+library and passed HDT window and Arena transitions with the compatibility plugin.
+This verifies runtime compatibility, not long-session desktop stability.
 
 This patch does not handle real device disappearance between open and query.
 A narrowly scoped Wine error guard remains a separate robustness improvement.
-The installed Steam runtime, Proton files, game prefix, and HDT launcher are
-unchanged. The patched library is used only by the isolated check.
+The Steam runtime and Proton files remain unchanged. The launcher supports an
+explicit HDT-only selection; it does not enable the patch by default.
+
+## Optional HDT-only runtime selection
+
+Build the launcher and library bundle from the same checkout:
+
+```sh
+nix build .#hdt-proton --out-link local/hdt-package --max-jobs 1 --cores 2
+nix build .#libxi-steam-runtime --out-link local/libxi-runtime-package --max-jobs 1 --cores 2
+HDT_LIBXI_LIBRARY="$(realpath local/libxi-runtime-package/lib/libXi.so.6)" \
+  local/hdt-package/bin/hdt-proton raw-launch
+```
+
+Use this launch command after closing HDT. For an existing automatic-start
+service, set the variable only on that service and select the matching launcher;
+do not export it globally or add it to Hearthstone's launch options. The library
+bundle retains upstream license notices and the patch. It removes its Nix RUNPATH
+so existing runtime dependencies determine library resolution.
+
+Successful startup prints the selected path. Verify the actual tracker's
+`/proc/PID/maps` contains that path; setting a variable alone is not proof of
+loading. The [private replay](../guides/ui-replay.md#test-an-hdt-only-libxi-runtime)
+also records the selected library's mappings and hash.
+
+Rollback: remove `HDT_LIBXI_LIBRARY` from the HDT-only launch environment and
+restart HDT with the previous launcher. If using a temporary service override,
+remove only that owned override and reload the user service definitions first.
+Neither applying nor reverting this setting requires restarting Hearthstone.
 
 ## Upstream submission draft
 
