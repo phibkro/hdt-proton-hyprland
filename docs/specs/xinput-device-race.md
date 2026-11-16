@@ -23,8 +23,9 @@ fixture. The actual pointer ID is 10, while the error reports another value.
 The desktop's reported `0x158` therefore does not establish which device failed.
 
 The fixture demonstrates a possible failure mechanism. It does not establish
-that device removal triggered the observed desktop crashes. Those crashes have
-no native call stack or device-lifecycle trace.
+that device removal triggered the observed desktop crashes. Later desktop
+captures identify the Wine caller, as described below; they do not establish
+device removal as the cause.
 
 ## The installed driver has an unguarded query
 
@@ -121,3 +122,21 @@ already intercepted Wine/Xlib error; no complete-capture marker was reached.
 The capture now avoids `info sharedlibrary` and saves `/proc` mappings outside
 the debugger. A matching-driver private reproducer and a scoped Wine fix are
 still unverified.
+
+
+## Complete capture and repeated exit
+
+At 19:17:03 Europe/Oslo on 16 November 2026, the revised capture recorded the
+same Wine caller stack, reached its completion marker, and detached normally
+with debugger status zero. GDB did not crash in this capture. The last mapping
+query recorded device ID 18 on the failing thread/display, following repeated
+queries for IDs 6 and 7. The separate observer's initial inventory contained
+neither device 18 nor a subsequent recorded hierarchy addition for that ID.
+This discrepancy is a diagnostic lead, not proof of device removal, memory
+corruption, or the exact triggering event.
+
+A replacement HDT process exited at 19:18:18 with the same mapping-request error.
+It was not attached to the debugger, so this repeat adds an error record but no
+native caller stack. The original complete capture and both error records are
+preserved privately. The installed driver remains unchanged; capture does not
+prevent the fatal Xlib handler from terminating HDT.
