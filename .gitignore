@@ -88,6 +88,7 @@
 !/docs/specs/rust-host.md
 !/docs/specs/structured-setup.md
 !/docs/specs/ui-replay.md
+!/docs/specs/replay-source-prefix.md
 !/docs/specs/xinput-device-race.md
 !/flake.nix
 !/fuzz/
