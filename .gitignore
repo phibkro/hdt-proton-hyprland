@@ -250,3 +250,7 @@
 !/tests/rust-client.rs
 
 !/avalonia/THIRD_PARTY_NOTICES.md
+
+!/src/plugin/NativeClientExport.cs
+
+!/src/plugin/NativeSnapshotWriter.cs

@@ -10,7 +10,7 @@ public sealed class LibraryView : UserControl
 {
     private readonly ClientLibrary _library;
     private string? _editing;
-    private bool _working;
+    private bool _working, _creating, _updatingDeckList;
     private ulong _shownRevision = ulong.MaxValue;
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
     public ListBox Decks { get; } = new() { MinHeight = 120, MaxHeight = 400 };
@@ -41,7 +41,10 @@ public sealed class LibraryView : UserControl
             var content = new DeckContent(uint.Parse(HeroBox.Text ?? ""), uint.Parse(FormatBox.Text ?? ""),
                 Lines(CardsBox.Text).Select(parts => parts.Length == 2 ? new CardCount(uint.Parse(parts[0]), uint.Parse(parts[1])) : throw new FormatException("Cards require DBF ID and count.")).ToArray(),
                 Lines(SideboardsBox.Text).Select(parts => parts.Length == 3 ? new SideboardCard(uint.Parse(parts[0]), uint.Parse(parts[1]), uint.Parse(parts[2])) : throw new FormatException("Sideboards require owner, card and count.")).ToArray());
-            await _library.SaveAsync(_editing, NameBox.Text ?? "", ClassBox.Text ?? "", content, NotesBox.Text ?? "");
+            var id = _editing;
+            await _library.SaveAsync(id, NameBox.Text ?? "", ClassBox.Text ?? "", content, NotesBox.Text ?? "");
+            Edit(_library.State.Decks.Single(deck => deck.Id == (id ?? _library.State.SelectedDeckId)));
+            Decks.SelectedItem = _library.State.Decks.Single(deck => deck.Id == _editing);
         });
         ImportButton.Click += (_, _) => Start(async () =>
         {
@@ -51,13 +54,14 @@ public sealed class LibraryView : UserControl
         ExportButton.Click += (_, _) => ExportSelected();
         CopyButton.Click += (_, _) => Start(async () =>
         {
-            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard is not null) { await clipboard.SetTextAsync(CodeBox.Text ?? ""); _status.Text = "Deck code copied."; }
-        });
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard ?? throw new IOException("Clipboard is unavailable.");
+            if (string.IsNullOrWhiteSpace(CodeBox.Text)) throw new IOException("Export or paste a deck code before copying.");
+            await clipboard.SetTextAsync(CodeBox.Text);
+        }, "Deck code copied.");
         UseButton.Click += (_, _) => { if (_editing is not null) Start(() => _library.SelectAsync(_editing)); };
         ArchiveButton.Click += (_, _) => { if (_editing is not null) Start(async () => { await _library.ArchiveAsync(_editing); ClearEditor(); }); };
         ReloadButton.Click += (_, _) => Start(_library.ReloadAsync);
-        Decks.SelectionChanged += (_, _) => { if (Decks.SelectedItem is DeckEntry deck) Edit(deck); };
+        Decks.SelectionChanged += (_, _) => { if (!_updatingDeckList && Decks.SelectedItem is DeckEntry deck) Edit(deck); };
         _library.Changed += Refresh;
         var columns = new Grid { ColumnDefinitions = new("300,*"), Margin = new(16) };
         var list = new StackPanel { Spacing = 12, Children = { Label("MY DECKS"), NewButton, ReloadButton, Decks, _status } };
@@ -86,7 +90,7 @@ public sealed class LibraryView : UserControl
     }
     private void ClearEditor()
     {
-        _editing = null; Decks.SelectedItem = null;
+        _creating = true; _editing = null; Decks.SelectedItem = null;
         NameBox.Text = ClassBox.Text = HeroBox.Text = CardsBox.Text = SideboardsBox.Text = NotesBox.Text = CodeBox.Text = "";
         FormatBox.Text = "2"; RefreshButtons(); NameBox.Focus();
     }
@@ -99,22 +103,22 @@ public sealed class LibraryView : UserControl
     private void Edit(DeckEntry deck)
     {
         if (_editing != deck.Id) CodeBox.Text = "";
-        _editing = deck.Id; NameBox.Text = deck.Name; ClassBox.Text = deck.HeroClass;
+        _creating = false; _editing = deck.Id; NameBox.Text = deck.Name; ClassBox.Text = deck.HeroClass;
         HeroBox.Text = deck.Content.HeroDbfId.ToString(); FormatBox.Text = deck.Content.Format.ToString();
         CardsBox.Text = string.Join('\n', deck.Content.Cards.Select(card => $"{card.DbfId} {card.Count}"));
         SideboardsBox.Text = string.Join('\n', deck.Content.Sideboards.Select(card => $"{card.OwnerDbfId} {card.DbfId} {card.Count}"));
         NotesBox.Text = deck.Notes; RefreshButtons();
     }
-    private void Start(Func<Task> action)
+    private void Start(Func<Task> action, string? success = null)
     {
         if (_working || _library.Busy) return;
-        PendingAction = RunAsync(action);
+        PendingAction = RunAsync(action, success);
     }
-    private async Task RunAsync(Func<Task> action)
+    private async Task RunAsync(Func<Task> action, string? success)
     {
         _working = true; RefreshButtons();
-        try { await action(); _status.Text = _library.Status; }
-        catch (Exception error) when (error is IOException or System.Text.Json.JsonException or InvalidDataException or FormatException or OverflowException)
+        try { await action(); _status.Text = success ?? _library.Status; }
+        catch (Exception error) when (error is IOException or System.Text.Json.JsonException or InvalidDataException or FormatException or OverflowException or NotSupportedException)
         { _status.Text = error.Message; }
         finally { _working = false; RefreshButtons(); }
     }
@@ -125,9 +129,12 @@ public sealed class LibraryView : UserControl
         {
             _shownRevision = _library.State.Revision;
             var selected = _editing ?? _library.State.SelectedDeckId;
-            Decks.ItemsSource = _library.State.Decks.Where(deck => !deck.Archived).ToArray();
-            Decks.SelectedItem = _library.State.Decks.FirstOrDefault(deck => deck.Id == selected && !deck.Archived)
+            var next = _creating ? null : _library.State.Decks.FirstOrDefault(deck => deck.Id == selected && !deck.Archived)
                 ?? _library.State.Decks.FirstOrDefault(deck => deck.Id == _library.State.SelectedDeckId && !deck.Archived);
+            _updatingDeckList = true;
+            try { Decks.ItemsSource = _library.State.Decks.Where(deck => !deck.Archived).ToArray(); Decks.SelectedItem = next; }
+            finally { _updatingDeckList = false; }
+            if (next is not null && next.Id != _editing) Edit(next);
         }
         RefreshButtons();
     }

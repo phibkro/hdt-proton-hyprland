@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Hdt.Avalonia;
@@ -218,6 +219,8 @@ Click(editor.SaveButton); Wait(editor.PendingAction);
 Check(window.Library.State.Decks.Length == 1 && window.Library.State.Decks[0].Name == "Native fixture deck", "native deck editor saves through real Rust transaction boundary");
 Click(editor.ExportButton); Wait(editor.PendingAction);
 Check(editor.CodeBox.Text?.Contains("AAECAf0EAU0BZAAA") == true, "native export produces independently specified Hearthstone deckstring");
+Click(editor.CopyButton); Wait(editor.PendingAction);
+Check(window.Clipboard is not null && Result(window.Clipboard.TryGetTextAsync()) == editor.CodeBox.Text && editor.Status.Contains("copied"), "native copy button publishes the actual exported deckstring to the isolated clipboard");
 Fill(editor.NameBox, "Imported native fixture");
 Click(editor.ImportButton); Wait(editor.PendingAction);
 Check(window.Library.State.Decks.Length == 2 && editor.NameBox.Text == "Imported native fixture", "native import creates and selects a second persisted deck");
@@ -242,4 +245,127 @@ Check(!window.Library.Ready && window.Library.State.Revision == savedLibrary.Rev
 Click(editor.ReloadButton); Wait(editor.PendingAction);
 Check(window.Library.Ready && window.Library.State.Decks.Length == savedLibrary.Decks.Length && window.Library.State.Matches.Length == 1, "native library recovers from failed import by verifying the actual persisted state");
 window.Close();
+var nativeFile = Path.Combine(evidence, $"native-observation-{Guid.NewGuid():N}.json");
+var nativeLibraryFile = Path.Combine(evidence, $"observed-library-{Guid.NewGuid():N}.json");
+var nativeLibrary = new ClientLibrary(nativeLibraryFile);
+Wait(nativeLibrary.ReloadAsync()); Wait(nativeLibrary.ImportAsync("Observed game fixture", "AAECAf0EAU0BZAAA"));
+var selectedForGame = nativeLibrary.State.SelectedDeckId;
+var nativeSession = Guid.NewGuid().ToString();
+var observedMatch = Guid.NewGuid().ToString();
+NativeObservation NativeFrame(string mode, int sequence, ArenaObservation? arenaFrame = null, MatchRecord[]? matches = null)
+{
+    var time = DateTimeOffset.UtcNow;
+    var menu = mode is "Menu" or "Offline";
+    var arena = (arenaFrame ?? frames[2]) with
+    {
+        SessionId = nativeSession,
+        ObservedAt = time,
+        Sequence = sequence,
+        Mode = mode == "Arena" ? ArenaMode.Drafting : ArenaMode.Inactive,
+        Offers = mode == "Arena" ? (arenaFrame ?? frames[0]).Offers : []
+    };
+    ObservedCard[] card = menu ? [] : [new("fixture-card", 77, "Illustrative observed card", 2, 1, null)];
+    return new(1, nativeSession, sequence, time, NativeAvailability.Available, null, Enum.Parse<NativeMode>(mode), mode == "Arena" ? "DRAFT" : "GAMEPLAY", mode,
+        observedMatch, menu, mode != "Offline", menu ? null : 30, menu ? null : 27, menu ? null : 3, menu ? null : 4,
+        menu ? null : 20, menu ? null : 18, card, card, card, card, arena, matches ?? [], 256);
+}
+var publishFailures = 0;
+using var nativePublisher = new NativeSnapshotWriter(nativeFile,
+    snapshot => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(snapshot, ReplaySource.JsonOptions),
+    () => Interlocked.Increment(ref publishFailures));
+var startNative = NativeFrame("Constructed", 1);
+nativePublisher.Offer(startNative);
+PumpUntil(() => File.Exists(nativeFile), "actual optional snapshot publisher emits initial observation");
+window = new MainWindow(new(null, Path.Combine(evidence, "observed-settings.json"), ClientData: nativeLibraryFile, NativeState: nativeFile));
+window.Show(); Wait(window.Initialization);
+var nativeTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+Check(window.SelectedPage == 5 && window.GameView.ModeText.Contains("Constructed") && window.GameView.CardCount == 4, "native game view consumes actual worker publication through bounded Rust reader");
+window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-constructed.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+Click((TabItem)nativeTabs.Items[1]!);
+nativePublisher.Offer(NativeFrame("Arena", 2, frames[0]));
+PumpUntil(() => window.OfferCount == 3 && window.PickedCount == 0, "real native poll observes initial live-contract offers");
+Check(window.OfferCount == 3, "native acquisition contract supplies offers without replay navigation");
+nativePublisher.Offer(NativeFrame("Arena", 3, frames[1]));
+PumpUntil(() => window.OfferCount == 2 && window.PickedCount == 1, "real native poll replaces offers and picks");
+Check(!window.NextButton.IsEnabled && window.PickedCount == 1, "live observation replacement has no replay-next semantics");
+window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-observed-arena.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+Click((TabItem)nativeTabs.Items[0]!);
+Fill(window.DeckLibrary.NotesBox, "Unsaved note must survive observed history");
+var observedResult = new MatchRecord(observedMatch, null, DateTimeOffset.UtcNow.ToString("o"), "Constructed fixture", "Win", "Mage", "Warrior", 8, null, "Anonymous source fixture");
+nativePublisher.Offer(NativeFrame("Battlegrounds", 4, matches: [observedResult]));
+PumpUntil(() => window.GameView.ModeText.Contains("Battlegrounds") && window.Library.State.Matches.Length == 1, "native mode transition records supplied completed game");
+Check(window.OfferCount == 0 && window.Library.State.Matches[0].DeckId == selectedForGame, "leaving Arena clears offers and associates only previously observed native tracking selection");
+Check(window.DeckLibrary.NotesBox.Text == "Unsaved note must survive observed history", "background history transactions preserve unsaved native deck edits");
+var historyRevision = window.Library.State.Revision;
+Wait(window.RefreshNativeAsync());
+Check(window.Library.State.Revision == historyRevision, "repeated observation does not duplicate history or rewrite the library");
+Click((TabItem)nativeTabs.Items[5]!);
+window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-battlegrounds.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+var staleNative = NativeFrame("Arena", 5, frames[1]);
+staleNative = staleNative with { ObservedAt = DateTimeOffset.UtcNow.AddSeconds(-10), Arena = staleNative.Arena! with { ObservedAt = DateTimeOffset.UtcNow.AddSeconds(-10) } };
+nativePublisher.Offer(staleNative);
+PumpUntil(() => window.GameView.ModeText.Contains("unavailable"), "native source freshness clears previous game data");
+Check(window.GameView.CardCount == 0 && window.OfferCount == 0 && window.PickedCount == 0, "stale native source cannot leave cards, picks or offers apparently live");
+window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-observation-stale.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+nativeSession = Guid.NewGuid().ToString();
+nativePublisher.Offer(NativeFrame("Menu", 1));
+PumpUntil(() => window.GameView.ModeText.StartsWith("Menu"), "native source recovers with a fresh process session");
+Check(window.GameView.CardCount == 0 && window.OfferCount == 0, "new source session preserves explicit menu transition without resurrecting prior game");
+var rollback = NativeFrame("Constructed", 2);
+nativePublisher.Offer(rollback);
+PumpUntil(() => window.GameView.ModeText.StartsWith("Constructed"), "fresh native source advances");
+nativePublisher.Offer(NativeFrame("Battlegrounds", 1));
+PumpUntil(() => window.GameView.ModeText.Contains("unavailable"), "backwards sequence is rejected");
+Check(window.GameView.CardCount == 0, "backwards native source sequence cannot replace current facts");
+nativePublisher.Offer(NativeFrame("Offline", 3));
+PumpUntil(() => window.GameView.ModeText.StartsWith("Offline"), "native observation recovers from backwards sequence");
+Check(window.GameView.CardCount == 0 && publishFailures == 0, "optional publisher and native consumer recover without leaking prior game facts");
+nativePublisher.Offer(new { schemaVersion = 1, sessionId = nativeSession, sequence = 4, observedAt = DateTimeOffset.UtcNow, availability = "Unavailable", error = "Anonymous producer failure fixture" });
+PumpUntil(() => window.GameView.ModeText.Contains("unavailable"), "partial unavailable producer envelope clears prior data");
+Check(window.GameView.CardCount == 0 && window.OfferCount == 0, "explicit producer capture failure never renders partial game facts");
+nativePublisher.Offer(NativeFrame("Menu", 5));
+PumpUntil(() => window.GameView.ModeText.StartsWith("Menu"), "capture failure recovers on fresh complete publication");
+window.Close(); nativePublisher.Dispose(); Wait(nativePublisher.Completion);
+Check(nativePublisher.Completion.IsCompletedSuccessfully, "owned optional publisher worker exits after native window closes");
+var failedOutput = Path.Combine(evidence, $"publisher-block-{Guid.NewGuid():N}", "state.json");
+var publicationFailed = 0;
+using var failedPublisher = new NativeSnapshotWriter(failedOutput, _ => [123, 125], () => Interlocked.Increment(ref publicationFailed));
+failedPublisher.Offer(new object());
+PumpUntil(() => Volatile.Read(ref publicationFailed) == 1, "publisher IO failure remains off dispatcher");
+Directory.CreateDirectory(Path.GetDirectoryName(failedOutput)!);
+failedPublisher.Offer(new object());
+PumpUntil(() => File.Exists(failedOutput), "actual publisher recovers after owned storage becomes available");
+Check(File.ReadAllText(failedOutput) == "{}", "optional publisher failure and recovery preserve complete atomic snapshots");
+failedPublisher.Dispose(); Wait(failedPublisher.Completion);
+
+var oversizedOutput = Path.Combine(evidence, $"publisher-size-{Guid.NewGuid():N}.json");
+var oversizedFailures = 0;
+using var boundedPublisher = new NativeSnapshotWriter(oversizedOutput, snapshot => (byte[])snapshot, () => Interlocked.Increment(ref oversizedFailures));
+boundedPublisher.Offer(new byte[2 * 1024 * 1024 + 1]);
+PumpUntil(() => Volatile.Read(ref oversizedFailures) == 1, "publisher rejects excess bytes");
+Check(!File.Exists(oversizedOutput), "oversized producer publication cannot expose an incomplete snapshot");
+boundedPublisher.Offer(new byte[] { 123, 125 });
+PumpUntil(() => File.Exists(oversizedOutput), "publisher recovers after excess output");
+boundedPublisher.Dispose(); Wait(boundedPublisher.Completion);
+Check(File.ReadAllText(oversizedOutput) == "{}", "producer publication recovers after byte-bound failure");
+var latestOutput = Path.Combine(evidence, $"publisher-latest-{Guid.NewGuid():N}.json");
+using var serializationEntered = new ManualResetEventSlim();
+using var allowSerialization = new ManualResetEventSlim();
+var serialized = 0;
+var serializationThread = 0;
+var uiThread = Environment.CurrentManagedThreadId;
+using var latestPublisher = new NativeSnapshotWriter(latestOutput, snapshot =>
+{
+    Interlocked.Exchange(ref serializationThread, Environment.CurrentManagedThreadId);
+    if (Interlocked.Increment(ref serialized) == 1) { serializationEntered.Set(); allowSerialization.Wait(); }
+    return System.Text.Encoding.UTF8.GetBytes(snapshot.ToString()!);
+}, () => throw new InvalidOperationException("Unexpected publisher failure"));
+latestPublisher.Offer(1);
+PumpUntil(() => serializationEntered.IsSet, "producer worker begins serialization independently");
+for (var sequence = 2; sequence <= 1000; sequence++) latestPublisher.Offer(sequence);
+allowSerialization.Set();
+PumpUntil(() => File.Exists(latestOutput) && File.ReadAllText(latestOutput) == "1000", "slow producer converges to newest complete snapshot");
+latestPublisher.Dispose(); Wait(latestPublisher.Completion);
+Check(serialized == 2 && serializationThread != uiThread, "producer serializes off dispatcher and coalesces pending captures instead of growing an unbounded queue");
+
 Console.WriteLine($"{checks} checks passed; renderer evidence: {evidence}");

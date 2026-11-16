@@ -2,7 +2,7 @@
 
 Feature IDs: `native-window`, `native-draft-replay`, `native-preferences`,
 `bounded-snapshot-io`, `proton-status-bridge`, `native-deck-library`,
-`native-deckstring`, `native-history`. These are preview routes; passing
+`native-deckstring`, `native-history`, `native-observation-bridge`. These are preview routes; passing
 them establishes no live game offer/rating/overlay parity.
 
 ## Preconditions and doctor
@@ -86,3 +86,26 @@ recover after explicit reload. The Rust CLI journey additionally verifies
 revision conflict, exact unchanged stored bytes, sideboard codec behavior and
 new file mode 0600. No card catalog, legality certification, automatic Windows
 history import or write into Hearthstone is implied by these routes.
+
+
+## Optional native observation bridge
+
+The default rendered journey links the same `NativeSnapshotWriter` as the
+optional source-only MIT plugin exporter. Require worker publication → actual
+Rust file reader → real timer/control replacement across constructed, Arena,
+Battlegrounds, menu, stale, unavailable and recovered sessions. Inspect
+`native-constructed.png`, `native-observed-arena.png`, `native-battlegrounds.png`
+and `native-observation-stale.png`. Stable completed-match IDs must deduplicate,
+associate native decks only after observing an in-progress match, and preserve
+unsaved deck notes during automatic history writes. The publisher must coalesce
+a blocked worker's pending snapshots, reject excess bytes, recover from missing
+owned storage and exit when disposed. This is producer IO/consumer acceptance
+with anonymous fixture observations, **not** proof of HDT model capture or real
+game acquisition. The latter requires separately authorized private runtime
+acceptance. Never deploy into the operator's prefix or restart the game here.
+
+When complete original reference assemblies are available locally, compile the
+full Framework source with `tooling/net/HdtAnalysis.csproj`, explicit
+`AnalysisScope=full` and `HdtAppDir`, without stubs. Record binary hashes and zero
+warnings/errors. Preserve no proprietary binary in source control. The export
+is disabled unless explicitly configured; its output directory must be private.

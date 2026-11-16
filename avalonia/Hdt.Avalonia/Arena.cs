@@ -46,6 +46,11 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
     public async Task<IReadOnlyList<ArenaObservation>> ReadAsync(CancellationToken cancellation = default)
     {
         var frames = await SnapshotFiles.ReadJsonAsync<ArenaObservation[]>(path, SnapshotFiles.ReplayBytes, cancellation).ConfigureAwait(false);
+        Validate(frames);
+        return frames;
+    }
+    public static void Validate(ArenaObservation[] frames)
+    {
         if (frames.Length is < 1 or > 4096) throw new InvalidDataException("Replay requires 1..4096 observations.");
         var previous = -1;
         foreach (var frame in frames)
@@ -76,12 +81,13 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
                 throw new InvalidDataException("Pick index must match picked cards, selected card must be picked, and inactive observations must have no offers.");
             previous = frame.Sequence;
         }
-        return frames;
     }
     public static JsonSerializerOptions JsonOptions { get; } = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true,
-        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter<ArenaMode>(allowIntegerValues: false) }
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter<ArenaMode>(allowIntegerValues: false),
+            new System.Text.Json.Serialization.JsonStringEnumConverter<NativeMode>(allowIntegerValues: false),
+            new System.Text.Json.Serialization.JsonStringEnumConverter<NativeAvailability>(allowIntegerValues: false) }
     };
 }

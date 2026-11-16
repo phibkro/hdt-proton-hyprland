@@ -17,7 +17,7 @@ internal static class Program
         catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
     }
 }
-public sealed record LaunchOptions(string? Replay, string Settings, string? ProtonState = null, string? ClientData = null)
+public sealed record LaunchOptions(string? Replay, string Settings, string? ProtonState = null, string? ClientData = null, string? NativeState = null)
 {
     public static LaunchOptions Current { get; set; } = new(null, DefaultSettings);
     private static string DefaultSettings => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hdt-avalonia", "settings.json");
@@ -26,16 +26,19 @@ public sealed record LaunchOptions(string? Replay, string Settings, string? Prot
         string? replay = null;
         string? protonState = null;
         string? clientData = null;
+        string? nativeState = null;
         var settings = DefaultSettings;
         for (var i = 0; i < args.Length; i++)
         {
             if (args[i] == "--replay" && i + 1 < args.Length) replay = args[++i];
             else if (args[i] == "--settings" && i + 1 < args.Length) settings = args[++i];
             else if (args[i] == "--proton-state" && i + 1 < args.Length) protonState = args[++i];
+            else if (args[i] == "--native-state" && i + 1 < args.Length) nativeState = args[++i];
             else if (args[i] == "--client-data" && i + 1 < args.Length) clientData = args[++i];
-            else throw new ArgumentException("Usage: Hdt.Avalonia [--replay FILE] [--settings FILE] [--proton-state FILE] [--client-data FILE]");
+            else throw new ArgumentException("Usage: Hdt.Avalonia [--replay FILE] [--settings FILE] [--proton-state FILE] [--client-data FILE] [--native-state FILE]");
         }
-        return new(replay, settings, protonState, clientData);
+        if (replay is not null && nativeState is not null) throw new ArgumentException("Choose replay acquisition or native observation acquisition explicitly.");
+        return new(replay, settings, protonState, clientData, nativeState);
     }
 }
 public sealed class App : Application

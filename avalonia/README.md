@@ -7,8 +7,9 @@ match-history view, an Arena replay view and local Arena preferences. It never r
 ```
 Arena observation replay ──validated v1 contract──▶ native draft view
 Native deck editor ────────Rust transactions─────▶ private native library
-MIT Proton plugin export ──read-only status──────▶ connection/status text
-                                                    (no cards in export)
+MIT Proton status export ──read-only status──────▶ connection/status text
+Optional observation export ──validated v1───────▶ native game / Arena / history
+                       (source-only; live installation not changed)
 ```
 
 ## Run
@@ -61,8 +62,9 @@ revision-checked transactions under a regular-file lock, atomic same-directory
 replacement, file/directory synchronization and private newly created files.
 Requests travel through bounded stdin rather than process arguments. A conflict
 or uncertain failure disables mutations until **Reload library** verifies disk.
-**Stats** displays persisted supplied match records; automatic match acquisition
-is pending the observation producer. It does not invent game history.
+**Stats** displays persisted supplied match records. The optional observation
+source can ingest completed games observed in its current session; Windows HDT
+database import is absent. It does not invent game history.
 
 Settings default to the platform's LocalApplicationData `hdt-avalonia/settings.json`.
 They are separate from Windows HDT settings and use an atomic same-directory
@@ -162,14 +164,15 @@ regular-file/fault acceptance.
 | Synergy calculation | Native | Enabled relations plus picked enhancer multiplicity, excluding overlap |
 | Underground color / inactive transition | Native rendering, replay acquisition | Observed mode drives border; inactive has no offers |
 | Existing Proton acquisition state | Read-only bridge, status only | Existing MIT export fields; no live card/pick/score export exists |
-| Live card offers / selections / scores | Absent | Requires a separately authorized producer of the v1 observation contract |
+| Live card offers / picked deck / scores | Native consumer + optional source-only Proton producer | Real public-model reference compile and owned publication/polling journey; actual game acquisition remains unverified |
 | HSReplay login, entitlement and rating requests | Absent | No claim that upstream acquisition is a public/free API |
-| HearthMirror / game memory / log watcher | Absent | Separate future acquisition adapter, no native port yet |
+| HearthMirror / game memory / log watcher | Retained Proton acquisition when optional producer is used | No native memory/log acquisition port; bridge reads public observed models only |
 | Hero/hero-power/package selection, redraft, related tooltips | Absent | Separate observation variants and views required |
 | In-game overlay placement/click-through | Absent | Separate compositor/window integration; ordinary window only |
 | Deck editing / notes / archive / selection | Native | Real private library, revision conflicts, stable IDs, atomic persistence; no game write |
 | Hearthstone deckstring import / export | Native, structural validation | Golden version-1 bytes, comments, sideboards; no current catalog / legality check |
-| Match history / basic win-loss counts | Native view and storage; supplied acquisition | Deduplicated records; automatic game import and richer analysis pending |
+| Match history / basic win-loss counts | Native storage/view + optional completed-observation ingestion | Stable source IDs deduplicate; native deck association only after observing match start; Windows database import absent |
+| Menu / constructed / Battlegrounds state and known cards | Native consumer + optional source-only Proton producer | Owned worker → Rust file reader → rendered timer journey; no combat odds or recommendations |
 | Upstream assets, localization, exact styling | Absent | No licensed artwork or fonts copied; native Fluent controls |
 
 ## Observation boundary
@@ -190,11 +193,67 @@ implements card acquisition. `ProtonStateReader` is a separate status contract,
 because the existing producer has different semantics and does not have the
 fields needed to implement `IArenaObservationSource`.
 
-The next slice is a versioned, account-free observation exporter owned by our MIT
-plugin, with upstream type access independently checked against the installed
-assembly. It must carry session/time/mode, offer IDs, picked IDs and nullable score
-availability; atomic snapshot publication and stale/session-change handling need
-real Proton-to-native acceptance. No guessed reflection bridge is included here.
+## Optional native observation bridge
+
+The original [NativeClientExport](../src/plugin/NativeClientExport.cs) is an
+opt-in source-only extension to our MIT plugin. `HDT_NATIVE_CLIENT_FILE` enables
+it; absence preserves the existing plugin behavior. It reads public cached HDT
+models on their UI owner, copies only bounded primitive/string/card observations,
+and sends the immutable projection to one latest-only worker. Serialization,
+file creation, flush and atomic replacement run on that worker. It makes no
+HSReplay request, acquires no game memory, reads no account identifiers and sends
+no game input. Unknown base/dynamic ratings stay null. The producer's last-selected
+card ID is explicitly unavailable; picked tiles and counts are observed facts.
+
+The Rust launcher's optional `HDT_NATIVE_CLIENT_FILE` setting requires an absolute
+host file in an existing directory owned by the current user with no group/other
+access. It rejects a final symlink/nonregular target and converts the path for
+Wine. This only configures a future opted-in launch; no installation/restart or
+live-prefix change was performed for this preview. Native launch uses the same
+host path, explicitly selecting acquisition instead of replay:
+
+```sh
+dotnet run --no-build --project Hdt.Avalonia -- \
+  --native-state /absolute/private/directory/native-observation.json \
+  --settings /absolute/private/directory/native-settings.json \
+  --client-data /absolute/private/directory/native-library.json
+```
+
+`--replay` and `--native-state` are mutually exclusive. The older `--proton-state`
+visibility/status projection remains separate and cannot supply card data.
+`NativeObservation` and its validator in
+[NativeObservation.cs](Hdt.Avalonia/NativeObservation.cs) define the native v1
+consumer boundary: own session/sequence/time, explicit availability and mode,
+known cards/counts/health, an identity-matched Arena observation and anonymous
+completed matches. The source never exports opponent hand or secret card IDs.
+Offline/menu snapshots clear previous game facts. Missing, invalid, stale,
+future, backwards and explicitly unavailable inputs clear all native cards,
+picks and offers; fresh complete sessions recover. A dispatcher freshness guard
+also expires already rendered facts while another asynchronous operation waits.
+
+Completed games use new random IDs owned by this source, never upstream game,
+account or player IDs. The producer retains the latest **256** completed records
+in memory for its current process session. Polling can miss games that finish
+between samples or before the source starts; this is not a historical database
+import or an exactly-once durable game event journal. Native ingestion writes at
+most one new/changed history record per poll and deduplicates stable identities.
+A native deck association is made only if the client observed that match in
+progress with a native selected deck. History arriving after startup otherwise
+has no inferred deck association. Automatic history transactions preserve unsaved
+deck edits.
+
+Verification is deliberately split. The producer compiles as C# 5/net472 against
+real HDT reference binaries (HDT exe SHA256
+`65d66314dddd8a36588a83b5d60deebea8ee2e758c6b91751838d663d0ae7586`), with no
+stubs and no copied binaries. The native acceptance driver links the **same**
+`NativeSnapshotWriter`, publishes anonymous illustrative observations through its
+actual worker/atomic file boundary, reads through the Rust child, and drives
+rendered constructed/Arena/Battlegrounds/menu/stale/recovery/history views. It
+also checks publisher failure/recovery, byte bounds and latest-only coalescing.
+Screenshots are `native-constructed.png`, `native-observed-arena.png`,
+`native-battlegrounds.png` and `native-observation-stale.png`. These checks do
+**not** execute cached HDT model capture inside a real game. Live Proton-to-native
+acquisition acceptance remains outstanding; no installed plugin was modified.
 
 ## Provenance and licensing
 

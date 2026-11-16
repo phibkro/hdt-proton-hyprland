@@ -15,6 +15,12 @@ public sealed class MainWindow : Window
     private readonly TextBlock _preferencesStatus = Text("Loading local preferences…", 13);
     private readonly TextBlock _connection = Text("Reading Proton status…", 13);
     private readonly ProtonStateReader? _protonReader;
+    private readonly NativeObservationReader? _nativeReader;
+    private readonly global::Avalonia.Threading.DispatcherTimer? _nativeTimer;
+    private bool _refreshingNative;
+    private DateTimeOffset _nativeObservedAt;
+    private readonly Dictionary<string, string?> _matchDecks = new();
+    public NativeGameView GameView { get; } = new();
     private readonly Button _openButton = new() { Content = "Open replay…", IsEnabled = false };
     public Task Initialization { get; }
     public Task PendingPreferences { get; private set; } = Task.CompletedTask;
@@ -85,7 +91,8 @@ public sealed class MainWindow : Window
             new() { Header = "Arena Draft", Content = content },
             new() { Header = "Stats", Content = new HistoryView(Library) },
             new() { Header = "Options", Content = optionsPane },
-            new() { Header = "Help", Content = Notice("Migration preview", "Arena observations → native model → Avalonia controls. Replay only; game memory, login, HSReplay acquisition and overlays are absent. No actions are sent to Hearthstone.") }
+            new() { Header = "Help", Content = Notice("Migration preview", "Native deck library and Arena rendering. Optional read-only Proton observations provide known cards and supplied history; native acquisition, account login, combat odds and overlays are not implemented. No actions are sent to Hearthstone.") },
+            new() { Header = "Live Game", Content = GameView }
         },
             SelectedIndex = 1
         };
@@ -95,7 +102,7 @@ public sealed class MainWindow : Window
             LibraryAction("New", () => { _tabs.SelectedIndex = 0; DeckLibrary.NewDeck(); }),
             LibraryAction("Import", () => { _tabs.SelectedIndex = 0; DeckLibrary.FocusImport(); }),
             LibraryAction("Export", () => { _tabs.SelectedIndex = 0; DeckLibrary.ExportSelected(); }), Navigate("Stats", 2),
-            Missing("HSReplay.net", "Account login and authenticated acquisition are not migrated."), Navigate("Options", 3), Navigate("Help", 4)
+            Missing("HSReplay.net", "Account login and authenticated acquisition are not migrated."), Navigate("Options", 3), Navigate("Help", 4), Navigate("Live Game", 5)
         }
         };
         var root = new DockPanel();
@@ -109,7 +116,20 @@ public sealed class MainWindow : Window
             _protonTimer = new() { Interval = TimeSpan.FromSeconds(1) };
             _protonTimer.Tick += async (_, _) => await RefreshProtonAsync();
         }
-        Closed += (_, _) => { _lifetime.Cancel(); _protonTimer?.Stop(); };
+        if (options.NativeState is not null)
+        {
+            if (options.Replay is not null) throw new ArgumentException("Choose one Arena acquisition source explicitly.");
+            _nativeReader = new NativeObservationReader(options.NativeState);
+            _nativeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+            _nativeTimer.Tick += async (_, _) =>
+            {
+                if (_nativeObservedAt != default && (DateTimeOffset.UtcNow - _nativeObservedAt).TotalSeconds > 5)
+                    ClearNativeFacts("Last observation is stale.");
+                await RefreshNativeAsync();
+            };
+            _tabs.SelectedIndex = 5;
+        }
+        Closed += (_, _) => { _lifetime.Cancel(); _protonTimer?.Stop(); _nativeTimer?.Stop(); };
         Initialization = InitializeAsync(options);
     }
     private async Task InitializeAsync(LaunchOptions options)
@@ -124,14 +144,16 @@ public sealed class MainWindow : Window
         { _preferencesStatus.Text = $"Preferences unavailable; defaults shown: {error.Message}"; }
         if (_lifetime.IsCancellationRequested) return;
         RestoreToggles();
-        ScoresToggle.IsEnabled = SynergiesToggle.IsEnabled = _openButton.IsEnabled = true;
+        ScoresToggle.IsEnabled = SynergiesToggle.IsEnabled = true;
+        _openButton.IsEnabled = _nativeReader is null;
         try { await Library.ReloadAsync(); }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
         catch (Exception error) when (InputFailure(error)) { /* The library exposes its explicit failure and reload action. */ }
         if (options.Replay is not null) await TryLoadAsync(options.Replay);
         if (_lifetime.IsCancellationRequested) return;
         await RefreshProtonAsync();
-        if (!_lifetime.IsCancellationRequested) _protonTimer?.Start();
+        await RefreshNativeAsync();
+        if (!_lifetime.IsCancellationRequested) { _protonTimer?.Start(); _nativeTimer?.Start(); }
     }
     private static bool InputFailure(Exception error) => error is IOException or System.Text.Json.JsonException
         or InvalidDataException or UnauthorizedAccessException;
@@ -148,6 +170,54 @@ public sealed class MainWindow : Window
         catch (Exception error) when (InputFailure(error))
         { if (!_lifetime.IsCancellationRequested) _connection.Text = $"Proton status unavailable: {error.Message}"; }
         finally { _refreshingProton = false; }
+    }
+
+    public async Task RefreshNativeAsync()
+    {
+        if (_nativeReader is null || _refreshingNative || _lifetime.IsCancellationRequested) return;
+        _refreshingNative = true;
+        try
+        {
+            var observation = await _nativeReader.ReadAsync(_lifetime.Token);
+            if (_lifetime.IsCancellationRequested) return;
+            _nativeObservedAt = observation.ObservedAt;
+            GameView.Apply(observation);
+            _frames = [observation.Arena!]; _index = 0; Render();
+            _status.Text = $"Game observation file • {observation.Mode} • updated {observation.ObservedAt.ToLocalTime():T}";
+            if (observation.MatchId is not null && !observation.InMenu && observation.IsRunning
+                && !observation.CompletedMatches!.Any(match => match.Id == observation.MatchId)
+                && !_matchDecks.ContainsKey(observation.MatchId))
+            {
+                if (_matchDecks.Count >= 256) _matchDecks.Clear();
+                _matchDecks.Add(observation.MatchId, Library.State.SelectedDeckId);
+            }
+            var existingById = Library.State.Matches.ToDictionary(match => match.Id);
+            foreach (var supplied in observation.CompletedMatches!)
+            {
+                existingById.TryGetValue(supplied.Id, out var existing);
+                var deck = existing?.DeckId ?? (_matchDecks.TryGetValue(supplied.Id, out var selected) ? selected : null);
+                var record = supplied with { DeckId = deck };
+                if (record == existing) continue;
+                if (Library.Busy || !Library.Ready) { _status.Text += " • history pending: reload/finish library action"; break; }
+                await Library.RecordAsync(record);
+                _status.Text += " • history record synchronized";
+                break; // Bound history work per poll; keep current game observations responsive.
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception error) when (InputFailure(error))
+        {
+            if (_lifetime.IsCancellationRequested) return;
+            ClearNativeFacts(error.Message);
+        }
+        finally { _refreshingNative = false; }
+    }
+
+    private void ClearNativeFacts(string reason)
+    {
+        GameView.Unavailable(reason); _frames = []; _index = 0; Render();
+        _summary.Text = "Arena observations unavailable"; _observation.Text = "Previous offers and picks cleared.";
+        _status.Text = $"Native observation/history unavailable: {reason}";
     }
 
     private static MenuItem LibraryAction(string label, Action action)
@@ -220,7 +290,7 @@ public sealed class MainWindow : Window
     private void Render()
     {
         _offers.Children.Clear(); _deck.Children.Clear();
-        if (_frames.Count == 0) return;
+        if (_frames.Count == 0) { NextButton.IsEnabled = ResetButton.IsEnabled = false; return; }
         var frame = _frames[_index];
         _summary.Text = $"{frame.Hero} • {(frame.Underground ? "Underground Arena" : "Arena")} • {frame.Mode} • {frame.PickedDeck.Length} cards picked";
         _observation.Text = $"Observation {_index + 1}/{_frames.Count} • {frame.Description}";

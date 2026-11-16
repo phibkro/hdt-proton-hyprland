@@ -42,6 +42,7 @@ public sealed class ProtonCompatibility : IPlugin
     int[] lastPreviewBounds;
     bool alphaFloorApplied;
     PortableOverlayInput portableInput;
+    NativeClientExport nativeClientExport;
     bool mouseDiagnosticsAttached;
     int overlayMouseDowns, overlayMouseUps;
     string lastMouseTargetType;
@@ -52,6 +53,7 @@ public sealed class ProtonCompatibility : IPlugin
     static int arenaParticleEmittersSuppressed;
     public void OnLoad()
     {
+        nativeClientExport = NativeClientExport.Start();
         var inputFile = Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
         if (!String.IsNullOrEmpty(inputFile) && Environment.GetEnvironmentVariable("HDT_FLIGHT_RECORDER") != "0")
         {
@@ -83,6 +85,7 @@ public sealed class ProtonCompatibility : IPlugin
     }
     public void OnUnload()
     {
+        if (nativeClientExport != null) { nativeClientExport.Dispose(); nativeClientExport = null; }
         if (portableInput != null) { portableInput.Stop(); portableInput = null; }
         CompositionTarget.Rendering -= ObserveRendering;
         if (battlegroundsTabs != null) battlegroundsTabs.PropertyChanged -= ObserveBattlegroundsTab;
@@ -229,6 +232,7 @@ public sealed class ProtonCompatibility : IPlugin
     }
     void UpdateUi()
     {
+        if (nativeClientExport != null) nativeClientExport.Capture();
         var overlay = Api.OverlayWindow;
         if (overlay != null && Environment.GetEnvironmentVariable("HDT_DESKTOP_BACKEND") == "x11")
         {
