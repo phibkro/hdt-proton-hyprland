@@ -13,7 +13,7 @@ for(const scenario of ["restart","game-owned","no-game","ambiguous"]) {
       const tracker={class:"steam_app_123",title:"Hearthstone Deck Tracker",pid:process.pid};
       await Bun.write(join(dir,"clients"),JSON.stringify(scenario==="ambiguous"?[tracker,tracker]:scenario==="no-game"?[]:[game]));
       for(const [name,source] of Object.entries({
-        bun:'printf "%s\\n" steam_app_123',
+        bun:'if [ "$1" = src/desktop/cli.ts ]; then case "$2" in kind) printf "%s\\n" hyprland ;; windows) cat "$TEST_DIR/clients" ;; esac; else printf "%s\\n" steam_app_123; fi',
         hyprctl:'cat "$TEST_DIR/clients"',
         systemctl:`if [ "$2" = show ]; then printf '%s\\n' "$TEST_GROUP"; else printf '%s\\n' "$*" >> "$TEST_DIR/calls"; fi`,
         "notify-send":'exit 0',

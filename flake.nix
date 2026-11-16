@@ -39,10 +39,24 @@
           cd source
           export HOME="$TMPDIR/home" HS_APP_ID=1234567890
           mkdir -p "$HOME"
-          bun test ./tests/config.test.ts ./tests/steam-launch.test.ts ./tests/desktop.test.ts
+          bun test ./tests/config.test.ts ./tests/steam-launch.test.ts ./tests/desktop.test.ts ./tests/desktop-backend.test.ts ./tests/trace-export.test.ts
           shellcheck scripts/*.sh
           actionlint .github/workflows/check.yml
           touch "$out"
+        '';
+        desktop-x11 = pkgs.runCommand "hdt-desktop-x11-check" {
+          nativeBuildInputs = with pkgs; [ bun bash coreutils ripgrep xorg.xorgserver xorg.xprop openbox xdotool stdenv.cc pkg-config libx11 libxext ];
+        } ''
+          mkdir -p source/scripts source/tests
+          cp ${./scripts/check-x11.sh} source/scripts/check-x11.sh
+          cp ${./tests/x11-conformance.ts} source/tests/x11-conformance.ts
+          export HDT_X11_TEST_RUN="$TMPDIR/desktop-test" HDT_X11_PRIVATE=1
+          export HOME="$HDT_X11_TEST_RUN/home" XDG_RUNTIME_DIR="$HDT_X11_TEST_RUN/runtime"
+          mkdir -p "$HDT_X11_TEST_RUN"
+          cp ${package}/libexec/hdt-proton/x11-desktop "$HDT_X11_TEST_RUN/"
+          cc -Wall -Wextra -Werror ${./tests/x11-fixture.c} -o "$HDT_X11_TEST_RUN/x11-fixture" $(pkg-config --cflags --libs x11 xext)
+          bash source/scripts/check-x11.sh --inside openbox
+          cp "$HDT_X11_TEST_RUN/conformance.json" "$out"
         '';
       };
     };

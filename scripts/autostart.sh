@@ -3,13 +3,16 @@ set -euo pipefail
 # Run inside the project devenv. Config remains authoritative for the Steam ID.
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 window_class=$(bun -e 'import {windowClass} from "./src/runtime/config"; console.log(windowClass)')
+if [[ $(bun src/desktop/cli.ts kind) == x11 ]]; then
+    bash scripts/hdt.sh build-desktop-helper
+fi
 : "${XDG_RUNTIME_DIR:?A graphical login is required}"
 exec 9>"$XDG_RUNTIME_DIR/hdt-proton-${window_class}.lock"
 flock -n 9 || { echo 'HDT automatic startup already has an owner.'; exit 0; }
 seen_game=''
 echo 'HDT automatic startup is watching for Hearthstone.'
 while true; do
-    clients=$(hyprctl -j clients)
+    clients=$(bun src/desktop/cli.ts windows)
     game=$(jq -er --arg class "$window_class" '
       [.[] | select(.class == $class and .title == "Hearthstone") | .pid] | unique |
       if length > 1 then error("Multiple Hearthstone processes; refusing to guess")

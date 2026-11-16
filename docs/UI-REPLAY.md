@@ -1,5 +1,7 @@
 # Replay HDT UI transitions in isolation
 
+For the optional stall detector and trace-export checks, see [freeze diagnostics](DIAGNOSTICS.md). Add `--diagnostics` to a run with `--with-plugin` to exercise them.
+
 Run the real HDT main window and Arena controls on a private X11 desktop. These tests leave the running game and tracker alone. See [component boundaries](COMPONENTS.md) for the distinction between draft updates, match tracking, and presentation.
 
 ## Prepare the private seed
@@ -55,6 +57,30 @@ devenv shell -- hdt-replay run --plaque-level 5
 This command reproduced `88980406` in the tested environment and is expected to fail there. The score graphics can freeze while exported model state still advances. Keep its logs and failure screenshot as regression evidence.
 
 To retain level-five artwork while suppressing particles in the fixture alone, add `--without-particles`. To compare badges without the level-five particle effect, use `--plaque-level 4`. Omitting `--plaque-level` tests levels 1, 3, and 5 together.
+
+## Check the Battlegrounds card-back tab
+
+Run the installed tab command and render its minion-browser view:
+
+```sh
+devenv shell -- hdt-replay run --with-plugin --plaque-level 5 --battlegrounds-tabs
+```
+
+Inspect `bgs-tab-*.json`, the matching screenshots, and `host.log`. The sequence opens and closes the tab three times and clicks Settings after each transition. An open tab must contain a visible `BattlegroundsMinions` view with positive height.
+
+This fixture does not replay combat, live minion-pool updates, or a pointer click on the card-back icon. A passing command sequence does not rule out the reported combat-time freeze. The [compatibility record](COMPATIBILITY.md) tracks that separate failure.
+
+## Check portable X11 input
+
+Run the actual plugin-exported control regions through the portable bridge:
+
+```sh
+devenv shell -- hdt-replay run --with-plugin --plaque-level 5 --desktop-input
+```
+
+The test adds a registered WPF button and a separate Win32 game-window stand-in to the private display. It checks empty-space input, the WPF button's native click handler, and input after leaving the button. It never launches Hearthstone.
+
+If the control click fails, the test retains focus and activation diagnostics and returns failure. Those diagnostic attempts cannot turn the failed journey into a pass. See [Desktop backend development](DESKTOPS.md) for current limits.
 
 ## Check failure handling
 

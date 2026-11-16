@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +13,8 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Data;
+using System.Windows.Input;
 
 class ReplayHost {
     static string output;
@@ -25,6 +28,16 @@ class ReplayHost {
     static Popup popup;
     static object compatibilityPlugin;
     static int pluginUpdates;
+    static Button desktopControl;
+    static int desktopClicks;
+    static int overlayNativeMoves,overlayNativeClicks;
+    [DllImport("user32.dll",EntryPoint="GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd,int index);
+    [DllImport("user32.dll",EntryPoint="SetWindowLongW")] static extern int SetWindowStyle(IntPtr hwnd,int index,int style);
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint {public int x,y;}
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out NativePoint point);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(NativePoint point);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool MoveFileEx(string source,string destination,int flags);
     static int? plaqueLevel;
     static JavaScriptSerializer serializer=new JavaScriptSerializer();
     static void Record(string phase, Exception error) {
@@ -70,6 +83,15 @@ class ReplayHost {
             overlay=(Window)core.GetProperty("Overlay").GetValue(null,null);
             overlay.Left=1250;overlay.Top=120;overlay.Width=1000;overlay.Height=750;
             overlay.Background=new SolidColorBrush(Color.FromArgb(1,0,0,0));
+            overlay.GetType().GetMethod("ShowOverlay").Invoke(overlay,new object[]{true});
+            HwndSource.FromHwnd(new WindowInteropHelper(overlay).Handle).AddHook((IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam,ref bool handled)=> {
+                if(message==0x200) overlayNativeMoves++;
+                if(message==0x201) overlayNativeClicks++;
+                return IntPtr.Zero;
+            });
+            // Normal startup hides the overlay before entering a game. Keep its
+            // cached click-through flag in sync with the SourceInitialized style.
+            overlay.GetType().GetMethod("ShowOverlay").Invoke(overlay,new object[]{false});
             overlay.GetType().GetMethod("ShowOverlay").Invoke(overlay,new object[]{true});
             arena=Get(overlay,"ArenaPickHelperViewModel");
             if(bool.Parse(args[1])) {
@@ -190,6 +212,60 @@ class ReplayHost {
         switch(op) {
             case "menu":case "arena-lobby":case "draft-1":case "draft-2":SetScene(op);break;
             case "settings-close":Set(main.FindName("FlyoutOptions"),"IsOpen",false);break;
+            case "bgs-start":
+                scene="battlegrounds";
+                var minions=Get(overlay,"BattlegroundsMinionsVM");
+                Set(minions,"ActiveTier",(int?)1);
+                File.AppendAllText(output,"bgs-tier-buttons="+((IEnumerable)Get(minions,"TierButtons")).Cast<object>().Count()+
+                    " groups="+((IEnumerable)Get(minions,"Groups")).Cast<object>().Count()+Environment.NewLine);
+                ((FrameworkElement)overlay.FindName("BgsTopBar")).Visibility=Visibility.Visible;
+                ((FrameworkElement)overlay.FindName("GuidesTabs")).Visibility=Visibility.Visible;
+                ((FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent")).MaxHeight=overlay.ActualHeight-54;
+                break;
+            case "bgs-minions-toggle":
+                var tabs=Get(overlay,"BattlegroundsGuidesTabsViewModel");
+                var minionsCommand=(System.Windows.Input.ICommand)Get(tabs,"ShowMinionsCommand");
+                if(!minionsCommand.CanExecute(null)) throw new InvalidOperationException("Battlegrounds minion tab unavailable");
+                var minionsButton=Children<FrameworkElement>(overlay).FirstOrDefault(b=> {
+                    if(b.GetType().Name!="OverlayButton") return false;
+                    var commandProperty=(DependencyProperty)b.GetType().GetField("CommandProperty").GetValue(null);
+                    var binding=BindingOperations.GetBindingExpression(b,commandProperty);
+                    return binding!=null && binding.ParentBinding.Path.Path=="ShowMinionsCommand";
+                });
+                if(minionsButton==null) throw new InvalidOperationException("Battlegrounds card-back button missing");
+                // Exercise WPF's routed observation separately from the command.
+                // This is synthetic WPF input, not a native desktop-input test.
+                minionsButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) {RoutedEvent=Mouse.PreviewMouseDownEvent});
+                ((ICommand)Get(minionsButton,"Command")).Execute(null);
+                break;
+            case "diagnostic-ui-stall":
+                // Only the account-free replay host exposes this deliberate stall.
+                System.Threading.Thread.Sleep(3500);
+                break;
+            case "bgs-end":
+                Set(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel",null);
+                ((FrameworkElement)overlay.FindName("BgsTopBar")).Visibility=Visibility.Collapsed;
+                scene="menu";
+                break;
+            case "desktop-control":
+                if(desktopControl==null) {
+                    desktopControl=new Button {Content="Portable input test",Width=160,Height=40,
+                        HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top};
+                    desktopControl.Click+=(sender,e)=>desktopClicks++;
+                    hdt.GetType("Hearthstone_Deck_Tracker.Utility.Extensions.OverlayExtensions").GetMethod("SetIsOverlayHitTestVisible")
+                        .Invoke(null,new object[]{desktopControl,true});
+                    Panel.SetZIndex(desktopControl,Int32.MaxValue);
+                    Canvas.SetLeft(desktopControl,20);Canvas.SetTop(desktopControl,20);
+                    // HDT's own hover detector transforms registered controls to
+                    // CanvasInfo; controls outside it never become clickable.
+                    ((Panel)overlay.FindName("CanvasInfo")).Children.Add(desktopControl);
+                }
+                desktopControl.Visibility=Visibility.Visible;break;
+            case "desktop-control-hide":if(desktopControl!=null) desktopControl.Visibility=Visibility.Collapsed;break;
+            case "desktop-activate-diagnostic":
+                var overlayHandle=new WindowInteropHelper(overlay).Handle;
+                SetWindowStyle(overlayHandle,-20,WindowStyle(overlayHandle,-20)&~0x08000000);
+                break;
             case "popup-show":
                 popup=new Popup {PlacementTarget=main,Placement=PlacementMode.Center,AllowsTransparency=true,
                     Child=new Border {Background=Brushes.DarkBlue,Padding=new Thickness(20),Child=new TextBlock {Text="Replay popup fixture",Foreground=Brushes.White}}};
@@ -225,7 +301,24 @@ class ReplayHost {
             ids.Add((string)Get(Get(card,"Card"),"Id"));
             plaqueLevels.Add((int)Get(Get(card,"PlaqueViewModel"),"Level"));
         }
-        var data=new {observedUTC=DateTime.UtcNow.ToString("o"),commandId,scene,mouseDowns,pluginUpdates,
+        object desktopBounds=null;
+        if(desktopControl!=null && desktopControl.IsVisible) {
+            var point=desktopControl.PointToScreen(new Point(desktopControl.ActualWidth/2,desktopControl.ActualHeight/2));
+            desktopBounds=new {x=(int)point.X,y=(int)point.Y};
+        }
+        NativePoint pointer;GetCursorPos(out pointer);
+        var bgsContent=(FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent");
+        var data=new {observedUTC=DateTime.UtcNow.ToString("o"),commandId,scene,mouseDowns,pluginUpdates,desktopClicks,desktopControl=desktopBounds,
+            battlegroundsContent=new {visible=bgsContent.IsVisible,width=bgsContent.ActualWidth,height=bgsContent.ActualHeight,
+                minionViews=Children<FrameworkElement>(bgsContent).Count(e=>e.IsVisible && e.GetType().Name=="BattlegroundsMinions"),
+                groupViews=Children<FrameworkElement>(bgsContent).Count(e=>e.IsVisible && e.GetType().Name=="BattlegroundsCardsGroup")},
+            pointer=new {pointer.x,pointer.y},pointerHwnd=WindowFromPoint(pointer).ToInt64(),foregroundHwnd=GetForegroundWindow().ToInt64(),overlayHwnd=new WindowInteropHelper(overlay).Handle.ToInt64(),
+            overlayNativeMoves,overlayNativeClicks,overlayExtendedStyle=WindowStyle(new WindowInteropHelper(overlay).Handle,-20),
+            overlayIsActive=overlay.IsActive,
+            desktopBackend=Environment.GetEnvironmentVariable("HDT_DESKTOP_BACKEND"),
+            battlegroundsActiveTab=Get(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel")==null?null:Get(Get(overlay,"BattlegroundsGuidesTabsViewModel"),"ActiveViewModel").GetType().Name,
+            clickthrough=Get(overlay,"_clickthrough"),interactivityRunning=Get(overlay,"_runInteractivityUpdates"),overlayZState=Get(overlay,"_overlayZState").ToString(),
+            clickableCount=((IEnumerable)Get(overlay,"_clickableElements")).Cast<object>().Count(),
             mainWin32Handle=new WindowInteropHelper(main).Handle.ToInt64(),mainWidth=main.ActualWidth,mainHeight=main.ActualHeight,
             settingsButton=bounds,settingsOpen=(bool)Get(main.FindName("FlyoutOptions"),"IsOpen"),
             arenaVisibility=view.Visibility.ToString(),arenaOpacity=view.Opacity,cards=ids,plaqueLevels,
@@ -237,7 +330,9 @@ class ReplayHost {
                 .Select(t=>(string)Get(t,"Text")).Where(t=>new[]{"60","61","62","80","81","82"}.Contains(t)).Distinct().OrderBy(t=>t).ToArray()};
         var path=Path.Combine(directory,"state.json");
         File.WriteAllText(path+".next",serializer.Serialize(data));
-        if(File.Exists(path)) File.Replace(path+".next",path,null);else File.Move(path+".next",path);
+        // Wine's File.Replace can briefly remove the destination. A replacement
+        // move keeps native readers from seeing a missing state file.
+        if(!MoveFileEx(path+".next",path,1)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
     }
 }
 

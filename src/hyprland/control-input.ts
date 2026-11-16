@@ -1,3 +1,5 @@
+import { readSnapshot } from "../desktop/snapshot";
+import { controlFrame } from "../desktop/regions";
 import { join } from "node:path";
 import { projectRoot as root, nativeDirectory, windowClass } from "../runtime/config";
 const session=process.argv[2];
@@ -14,7 +16,7 @@ async function command(args:string[]) {
 }
 while(running) {
   try {
-    const data=await Bun.file(join(root,"evidence/input-region.json")).json();
+    const data:any=await readSnapshot(join(root,"evidence/input-region.json"));
     if(data.session!==session) {await Bun.sleep(200);continue;}
     const clients=JSON.parse(await command(["hyprctl","-j","clients"]));
     const overlays=clients.filter((x:any)=>x.title==="HearthstoneOverlay" && x.class===windowClass);
@@ -36,15 +38,13 @@ while(running) {
       }
     }
     const [width,height]=overlays[0].size;
-    const fresh=Number.isFinite(data.observedMS) && Math.abs(Date.now()-data.observedMS)<1500 && width===data.width && height===data.height;
-    const rectangles=fresh?data.rectangles:[];
-    if(!Array.isArray(rectangles) || rectangles.length>2048 || !rectangles.every((r:any)=>Array.isArray(r)&&r.length===4&&r.every(Number.isInteger)&&r[0]>=0&&r[1]>=0&&r[2]>0&&r[3]>0&&r[0]+r[2]<=width&&r[1]+r[3]<=height)) throw Error("Invalid control rectangles");
+    const {fresh,rectangles}=controlFrame(data,session,width,height,Date.now());
     // Only validated integers enter Lua; never interpolate target text or card/account content.
-    const lua=`hdtProtonControls={${rectangles.map((r:number[])=>`{${r.join(",")}}`).join(",")}}; hdtProtonControlTicks=40`;
+    const lua=`hdtProtonControls={${rectangles.map(r=>`{${r.join(",")}}`).join(",")}}; hdtProtonControlTicks=40`;
     await command(["hyprctl","eval",lua]);
     const cursor=JSON.parse(await command(["hyprctl","-j","cursorpos"]));
     const [left,top]=overlays[0].at;
-    const hit=rectangles.some((r:number[])=>cursor.x>=left+r[0]&&cursor.y>=top+r[1]&&cursor.x<left+r[0]+r[2]&&cursor.y<top+r[1]+r[3]);
+    const hit=rectangles.some(r=>cursor.x>=left+r[0]&&cursor.y>=top+r[1]&&cursor.x<left+r[0]+r[2]&&cursor.y<top+r[1]+r[3]);
     await Bun.write(join(root,"evidence/control-input.json"),JSON.stringify({observedUTC:new Date().toISOString(),fresh,controls:rectangles.length,pointerOverControl:hit}));
     lastFailure="";
   } catch(error) {

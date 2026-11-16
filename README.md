@@ -14,12 +14,14 @@ Plugin 0.5.0 prevents Arena score particles from triggering the reproduced WPF r
 | Apply the plugin and start HDT with Steam | [Apply HDT compatibility fixes](docs/INSTALL.md) |
 | Build the plugin or diagnose an overlay problem | [Check and diagnose HDT](docs/DEVELOPMENT.md) |
 | Repeat synthetic Arena UI transitions without the live game | [Replay HDT UI transitions in isolation](docs/UI-REPLAY.md) |
+| Record UI stalls and export a local timeline | [Debug HDT freezes](docs/DIAGNOSTICS.md) |
 | Test tracking, draft updates, or another Proton version | [Test HDT with Hearthstone](docs/TESTING.md) |
 | Look up commands, settings, or source files | [Command and configuration reference](docs/REFERENCE.md) |
 | Check what passed and what remains untested | [Observed compatibility](docs/COMPATIBILITY.md) |
 | Understand the rendering, input, and window fixes | [HDT compatibility design](docs/EXPLANATION.md) |
 | Distinguish window, draft-state, and rendering failures | [HDT windows, state, and failure observations](docs/COMPONENTS.md) |
 | Review the Arena particle reproduction for upstream | [Upstream report draft](docs/UPSTREAM-REPORT.md) |
+| Check experimental KDE, GNOME, and X11 backend work | [Desktop backend development](docs/DESKTOPS.md) |
 
 ## Scope
 

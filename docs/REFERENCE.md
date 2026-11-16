@@ -7,11 +7,12 @@
 | Command | Behavior |
 |---|---|
 | `hdt-setup` | Builds the plugin, closes an identified HDT normally if open, installs the plugin, and changes the overlay settings |
-| `hdt-overlay-launch` | Builds the X11 helper, applies runtime Hyprland rules, and starts HDT with the compatibility defaults |
+| `hdt-overlay-launch` | Prepares the selected desktop backend and starts HDT with the compatibility defaults |
 | `hdt-launch` | Starts HDT in the running Steam server's namespace without the overlay defaults |
 | `hdt-launch --build-plugin` | Compiles `src/plugin/ProtonCompatibility.cs` against the installed HDT assemblies and native .NET compiler |
 | `hdt-launch --window-probe` | Compiles and runs the read-only Win32 window probe |
 | `hdt-status` | Reports selected window, rendering, log, and saved-match fields |
+| `hdt-proton trace-export OUTPUT.json INPUT.jsonl [INPUT.jsonl ...]` | Exports local flight-recorder events for Perfetto. See [diagnostics](DIAGNOSTICS.md) |
 | `hdt-steam-options` | Prints a quoted Steam Launch Options line for this checkout |
 | `hdt-check` | Runs the selected tests, shellcheck, TypeScript bundles, and native helper builds |
 | `hdt-build-surface-probe` | Builds the read-only XComposite probe |
@@ -66,6 +67,7 @@ These environment variables affect HDT on its next launch. They do not change th
 | `HDT_RENDERER` | `dxvk-software` | Adds `d3d9.shaderModel = 1` to HDT's DXVK configuration. `inherit` omits that workaround. `wine-gdi` is a retained failed experiment |
 | `HDT_ALPHA_FLOOR` | `1` | Gives the overlay a black background at 1/255 opacity |
 | `HDT_CONTROL_INPUT` | `1` | Starts the bridge that allows input over HDT's marked controls |
+| `HDT_DESKTOP_BACKEND` | `auto` | Selects the existing Hyprland integration or experimental X11 backend; see [Desktop backend development](DESKTOPS.md) |
 | `HDT_HOVER_DIAGNOSTICS` | Unset | A value of `1` exports tooltip, preview, UI-update, and mouse-counter diagnostics |
 | `HDT_DEBUG` | Unset | A value of `1` enables CLR and exception traces through `WINEDEBUG` |
 

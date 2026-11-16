@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { projectRoot, prefix, hdtData as data, windowClass } from "./config";
+import { projectRoot, prefix, hdtData as data, windowClass, nativeDirectory } from "./config";
+import { selectBackend, windows, command } from "../desktop/backend";
 const drive = join(prefix,"drive_c");
 async function optional(path: string) {
   try { return await readFile(path, "utf8"); }
@@ -9,15 +10,10 @@ async function optional(path: string) {
     throw error;
   }
 }
-const hyprctl = Bun.which("hyprctl") ?? "/run/current-system/sw/bin/hyprctl";
-async function hypr(kind: string) {
-  const p = Bun.spawn([hyprctl, "-j", kind], { stdout: "pipe", stderr: "pipe" });
-  const output = await new Response(p.stdout).text();
-  if (await p.exited) throw Error(`hyprctl ${kind} failed`);
-  return JSON.parse(output);
-}
-const clients = (await hypr("clients")).filter((x: any) => x.class===windowClass && ["Hearthstone", "HearthstoneOverlay", "Hearthstone Deck Tracker", "Battle.net"].includes(x.title));
-const monitors = await hypr("monitors");
+const backend = selectBackend(process.env);
+const clients = await windows(backend, nativeDirectory, windowClass);
+const monitors = JSON.parse(await command(backend === "hyprland" ? ["hyprctl", "-j", "monitors"] :
+  [join(nativeDirectory,"x11-desktop"),"monitors"]));
 const logs = join(drive, "Program Files (x86)/Hearthstone/Logs");
 const sessions = (await readdir(logs)).filter(x => /^Hearthstone_/.test(x)).sort();
 const latest = sessions.at(-1);
@@ -55,6 +51,7 @@ const matches=(deckStats?.match(/<Game\b[^>]*>[\s\S]*?<\/Game>/g) ?? []).map(blo
   Object.fromEntries(["GameMode","Result","Turns","Format"].map(key=>[key,block.match(new RegExp(`<${key}>([^<]*)</${key}>`))?.[1]??null])));
 console.log(JSON.stringify({
   observedUTC: new Date().toISOString(),
+  desktopBackend: backend,
   windows: clients.map((x: any) => ({ title: x.title, position: x.at, size: x.size, xwayland: x.xwayland, fullscreen: x.fullscreen })),
   monitors: monitors.map((x: any) => ({ name: x.name, width: x.width, height: x.height, scale: x.scale })),
   latestGameLogSession: latest, files,

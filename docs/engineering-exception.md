@@ -18,6 +18,8 @@ Bun 1.4.4 was the observed runtime. `devenv.lock` pins the toolchain. `scripts/c
 
 C# is required by HDT's .NET Framework plugin interface. The C probes use Xlib, XComposite, and XRender. The repository ships no Python source.
 
+The local flight recorder also uses C# because it observes WPF inside HDT's existing CLR. Its exporter uses Bun without a new runtime dependency. Both plugin build paths derive their source list from `src/plugin/*.cs`. Perfetto provides the trace format and viewer. OpenTelemetry was evaluated as a future integration, but this change does not add an SDK before its Framework and Proton behavior has been tested.
+
 ## Reopening and retirement
 
 A change to process supervision, configuration ownership, or runtime dependencies reopens this exception. Review then uses the installed Effect guidance for that version.
@@ -49,3 +51,11 @@ Nix builds the native helpers before installation. The package supplies their pa
 ## Isolated WPF replay
 
 The replay host uses C# to instantiate HDT's actual .NET Framework WPF classes. Bash composes Bubblewrap, the selected Steam runtime, Xvfb, and native X11 input tools. These are the existing project shell and HDT interfaces. The harness adds no TypeScript supervisor or Python source. Its lifecycle is bounded by a timeout and a PID namespace; it does not replace the live launcher.
+
+## Portable desktop backend recorded on 2026-11-15
+
+This change reopens the runtime exception because it adds a native-helper protocol and desktop backend selection. No Effect package or installed version-specific guidance was found in the project. The existing Bun launcher remains the single supervisor across the Steam namespace boundary. A framework migration remains deferred until it can preserve that behavior through real runtime tests.
+
+The portable bridge reuses plugin-exported rectangles and the existing transient-parent mechanism. Shared validation replaces duplicated region bounds checks. Xlib, X Shape, and RandR supply desktop operations; no new TypeScript dependency or Python source is introduced. A readiness receipt separates native input setup from the plugin's activation-style change.
+
+The [desktop backend record](DESKTOPS.md) separates native-window conformance from actual WPF input and live desktop acceptance. A passing synthetic test is not a compatibility claim for every compositor.

@@ -1,47 +1,5 @@
 // HDT-only X11 transient relationship. No game writes, focus, geometry or input events.
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xatom.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <stdint.h>
-static Display *display;
-static int xerror;
-static int on_error(Display *d, XErrorEvent *e) { (void)d; xerror=e->error_code; return 0; }
-static void fail(const char *s) { fprintf(stderr,"HDT overlay link: %s\n",s); exit(1); }
-static unsigned long number(const char *s) {
-    char *end; errno=0; unsigned long n=strtoul(s,&end,0);
-    if(errno || !*s || *end || *s=='-' || n>UINT32_MAX) fail("invalid XID/PID");
-    return n;
-}
-static int identity(Window w, unsigned long pid, const char *title, const char *class) {
-    char *name=NULL; XClassHint hint={0}; unsigned char *value=NULL;
-    Atom type; int format; unsigned long count,left; int ok=0;
-    if(!XFetchName(display,w,&name) || !name || strcmp(name,title)) goto end;
-    if(!XGetClassHint(display,w,&hint) || !hint.res_class || strcmp(hint.res_class,class)) goto end;
-    if(XGetWindowProperty(display,w,XInternAtom(display,"_NET_WM_PID",False),0,1,False,XA_CARDINAL,
-        &type,&format,&count,&left,&value)!=Success || type!=XA_CARDINAL || format!=32 || count!=1 || !value) goto end;
-    ok=*(unsigned long*)value==pid;
-end:
-    if(name) XFree(name);
-    if(hint.res_name) XFree(hint.res_name);
-    if(hint.res_class) XFree(hint.res_class);
-    if(value) XFree(value);
-    return ok;
-}
-static Window find(unsigned long pid, const char *title,const char *class) {
-    Window root,parent,*children=NULL,result=0; unsigned int count=0;
-    if(!XQueryTree(display,DefaultRootWindow(display),&root,&parent,&children,&count)) fail("cannot enumerate windows");
-    for(unsigned int i=0;i<count;i++) if(identity(children[i],pid,title,class)) {
-        if(result) fail("ambiguous window identity");
-        result=children[i];
-    }
-    if(children) XFree(children);
-    if(!result) fail("expected window not found");
-    return result;
-}
+#include "../desktop/x11-common.h"
 int main(int argc,char **argv) {
     if(argc!=5 && argc!=7) fail("expected apply PID GAME_PID CLASS, or restore PID CLASS XID GAME_XID ORIGINAL");
     display=XOpenDisplay(NULL); if(!display) fail("cannot open X display");

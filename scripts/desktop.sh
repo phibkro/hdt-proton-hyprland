@@ -18,7 +18,10 @@ if (( $# > 1 )) || [[ "$action" != open && "$action" != restart ]]; then
     exit 2
 fi
 window_class=$(bun -e 'import {windowClass} from "./src/runtime/config"; console.log(windowClass)')
-clients=$(hyprctl -j clients)
+if [[ $(bun src/desktop/cli.ts kind) == x11 ]]; then
+    bash scripts/hdt.sh build-desktop-helper
+fi
+clients=$(bun src/desktop/cli.ts windows)
 trackers=$(jq -c --arg class "$window_class" '[.[] | select(.class==$class and .title=="Hearthstone Deck Tracker")]' <<<"$clients")
 count=$(jq length <<<"$trackers")
 if (( count > 1 )); then fail 'Multiple HDT windows; refusing to guess.'; fi
@@ -26,7 +29,7 @@ if [[ "$action" == open && "$count" == 1 ]]; then
     address=$(jq -er '.[0].address | select(test("^0x[0-9a-fA-F]+$"))' <<<"$trackers")
     pid=$(jq -er '.[0].pid | select(type=="number" and .>0 and .==floor)' <<<"$trackers")
     [[ $(cat "/proc/$pid/comm") == HearthstoneDeck ]] || { fail 'Tracker identity changed.'; }
-    exec hyprctl dispatch "hl.dsp.focus({window=\"address:$address\"})"
+    exec bun src/desktop/cli.ts focus "$address" "$pid"
 fi
 # The service owns HDT only. Do not restart it if that boundary has changed.
 service=$(systemctl --user show hdt-proton-autostart.service --property=ControlGroup --value)

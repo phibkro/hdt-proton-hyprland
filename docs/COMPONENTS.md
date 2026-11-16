@@ -96,6 +96,8 @@ Microsoft documents one render thread per WPF process and explains that a modal 
 
 `presentation-state.json` describes the WPF presentation roots visible to the plugin at the sampling instant. It records root types, dispatcher thread identities, dimensions, and requested per-target render modes. A `Default` target mode does not establish hardware rendering. The process preference and target preference are separate fields.
 
+The development plugin adds a bounded background flight recorder and an independent dispatcher ping. See [freeze diagnostics](DIAGNOSTICS.md) for event meanings, export commands, and the limits of each signal. Running the replay does not install this addition.
+
 `dispatcher-failures-<pid>.jsonl` retains the first 32 exception observations in order within a process. Each entry includes HRESULTs and method names. A later crash-dialog failure does not overwrite the initiating exception. Exception messages, arguments, account data, and card identities are excluded.
 
 The existing `input-region.json` describes cached HDT state and control rectangles. Fresh timestamps establish that the exporter ran. They do not establish watcher progress, correct ratings, completed commands, or healthy rendering. A modal dispatcher can keep the exporter running.

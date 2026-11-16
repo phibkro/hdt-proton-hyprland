@@ -3,7 +3,9 @@ let
   command = name: ''exec bash "$REA_PROJECT/scripts/hdt.sh" ${name} "$@"'';
 in
 {
-  packages = with pkgs; [ bash shellcheck actionlint bun nodejs_24 protontricks winetricks steam-run util-linux ripgrep jq unzip git rsync gitleaks libnotify xorg.xwininfo xorg.xprop xorg.xorgserver xcompmgr openbox xdotool imagemagick bubblewrap gcc pkg-config libx11 libxcomposite libxrender ];
+  packages = with pkgs; [ bash shellcheck actionlint bun nodejs_24 protontricks winetricks steam-run util-linux ripgrep jq unzip git rsync gitleaks libnotify xorg.xwininfo xorg.xprop xorg.xorgserver xwayland xcompmgr openbox xdotool imagemagick bubblewrap gcc pkg-config libx11 libxext libxrandr libxcomposite libxrender strace dbus kdePackages.kwin mutter ];
+  env.HDT_KWIN_BINARY = "${pkgs.kdePackages.kwin}/bin/kwin_wayland";
+  env.HDT_TEST_EGL_VENDOR = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
   env.REA_PROJECT = config.devenv.root;
   env.W_CACHE = "${config.devenv.root}/cache/winetricks";
   env.npm_config_cache = "${config.devenv.root}/cache/npm";

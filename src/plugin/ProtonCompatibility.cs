@@ -1,5 +1,5 @@
 // Local HDT plugin, using HDT's existing plugin lifecycle and layout APIs.
-// No game writes, injected game code, window activation, or additional hooks.
+// No game writes, injected game code, or synthetic input.
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,7 +8,10 @@ using System.Windows.Media;
 using System.Windows.Interop;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Web.Script.Serialization;
+using System.ComponentModel;
+using System.Windows.Data;
 using Hearthstone_Deck_Tracker.Utility.Extensions;
 using Hearthstone_Deck_Tracker.Plugins;
 using Hearthstone_Deck_Tracker.Utility.Logging;
@@ -19,9 +22,14 @@ public sealed class ProtonCompatibility : IPlugin {
     public string Description { get { return "Refresh overlay geometry, suppress incompatible Arena particles, and export input diagnostics."; } }
     public string ButtonText { get { return "No settings"; } }
     public string Author { get { return "Local investigation"; } }
-    public Version Version { get { return new Version(0,5,0); } }
+    public Version Version { get { return new Version(0,6,0); } }
     public MenuItem MenuItem { get { return null; } }
     bool pending;
+    FlightRecorder recorder;
+    INotifyPropertyChanged battlegroundsTabs;
+    object lastBattlegroundsView;
+    DateTime lastFlightSample=DateTime.MinValue;
+    string lastFlightState;
     int moves;
     DateTime lastRegionWrite = DateTime.MinValue;
     DateTime lastHoverWrite = DateTime.MinValue;
@@ -33,6 +41,34 @@ public sealed class ProtonCompatibility : IPlugin {
     DateTime lastTooltipEvent = DateTime.MinValue;
     int[] lastPreviewBounds;
     bool alphaFloorApplied;
+    IntPtr portableInputWindow;
+    bool portableInputFailed;
+    bool portableFocusOwned;
+    [DllImport("user32.dll",EntryPoint="GetWindowLongW")] static extern int ExtendedStyle(IntPtr hwnd,int index);
+    public sealed class X11Acknowledgement {
+        public string session {get;set;}
+        public string backend {get;set;}
+        public bool nativeReady {get;set;}
+        public bool active {get;set;}
+        public bool fresh {get;set;}
+        public bool focused {get;set;}
+        public bool pointerOverControl {get;set;}
+        public long overlayHwnd {get;set;}
+        public long observedMS {get;set;}
+    }
+    static X11Acknowledgement PortableInputReady(string input,string session,long hwnd) {
+        try {
+            var path=Path.Combine(Path.GetDirectoryName(input),"control-input.json");
+            if(new FileInfo(path).Length>8192) return null;
+            var ack=new JavaScriptSerializer().Deserialize<X11Acknowledgement>(File.ReadAllText(path));
+            var now=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            return ack!=null && ack.session==session && ack.backend=="x11" && ack.nativeReady && ack.overlayHwnd==hwnd &&
+                ack.observedMS>now-1500 && ack.observedMS<now+1500 ? ack : null;
+        } catch(IOException) {return null;}
+        catch(UnauthorizedAccessException) {return null;}
+        catch(ArgumentException) {return null;}
+        catch(InvalidOperationException) {return null;}
+    }
     bool mouseDiagnosticsAttached;
     int overlayMouseDowns,overlayMouseUps;
     string lastMouseTargetType;
@@ -42,6 +78,15 @@ public sealed class ProtonCompatibility : IPlugin {
     static bool suppressArenaParticles;
     static int arenaParticleEmittersSuppressed;
     public void OnLoad() {
+        portableInputFailed=false;
+        var inputFile=Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
+        if(!String.IsNullOrEmpty(inputFile) && Environment.GetEnvironmentVariable("HDT_FLIGHT_RECORDER")!="0") {
+            var dispatcher=Application.Current.Dispatcher;
+            recorder=new FlightRecorder(Path.GetDirectoryName(inputFile),Version.ToString(),
+                action=>dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,action),
+                message=>Log.Warn(message));
+            CompositionTarget.Rendering+=ObserveRendering;
+        }
         RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
         suppressArenaParticles=true;
         if(!particleHandlerRegistered) {
@@ -62,10 +107,19 @@ public sealed class ProtonCompatibility : IPlugin {
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged += ObserveTooltip;
     }
     public void OnUnload() {
+        CompositionTarget.Rendering-=ObserveRendering;
+        if(battlegroundsTabs!=null) battlegroundsTabs.PropertyChanged-=ObserveBattlegroundsTab;
+        battlegroundsTabs=null;
+        if(recorder!=null) {recorder.Stop();recorder=null;}
         suppressArenaParticles=false;
         Application.Current.Dispatcher.UnhandledExceptionFilter -= ObserveDispatcherFailure;
         if(!String.IsNullOrEmpty(hoverOutput)) OverlayExtensions.OnToolTipChanged -= ObserveTooltip;
         var overlay=Api.OverlayWindow;
+        if(portableInputWindow!=IntPtr.Zero && overlay!=null && new WindowInteropHelper(overlay).Handle==portableInputWindow) {
+            Hearthstone_Deck_Tracker.User32.SetWindowExStyle(portableInputWindow,Hearthstone_Deck_Tracker.User32.WsExNoActivate);
+            portableInputWindow=IntPtr.Zero;
+        }
+        portableFocusOwned=false;
         var main=(Window)(object)Api.MainWindow;
         if(main!=null && mainDiagnosticsAttached) {
             main.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMainMouseDown));
@@ -77,6 +131,7 @@ public sealed class ProtonCompatibility : IPlugin {
             overlay.RemoveHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMouseUp));
             mouseDiagnosticsAttached=false;
         }
+        if(overlay!=null) overlay.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveBattlegroundsPointer));
         Log.Info("Local Proton compatibility stopped; layout refreshes="+moves);
     }
     static void SuppressArenaParticleEmitter(object sender,RoutedEventArgs e) {
@@ -97,6 +152,7 @@ public sealed class ProtonCompatibility : IPlugin {
     }
     public void OnButtonPress() { }
     void ObserveDispatcherFailure(object sender, System.Windows.Threading.DispatcherUnhandledExceptionFilterEventArgs e) {
+        if(recorder!=null) recorder.Event("ui.exception",new {type=e.Exception.GetType().FullName,hresult=e.Exception.HResult.ToString("X8")});
         var regionFile=Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
         if(String.IsNullOrEmpty(regionFile) || failureSequence>=32) return;
         var sequence=++failureSequence;
@@ -164,6 +220,57 @@ public sealed class ProtonCompatibility : IPlugin {
     }
     void UpdateUi() {
         var overlay = Api.OverlayWindow;
+        if(overlay!=null && recorder!=null) {
+            var tabs=overlay.BattlegroundsGuidesTabsViewModel as INotifyPropertyChanged;
+            if(!Object.ReferenceEquals(tabs,battlegroundsTabs)) {
+                if(battlegroundsTabs!=null) battlegroundsTabs.PropertyChanged-=ObserveBattlegroundsTab;
+                battlegroundsTabs=tabs;
+                lastBattlegroundsView=overlay.BattlegroundsGuidesTabsViewModel.ActiveViewModel;
+                if(tabs!=null) tabs.PropertyChanged+=ObserveBattlegroundsTab;
+                overlay.RemoveHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveBattlegroundsPointer));
+                overlay.AddHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveBattlegroundsPointer),true);
+            }
+            if((DateTime.UtcNow-lastFlightSample).TotalSeconds>=1) {
+                var arena=overlay.ArenaPickHelperViewModel;
+                string state=Api.Game.CurrentMode+"/"+Api.Game.IsInMenu+"/"+arena.ClientState+"/"+arena.SessionState+"/"+arena.IsOverlayVisible;
+                if(state!=lastFlightState) {
+                    recorder.Event("view.state",new {mode=Api.Game.CurrentMode.ToString(),inMenu=Api.Game.IsInMenu,
+                        arenaClientState=arena.ClientState.ToString(),arenaSessionState=arena.SessionState.ToString(),arenaVisible=arena.IsOverlayVisible});
+                    lastFlightState=state;
+                }
+                lastFlightSample=DateTime.UtcNow;
+            }
+        }
+        if(overlay!=null && !portableInputFailed && Environment.GetEnvironmentVariable("HDT_DESKTOP_BACKEND")=="x11") {
+            var input=Environment.GetEnvironmentVariable("HDT_INPUT_REGION_FILE");
+            var session=Environment.GetEnvironmentVariable("HDT_INPUT_SESSION");
+            var hwnd=new WindowInteropHelper(overlay).Handle;
+            var ack=String.IsNullOrEmpty(input) || String.IsNullOrEmpty(session) || hwnd==IntPtr.Zero ? null : PortableInputReady(input,session,hwnd.ToInt64());
+            if(ack!=null) {
+                if(portableInputWindow!=hwnd && (ExtendedStyle(hwnd,-20)&Hearthstone_Deck_Tracker.User32.WsExNoActivate)!=0) {
+                    // The host acknowledged empty input shaping before readiness.
+                    // Wine otherwise drops clicks on the non-activating WPF window.
+                    Hearthstone_Deck_Tracker.User32.RemoveWindowExStyle(hwnd,Hearthstone_Deck_Tracker.User32.WsExNoActivate);
+                    if((ExtendedStyle(hwnd,-20)&Hearthstone_Deck_Tracker.User32.WsExNoActivate)!=0) {
+                        portableInputFailed=true;
+                        Log.Error("Portable overlay activation style did not change; controls remain unavailable");
+                    } else {
+                        portableInputWindow=hwnd;
+                        Log.Info("Portable overlay controls enabled after native input readiness");
+                    }
+                }
+                var foreground=Hearthstone_Deck_Tracker.User32.GetForegroundWindow();
+                if(!portableInputFailed && ack.fresh && ack.active && ack.focused && ack.pointerOverControl && foreground!=hwnd)
+                    portableFocusOwned=overlay.Activate();
+                else if(portableFocusOwned && ack.active && !ack.pointerOverControl && foreground==hwnd) {
+                    // HDT's BringHsToForeground helper also emits an Alt key.
+                    // Request only window focus; never synthesize game input.
+                    var gameWindow=Hearthstone_Deck_Tracker.User32.GetHearthstoneWindow();
+                    if(gameWindow!=IntPtr.Zero) Hearthstone_Deck_Tracker.User32.SetForegroundWindow(gameWindow);
+                    portableFocusOwned=false;
+                } else if(!ack.active) portableFocusOwned=false;
+            }
+        }
         if(overlay!=null && !mouseDiagnosticsAttached && !String.IsNullOrEmpty(hoverOutput)) {
             overlay.AddHandler(Mouse.PreviewMouseDownEvent,new MouseButtonEventHandler(ObserveMouseDown),true);
             overlay.AddHandler(Mouse.PreviewMouseUpEvent,new MouseButtonEventHandler(ObserveMouseUp),true);
@@ -234,6 +341,7 @@ public sealed class ProtonCompatibility : IPlugin {
                 var json = new JavaScriptSerializer().Serialize(new {
                     session=Environment.GetEnvironmentVariable("HDT_INPUT_SESSION"),
                     observedMS=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    overlayHwnd=new WindowInteropHelper(overlay).Handle.ToInt64(),
                     width=(int)Math.Round(clip.Width), height=(int)Math.Round(clip.Height), rectangles=regions,
                     state=new {
                         mode=Api.Game.CurrentMode.ToString(), inMenu=Api.Game.IsInMenu,
@@ -259,7 +367,32 @@ public sealed class ProtonCompatibility : IPlugin {
     void ObserveMouseDown(object sender,MouseButtonEventArgs e) {
         overlayMouseDowns++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;
     }
-    void ObserveMainMouseDown(object sender,MouseButtonEventArgs e) { mainMouseDowns++; }
+    void ObserveMainMouseDown(object sender,MouseButtonEventArgs e) {
+        mainMouseDowns++;
+        if(recorder!=null) recorder.Event("main.pointer.down",new {targetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name});
+    }
+    void ObserveRendering(object sender,EventArgs e) {if(recorder!=null) recorder.Rendered();}
+    void ObserveBattlegroundsTab(object sender,PropertyChangedEventArgs e) {
+        if(recorder==null || e.PropertyName!="ActiveViewModel") return;
+        var active=Api.OverlayWindow.BattlegroundsGuidesTabsViewModel.ActiveViewModel;
+        if(Object.ReferenceEquals(active,lastBattlegroundsView)) return;
+        lastBattlegroundsView=active;
+        recorder.Event("battlegrounds.tab.changed",new {viewType=active==null?null:active.GetType().Name});
+    }
+    void ObserveBattlegroundsPointer(object sender,MouseButtonEventArgs e) {
+        if(recorder==null || e.ChangedButton!=MouseButton.Left) return;
+        var node=e.OriginalSource as DependencyObject;
+        for(int depth=0;node!=null && depth<32;depth++) {
+            var button=node as Hearthstone_Deck_Tracker.Controls.Overlay.Battlegrounds.OverlayButton;
+            if(button!=null) {
+                var binding=BindingOperations.GetBindingExpression(button,Hearthstone_Deck_Tracker.Controls.Overlay.Battlegrounds.OverlayButton.CommandProperty);
+                if(binding!=null && binding.ParentBinding.Path!=null && binding.ParentBinding.Path.Path=="ShowMinionsCommand" && Object.ReferenceEquals(button.DataContext,battlegroundsTabs))
+                    recorder.Event("battlegrounds.minions.pointer.down",new {});
+                return;
+            }
+            node=node is Visual ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
+        }
+    }
     void ObserveMainMouseUp(object sender,MouseButtonEventArgs e) { mainMouseUps++; }
     void ObserveMouseUp(object sender,MouseButtonEventArgs e) {
         overlayMouseUps++; lastMouseTargetType=e.OriginalSource==null?null:e.OriginalSource.GetType().Name;

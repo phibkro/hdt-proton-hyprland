@@ -48,7 +48,7 @@ The later saved Arena wins establish successful recording after the earlier fail
 | White main and crash windows during drafting | Failed in later tests | New, repeated Settings clicks, and a floating-state change were associated with failures. A live dispatcher capture recorded COMException `88980406`. The overlay remained drawn, but repainting was not established |
 | Fresh offer after a draft pick | Failed in a later user observation | The previous offer's ratings remained visible. UI exports continued. The failing stage remains unknown |
 | Arena score particle path | Verified workaround in replay and the completed live draft | Actual level-five badges reproduced `88980406`, stale pixels, and white window regions without the compatibility plugin. Version 0.5.0 prevented particle initialization and passed 12 simulated decisions with native Settings clicks. After an HDT-only restart, the operator confirmed offer updates, responsive main-window controls, and successful completion of the current draft |
-| Battlegrounds menu and match | Verified by user observation | The operator reports working main-window interaction in both contexts and a working in-game overlay. This comparison did not instrument every Battlegrounds update |
+| Battlegrounds menu and match | Partial; later freeze reported | Main-window interaction and gameplay overlays worked in earlier user checks. The operator later reported the whole app becoming unresponsive after using the card-back tab beside the turn counter during combat. No matching exception or root cause has been established |
 
 The rendering and input mechanisms are described in [HDT compatibility design](EXPLANATION.md).
 

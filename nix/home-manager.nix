@@ -3,7 +3,7 @@ flake:
 let
   cfg = config.programs.hdt-proton;
   package = flake.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  environment = { HDT_PROJECT_DIR = cfg.dataDirectory; }
+  environment = { HDT_PROJECT_DIR = cfg.dataDirectory; HDT_DESKTOP_BACKEND = cfg.desktopBackend; }
     // lib.optionalAttrs (cfg.appDirectory != null) { HDT_APP_DIR = cfg.appDirectory; };
   launcher = pkgs.writeShellScript "hdt-proton-desktop" ''
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (key: value: "export ${key}=${lib.escapeShellArg value}") environment)}
@@ -28,6 +28,16 @@ in
       default = true;
       description = "Start the HDT watcher with the Hyprland session.";
     };
+    desktopBackend = lib.mkOption {
+      type = lib.types.enum [ "auto" "hyprland" "x11" ];
+      default = "auto";
+      description = "Desktop window/input backend. x11 supports experimental EWMH/XWayland integration.";
+    };
+    sessionTarget = lib.mkOption {
+      type = lib.types.str;
+      default = "hyprland-session.target";
+      description = "Session target that starts and stops the watcher. Use graphical-session.target on KDE or GNOME.";
+    };
   };
   config = lib.mkIf cfg.enable {
     assertions = [ {
@@ -42,8 +52,8 @@ in
     systemd.user.services.hdt-proton-autostart = {
       Unit = {
         Description = "Start HDT compatibility launcher when Hearthstone opens";
-        After = [ "hyprland-session.target" ];
-        PartOf = [ "hyprland-session.target" ];
+        After = [ cfg.sessionTarget ];
+        PartOf = [ cfg.sessionTarget ];
         ConditionPathExists = "${cfg.dataDirectory}/hdt.local.json";
       };
       Service = {
@@ -53,7 +63,7 @@ in
         Restart = "on-failure";
         RestartSec = 5;
       };
-      Install.WantedBy = lib.optional cfg.autoStart "hyprland-session.target";
+      Install.WantedBy = lib.optional cfg.autoStart cfg.sessionTarget;
     };
   };
 }

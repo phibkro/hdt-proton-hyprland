@@ -1,4 +1,4 @@
-{ lib, stdenv, makeWrapper, bun, bash, jq, coreutils, util-linux, systemd, libnotify, pkg-config, libx11, libxcomposite, libxrender, desktop-file-utils }:
+{ lib, stdenv, makeWrapper, bun, bash, jq, coreutils, util-linux, systemd, libnotify, pkg-config, libx11, libxext, libxrandr, libxcomposite, libxrender, desktop-file-utils }:
 let
   commands = {
     hdt-proton = "";
@@ -22,10 +22,11 @@ stdenv.mkDerivation {
         || type == "regular" && (lib.hasPrefix "src/" relative || lib.hasPrefix "scripts/" relative || relative == "LICENSE");
   };
   nativeBuildInputs = [ makeWrapper pkg-config desktop-file-utils ];
-  buildInputs = [ libx11 libxcomposite libxrender ];
+  buildInputs = [ libx11 libxext libxrandr libxcomposite libxrender ];
   buildPhase = ''
     runHook preBuild
     cc -Wall -Wextra -Werror src/hyprland/overlay-link.c -o overlay-link $(pkg-config --cflags --libs x11)
+    cc -Wall -Wextra -Werror src/desktop/x11-desktop.c -o x11-desktop $(pkg-config --cflags --libs x11 xext xrandr)
     cc -Wall -Wextra -Werror src/diagnostics/x-surface-probe.c -o x-surface-probe $(pkg-config --cflags --libs x11 xcomposite xrender)
     runHook postBuild
   '';
@@ -33,7 +34,7 @@ stdenv.mkDerivation {
     runHook preInstall
     mkdir -p "$out/share/hdt-proton" "$out/libexec/hdt-proton" "$out/bin" "$out/share/applications"
     cp -R src scripts LICENSE "$out/share/hdt-proton/"
-    install -m755 overlay-link x-surface-probe "$out/libexec/hdt-proton/"
+    install -m755 overlay-link x11-desktop x-surface-probe "$out/libexec/hdt-proton/"
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: command: ''
       makeWrapper ${bash}/bin/bash "$out/bin/${name}" \
         --add-flags "$out/share/hdt-proton/scripts/hdt.sh ${command}" \

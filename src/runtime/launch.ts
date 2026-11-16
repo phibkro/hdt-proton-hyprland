@@ -1,5 +1,6 @@
 import { readdir, readFile, readlink, realpath, stat, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { selectBackend } from "../desktop/backend";
 import { projectRoot as root, sourceRoot, prefix, appDirectory } from "./config";
 
 const canonicalPrefix=await realpath(prefix);
@@ -47,7 +48,8 @@ if (inside) {
       "/r:System.Web.Extensions.dll",
       "/r:"+win(join(appDirectory,"MahApps.Metro.dll")),
       ...["PresentationCore.dll","PresentationFramework.dll","WindowsBase.dll"].map(x=>"/r:"+wpf+x),
-      win(join(sourceRoot,"src/plugin/ProtonCompatibility.cs"))];
+      ...(await readdir(join(sourceRoot,"src/plugin"))).filter(x=>x.endsWith(".cs")).sort()
+        .map(x=>win(join(sourceRoot,"src/plugin",x)))];
     const p = Bun.spawn([join(dirname(proton),"files/bin/wine"),"C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe",...args],
       {cwd:root,env:e,stdout:"inherit",stderr:"inherit"});
     process.exit(await p.exited);
@@ -85,12 +87,15 @@ if (inside) {
     e.WINEDEBUG = "-all,+winediag";
   }
   if (process.env.HDT_DEBUG === "1") e.WINEDEBUG = "+mscoree,+seh";
+  e.HDT_FLIGHT_RECORDER=process.env.HDT_FLIGHT_RECORDER ?? "1";
+  if(!["0","1"].includes(e.HDT_FLIGHT_RECORDER)) throw Error("HDT_FLIGHT_RECORDER must be 0 or 1");
   if (process.env.HDT_HOVER_DIAGNOSTICS === "1") e.HDT_HOVER_DIAGNOSTICS_FILE = join(root,"evidence/hover-state.json");
   if (process.env.HDT_ALPHA_FLOOR === "1") e.HDT_ALPHA_FLOOR="1";
   if(process.env.HDT_CONTROL_INPUT === "1") {
     e.HDT_INPUT_REGION_FILE=join(root,"evidence/input-region.json");
     e.HDT_INPUT_SESSION=process.env.HDT_INPUT_SESSION!;
     if(!e.HDT_INPUT_SESSION) throw Error("Input-region session is missing");
+    e.HDT_DESKTOP_BACKEND=selectBackend(process.env);
   }
   // Do not persist the inherited session environment: it may contain credentials.
   const command = process.env.HDT_DIRECT === "1"
@@ -124,7 +129,7 @@ let bridge: ReturnType<typeof Bun.spawn> | undefined;
 if(process.env.HDT_ELEMENT_INPUT === "1") throw Error("X11 input-shape experiment retired; use HDT_CONTROL_INPUT=1 for compositor control gating.");
 if(process.env.HDT_CONTROL_INPUT === "1" && !probe && !buildPlugin) {
   process.env.HDT_INPUT_SESSION=crypto.randomUUID();
-  bridge=Bun.spawn([process.execPath,join(sourceRoot,"src/hyprland/control-input.ts"),process.env.HDT_INPUT_SESSION],{cwd:root,env:{...process.env},stdout:"inherit",stderr:"inherit"});
+  bridge=Bun.spawn([process.execPath,join(sourceRoot,selectBackend(process.env)==="hyprland"?"src/hyprland/control-input.ts":"src/desktop/x11-input.ts"),process.env.HDT_INPUT_SESSION],{cwd:root,env:{...process.env},stdout:"inherit",stderr:"inherit"});
   bridge.exited.then(code=>{if(code) console.error(`HDT input-region helper failed (${code}); selective input is not verified.`);});
 }
 const p = Bun.spawn([nsenter, "--target", candidates[0], "--user", "--mount", "--preserve-credentials", "--root", "--", process.execPath, import.meta.path, "--inside", candidates[0], ...(probe ? ["--window-probe"] : []), ...(buildPlugin ? ["--build-plugin"] : [])], {
