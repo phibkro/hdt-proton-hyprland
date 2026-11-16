@@ -87,7 +87,9 @@ jobs:
       - name: Build lifecycle observer executable
         run: nix develop --command cargo build --locked --bin hdt-host
       - name: Verify independent XInput lifecycle capture
-        run: nix develop --command bash scripts/check-xinput.sh
+        # Hosted Ubuntu restricts rootless network namespace setup; the fixture
+        # still exposes only its private server and capture directory.
+        run: sudo -- "$(command -v nix)" develop --command bash scripts/check-xinput.sh
       - name: Bounded coverage-guided fuzz smoke
         run: nix develop --command bash scripts/check-fuzz.sh
       - name: Compile and smoke-test parser benchmarks

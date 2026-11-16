@@ -14,6 +14,7 @@ with pkgs;
   rustfmt
   clippy
   rust-analyzer
+  gdb
   cargo-nextest
   cargo-fuzz
   cargo-deny
