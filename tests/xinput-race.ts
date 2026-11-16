@@ -1,40 +1,52 @@
 import { mkdir, writeFile, lstat, readlink, readdir } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import path from "node:path";
 
 if (
   process.argv.length !== 4 ||
-  process.env.DISPLAY ||
-  process.env.WAYLAND_DISPLAY ||
-  process.env.XAUTHORITY
+  (process.env.DISPLAY ?? "") !== "" ||
+  (process.env.WAYLAND_DISPLAY ?? "") !== "" ||
+  (process.env.XAUTHORITY ?? "") !== ""
 ) {
-  throw Error(
+  throw new Error(
     "Run through scripts/check-xinput.sh with the host desktop hidden."
   );
 }
-const root = resolve(process.argv[2]);
-const out = join(root, "results");
+
+const root = path.resolve(process.argv[2]);
+const out = path.join(root, "results");
 
 if (root !== "/capture") {
-  throw Error("The fixture requires the private capture mount.");
+  throw new Error("The fixture requires the private capture mount.");
 }
-for (const path of ["/home", "/srv", "/run/user"]) {
+
+// oxlint-disable no-await-in-loop -- Check isolation paths before starting the server, with an exact failing path.
+for (const hostPath of ["/home", "/srv", "/run/user"]) {
   try {
-    await lstat(path);
-    throw new Error(`A host directory is visible: ${path}`);
+    await lstat(hostPath);
+    throw new Error(`A host directory is visible: ${hostPath}`);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      error.code !== "ENOENT"
+    ) {
       throw error;
     }
   }
 }
 
+// oxlint-enable no-await-in-loop
+
 await mkdir(out, { mode: 0o700 });
 
 await mkdir("/tmp/.X11-unix", { recursive: true, mode: 0o1777 });
 
-if ((await readdir("/tmp/.X11-unix")).length) {
-  throw Error("The fixture requires an empty private X socket directory.");
+const initialSockets = await readdir("/tmp/.X11-unix");
+
+if (initialSockets.length !== 0) {
+  throw new Error("The fixture requires an empty private X socket directory.");
 }
+
 const isolation = {
   desktopEnvironmentAbsent: true,
   hostDirectoriesAbsent: true,
@@ -66,7 +78,8 @@ try {
 
   const first = await Promise.race([
     reader.read(),
-    new Promise<never>((_, reject) => {
+    // oxlint-disable-next-line promise/avoid-new -- Adapt the X-server stream startup deadline; retain its timer handle for unconditional cancellation.
+    new Promise<never>((_resolve, reject) => {
       startup = setTimeout(() => {
         reject(new Error("Private X server startup timed out"));
       }, 5000);
@@ -80,12 +93,14 @@ try {
     .toString()
     .trim();
 
-  if (!/^\d+$/.test(number)) {
-    throw Error("Private display allocation failed");
+  if (!/^\d+$/u.test(number)) {
+    throw new Error("Private display allocation failed");
   }
+
   const display = `:${number}`;
   const results = [];
 
+  // oxlint-disable no-await-in-loop -- Protocol cases share one private X server; serialize them to preserve error attribution and bounded capture order.
   for (const [mode, expected] of [
     ["fatal", 1],
     ["guarded", 0],
@@ -94,7 +109,7 @@ try {
     ["wrong-serial", 1],
     ["bad-match", 1],
   ] as const) {
-    const p = Bun.spawn([join(root, "xinput-race"), display, mode], {
+    const p = Bun.spawn([path.join(root, "xinput-race"), display, mode], {
       env: { ...process.env, HDT_XINPUT_REPRO: "1" },
       stdout: "pipe",
       stderr: "pipe",
@@ -111,35 +126,43 @@ try {
     ]);
 
     clearTimeout(timeout);
-    await writeFile(join(out, `${mode}.log`), stdout + stderr, { mode: 0o600 });
+    await writeFile(path.join(out, `${mode}.log`), stdout + stderr, {
+      mode: 0o600,
+    });
     results.push({ mode, exit, expected, stdout, stderr });
     console.log(JSON.stringify({ mode, exit, expected }));
 
     if (exit !== expected) {
-      throw Error("Unexpected fixture result: " + mode);
+      throw new Error(`Unexpected fixture result: ${mode}`);
     }
+
     if (
       (mode === "fatal" || mode === "wrong-serial") &&
       !stderr.includes("X_GetDeviceButtonMapping")
     ) {
-      throw Error("Expected mapping failure missing");
+      throw new Error("Expected mapping failure missing");
     }
+
     if (mode === "unrelated" && !stderr.includes("X_DestroyWindow")) {
-      throw Error("Unrelated error was suppressed");
+      throw new Error("Unrelated error was suppressed");
     }
+
     if (mode === "bad-match" && !stderr.includes("BadMatch")) {
-      throw Error("Wrong mapping error was suppressed");
+      throw new Error("Wrong mapping error was suppressed");
     }
+
     if (mode === "guarded" && !stdout.includes("caught=1")) {
-      throw Error("Expected mapping error was not caught");
+      throw new Error("Expected mapping error was not caught");
     }
+
     if (mode === "valid" && !stdout.includes("caught=0")) {
-      throw Error("Valid device was rejected");
+      throw new Error("Valid device was rejected");
     }
   }
 
+  // oxlint-enable no-await-in-loop
   await writeFile(
-    join(out, "result.json"),
+    path.join(out, "result.json"),
     JSON.stringify({ display, isolation, results }, null, 2),
     { mode: 0o600 }
   );
@@ -148,7 +171,7 @@ try {
   server.kill("SIGTERM");
   const exit = await server.exited;
   const stderr = await new Response(server.stderr).text();
-  await writeFile(join(out, "xvfb.log"), stderr, { mode: 0o600 });
+  await writeFile(path.join(out, "xvfb.log"), stderr, { mode: 0o600 });
 
   if (exit !== 0 && stderr) {
     console.error(stderr);

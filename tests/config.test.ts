@@ -43,8 +43,9 @@ test("configuration uses the checkout when invoked from another directory", asyn
   );
 
   expect(await p.exited).toBe(0);
-  expect((await new Response(p.stdout).text()).trim()).toBe(
-    decodeURIComponent(expected.pathname).replace(/\/$/, "")
+  const stdout = await new Response(p.stdout).text();
+  expect(stdout.trim()).toBe(
+    decodeURIComponent(expected.pathname).replace(/\/$/u, "")
   );
 });
 
@@ -73,7 +74,29 @@ test("installed source reads configuration and app data from the explicit mutabl
     );
 
     expect(await p.exited).toBe(0);
-    const value = JSON.parse(await new Response(p.stdout).text());
+    const value: unknown = JSON.parse(await new Response(p.stdout).text());
+
+    /* oxlint-disable anti-slop/no-runtime-typeof -- Parse the actual subprocess JSON boundary without a runtime schema dependency. */
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      !("projectRoot" in value) ||
+      typeof value.projectRoot !== "string" ||
+      !("sourceRoot" in value) ||
+      typeof value.sourceRoot !== "string" ||
+      !("appId" in value) ||
+      typeof value.appId !== "string" ||
+      !("appDirectory" in value) ||
+      typeof value.appDirectory !== "string" ||
+      !("nativeDirectory" in value) ||
+      typeof value.nativeDirectory !== "string" ||
+      !("prefix" in value) ||
+      typeof value.prefix !== "string"
+    ) {
+      throw new Error("Configuration subprocess returned an invalid snapshot");
+    }
+
+    /* oxlint-enable anti-slop/no-runtime-typeof */
     expect(value.projectRoot).toBe(dir);
     expect(value.sourceRoot).not.toBe(dir);
     expect(value.appId).toBe("6789");
@@ -99,6 +122,7 @@ for (const dir of ["relative/path", "/nix/store/not-mutable"]) {
         stderr: "pipe",
       }
     );
+
     expect(await p.exited).not.toBe(0);
   });
 }
