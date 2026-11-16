@@ -227,6 +227,10 @@ if [[ "$reference_views" == true ]]; then
     for phase in menu arena-lobby draft-1 draft-2 bgs-start bgs-minions-toggle bgs-end; do
         if [[ "$phase" == bgs-start ]]; then
             send menu
+            for ((attempt = 0; attempt < 30; attempt++)); do
+                jq -e '.cards==[] and .arenaVisibility=="Collapsed" and .visibleScores==[]' "$run/state.json" >/dev/null && break
+                sleep 0.1
+            done
             jq -e '.cards==[] and .arenaVisibility=="Collapsed" and .visibleScores==[]' "$run/state.json" >/dev/null
         fi
         send "$phase"
