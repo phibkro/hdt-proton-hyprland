@@ -499,11 +499,11 @@ impl Bridge {
                     && i32::from(pointer.win_y) < i32::from(r.y) + i32::from(r.height)
             });
         self.focus(active, hit)?;
-        // Generic X11 clients own their readiness. Wine requires an explicit
-        // Win32 activation acknowledgement before pointer entry is admitted.
+        // Prepare Wine before admitting controls, then retain their shape
+        // across asynchronous focus notifications. Focus is not input readiness.
         let admitted = match win32_input {
             None => rectangles,
-            Some(Win32Input::Active) if hit => rectangles,
+            Some(Win32Input::Prepared) => rectangles,
             _ => &[],
         };
         self.display.shape(self.overlay, admitted)?;
@@ -665,7 +665,6 @@ fn bridge(mut owner: Bridge) -> Result<()> {
 enum Win32Input {
     Unprepared,
     Prepared,
-    Active,
 }
 
 #[derive(Deserialize)]

@@ -738,18 +738,17 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
         "native input stays empty until Win32 is prepared"
     );
     publish("owned", 0, "Prepared");
-    wait_ack(&|v| v["fresh"] == true && v["controls"] == 1 && v["inputControls"] == 0);
-    assert!(
+    wait_ack(&|v| v["fresh"] == true && v["controls"] == 1 && v["inputControls"] == 1);
+    assert_eq!(
         conn.shape_get_rectangles(overlay, SK::INPUT)
             .unwrap()
             .reply()
             .unwrap()
             .rectangles
-            .is_empty(),
-        "Win32 preparation without activation cannot admit pointer entry"
+            .len(),
+        1,
+        "prepared controls remain admitted independently of WPF activation"
     );
-    publish("owned", 0, "Active");
-    wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
     publish("owned", 0, "Unprepared");
     wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == true && v["controls"] == 0);
     assert!(
@@ -761,7 +760,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .is_empty(),
         "losing Win32 preparation removes native input immediately"
     );
-    publish("owned", 0, "Active");
+    publish("owned", 0, "Prepared");
     wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
     let second = command().output().unwrap();
     assert!(!second.status.success());
@@ -787,7 +786,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .is_empty()
     );
     for (session, age) in [("other", 0), ("owned", 5000), ("owned", -5000)] {
-        publish("owned", 0, "Active");
+        publish("owned", 0, "Prepared");
         wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
         assert_eq!(
             conn.shape_get_rectangles(overlay, SK::INPUT)
@@ -798,7 +797,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
                 .len(),
             1
         );
-        publish(session, age, "Active");
+        publish(session, age, "Prepared");
         wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == false && v["controls"] == 0);
         assert!(
             conn.shape_get_rectangles(overlay, SK::INPUT)
@@ -809,7 +808,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
                 .is_empty()
         );
     }
-    publish("owned", 0, "Active");
+    publish("owned", 0, "Prepared");
     wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
     assert_eq!(
         conn.shape_get_rectangles(overlay, SK::INPUT)

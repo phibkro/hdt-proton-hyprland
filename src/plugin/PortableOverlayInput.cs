@@ -66,7 +66,7 @@ sealed class PortableOverlayInput
     {
         var hwnd = new WindowInteropHelper(overlay).Handle;
         if (!PreparedFor(hwnd)) return "Unprepared";
-        return overlay.IsActive && Hearthstone_Deck_Tracker.User32.GetForegroundWindow() == hwnd ? "Active" : "Prepared";
+        return "Prepared";
     }
 
     static Acknowledgement Read(string path, string session, IntPtr hwnd)
