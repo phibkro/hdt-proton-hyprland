@@ -116,6 +116,7 @@ while (($#)); do
     shift
 done
 [[ "$diagnostics" == false || "$plugin" == true ]] || fail '--diagnostics requires --with-plugin.'
+[[ "$canonical_events" == false || "$diagnostics" == false ]] || fail '--canonical-events and --diagnostics require separate replay runs.'
 [[ -f "$manifest" ]] || fail 'Run prepare first.'
 jq -e --arg root "$root" '.schema==2 and .kind=="hdt-ui-replay" and .project==$root' "$manifest" >/dev/null || fail 'Invalid environment ownership.'
 proton=$(jq -er .proton "$manifest")

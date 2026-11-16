@@ -188,3 +188,43 @@ test("replay preserves namespace arguments and a failing supervisor result witho
     await rm(temp, { recursive: true, force: true });
   }
 });
+
+test("canonical replay cannot silently bypass requested diagnostics", async () => {
+  const temp = await mkdtemp(nodePath.join(tmpdir(), "hdt-replay-conflict-"));
+
+  try {
+    await mkdir(nodePath.join(temp, "scripts"));
+    await copyFile(
+      nodePath.join(root, "scripts/replay.sh"),
+      nodePath.join(temp, "scripts/replay.sh")
+    );
+
+    const child = Bun.spawn(
+      [
+        "bash",
+        nodePath.join(temp, "scripts/replay.sh"),
+        "run",
+        "--with-plugin",
+        "--canonical-events",
+        "--diagnostics",
+      ],
+      { stdout: "pipe", stderr: "pipe" }
+    );
+
+    const status = await child.exited;
+    const stderr = await new Response(child.stderr).text();
+
+    expect(status).toBe(1);
+    expect(stderr).toContain("require separate replay runs");
+    expect(
+      await Bun.file(
+        nodePath.join(temp, "local/replay/ownership.json")
+      ).exists()
+    ).toBe(false);
+    expect(await readdir(nodePath.join(temp, "local/replay"))).toEqual([
+      ".lock",
+    ]);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});

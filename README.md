@@ -14,6 +14,7 @@ The Linux host is now a native Rust executable. The C# plugin still runs inside 
 
 | Task or question | Document |
 |---|---|
+| Review and merge changes with reproducible verification | [PR review workflow](docs/PR-REVIEW.md) |
 | Install through Nix and register the desktop app | [Install the compatibility tools with Nix](docs/NIX.md) |
 | Apply the plugin and start HDT with Steam | [Apply HDT compatibility fixes](docs/INSTALL.md) |
 | Build the plugin or diagnose an overlay problem | [Check and diagnose HDT](docs/DEVELOPMENT.md) |

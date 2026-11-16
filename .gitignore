@@ -183,3 +183,17 @@
 !/tests/reference/
 /tests/reference/*
 !/tests/reference/x-surface-probe.c
+
+# Project-local verification instructions; evidence stays private.
+!/.cursor/
+/.cursor/*
+!/.cursor/skills/
+/.cursor/skills/*
+!/.cursor/skills/verify-hdt-proton/
+/.cursor/skills/verify-hdt-proton/*
+!/.cursor/skills/verify-hdt-proton/SKILL.md
+!/.cursor/skills/verify-hdt-proton/features/
+/.cursor/skills/verify-hdt-proton/features/*
+!/.cursor/skills/verify-hdt-proton/features/*.md
+
+!/docs/PR-REVIEW.md
