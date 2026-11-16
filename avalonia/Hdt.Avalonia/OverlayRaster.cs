@@ -113,7 +113,6 @@ public static class OverlayRendering
 }
 public static class ArenaPresentation
 {
-    private static TextBlock Text(string value, double size) => new() { Text = value, FontSize = size, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap };
     public static string Evidence(ArenaChoiceEvidence evidence) => $"HDT watcher event received {evidence.ReceivedAt:HH:mm:ss} UTC • memory freshness unknown";
     public static string Heading(ArenaObservation frame)
     {
@@ -132,42 +131,30 @@ public static class ArenaPresentation
         {
             case ArenaHeroSelection heroes:
                 foreach (var hero in heroes.Choices)
-                    yield return TrackerLayout.Section(hero.Name, new StackPanel
-                    {
-                        Spacing = 6,
-                        Children = {
-                        Text(hero.Class ?? "Class not observed", size - 3), Text(hero.Id, 12),
-                        Text(hero.SourceIndex is { } index ? $"Source actor index {index} • position unknown" : "Source position not supplied", 11),
-                        Text("Hero statistics unavailable", 13) }
-                    });
-                if (heroes.UnavailableReason is not null) yield return Text(heroes.UnavailableReason, 14);
+                    yield return ArenaChoiceViews.Render(ArenaChoiceDisplay.NewHero(new ArenaHeroDisplay(
+                        hero.Id, hero.Name, hero.Class ?? "Class not observed", Source(hero.SourceIndex))), size);
+                if (heroes.UnavailableReason is not null) yield return ArenaChoiceViews.Message(heroes.UnavailableReason, 14);
                 break;
             case ArenaCardDraft cards:
                 foreach (var offer in cards.Choices) yield return Offer(offer, frame.PickedDeck, settings, frame.Underground, size, frame.SchemaVersion != 3);
                 break;
             case ArenaUnavailable unavailable:
-                yield return Text($"{unavailable.Kind} choices unavailable • {unavailable.Reason}", 14);
+                yield return ArenaChoiceViews.Render(ArenaChoiceDisplay.NewUnavailable(unavailable.Kind.ToString(), unavailable.Reason), size);
                 break;
         }
-        if (frame.ChoiceEvidence is { } evidence) yield return Text(Evidence(evidence), 12);
+        if (frame.ChoiceEvidence is { } evidence) yield return ArenaChoiceViews.Message(Evidence(evidence), 12);
     }
-    public static Border Offer(ArenaOffer offer, ArenaCard[] deck, TrackerSettings settings, bool underground, double size, bool adviceAvailable = true)
+    private static ArenaSource Source(int? index) => index is { } value ? ArenaSource.NewActorIndex(value) : ArenaSource.Unspecified;
+    public static Control Offer(ArenaOffer offer, ArenaCard[] deck, TrackerSettings settings, bool underground, double size, bool adviceAvailable = true)
     {
-        var lines = new StackPanel { Spacing = 6, Children = { Text($"{offer.Card.Mana} mana   {offer.Card.Name}", size), Text(offer.Card.Id, 12) } };
-        if (offer.SourceIndex is { } index) lines.Children.Add(Text($"Source actor index {index} • position unknown", 11));
-        if (!adviceAvailable) lines.Children.Add(Text("Ratings and deck synergies unavailable • no matching source generation", 13));
-        else
+        var advice = !adviceAvailable ? ArenaAdvice.Unavailable : (settings.ShowArenasmithScore, settings.ShowArenaDeckSynergies) switch
         {
-            if (settings.ShowArenasmithScore) lines.Children.Add(Text($"Arenasmith {offer.DisplayScore} • plaque {offer.Plaque}", size - 3));
-            if (settings.ShowArenaDeckSynergies) lines.Children.Add(Text($"Deck synergies: {offer.SynergyCount(deck)}", 14));
-        }
-        return new Border
-        {
-            Padding = new(size < 20 ? 10 : 16),
-            CornerRadius = new(6),
-            BorderThickness = new(2),
-            BorderBrush = new SolidColorBrush(Color.Parse(underground ? "#932020" : "#067F93")),
-            Child = lines
+            (true, true) => ArenaAdvice.NewScoreAndSynergies(offer.DisplayScore, offer.Plaque, offer.SynergyCount(deck)),
+            (true, false) => ArenaAdvice.NewScoreOnly(offer.DisplayScore, offer.Plaque),
+            (false, true) => ArenaAdvice.NewSynergiesOnly(offer.SynergyCount(deck)),
+            (false, false) => ArenaAdvice.Hidden
         };
+        return ArenaChoiceViews.Render(ArenaChoiceDisplay.NewCard(new ArenaCardDisplay(offer.Card.Id, offer.Card.Name, offer.Card.Mana,
+            Source(offer.SourceIndex), advice, underground)), size);
     }
 }

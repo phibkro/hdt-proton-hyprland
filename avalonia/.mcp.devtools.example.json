@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "avalonia-devtools": {
+      "command": "bash",
+      "args": ["dev.sh", "mcp"]
+    }
+  }
+}

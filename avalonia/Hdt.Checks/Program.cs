@@ -483,6 +483,46 @@ try
         Click(window.ResetButton);
     }
     window.Close();
+    var rawCardFrame = cardFrame with
+    {
+        SchemaVersion = 3,
+        PickedDeck = [],
+        PickIndex = 0,
+        SelectedCardId = null,
+        ChoiceEvidence = eventHero.ChoiceEvidence,
+        CachedDeck = new(ArenaCachedDeckOrigin.HdtPublicTileModel, []),
+        Selection = new ArenaCardDraft(cardFrame.CardOffers.Select((offer, index) => offer with
+        {
+            BaseRating = null,
+            DynamicRating = null,
+            Enabled = new([], []),
+            EnhancedBy = new([], []),
+            SourceIndex = index
+        }).ToArray())
+    };
+    foreach (var adviceFrame in new[] { cardFrame, rawCardFrame })
+    {
+        var adviceFile = Path.Combine(evidence, $"advice-{adviceFrame.SchemaVersion}.json");
+        File.WriteAllText(adviceFile, System.Text.Json.JsonSerializer.Serialize(new[] { adviceFrame }, ReplaySource.JsonOptions));
+        window = CreateWindow(new(adviceFile, Path.Combine(evidence, $"advice-settings-{adviceFrame.SchemaVersion}.json")));
+        window.Show(); Wait(window.Initialization);
+        Console.WriteLine($"ARENA CHOICE IMPLEMENTATION {typeof(ArenaChoiceViews).Assembly.FullName}");
+        var adviceTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+        foreach (var (scores, synergies) in new[] { (true, true), (false, true), (false, false), (true, false) })
+        {
+            Click((TabItem)adviceTabs.Items[3]!);
+            if (window.ScoresToggle.IsChecked != scores) { Click(window.ScoresToggle); Wait(window.PendingPreferences); }
+            if (window.SynergiesToggle.IsChecked != synergies) { Click(window.SynergiesToggle); Wait(window.PendingPreferences); }
+            Click((TabItem)adviceTabs.Items[1]!);
+            Check(window.OfferCount == cardFrame.CardOffers.Length && HasText("mana"), "F# advice preference changes preserve the offered card identities");
+            Check(adviceFrame.SchemaVersion == 3
+                ? HasText("no matching source generation") && !HasText("Arenasmith ") && !HasText("Deck synergies:")
+                : HasText("Arenasmith ") == scores && HasText("Deck synergies:") == synergies,
+                $"schema {adviceFrame.SchemaVersion}: scores={scores}, synergies={synergies} preserves available versus unavailable advice");
+        }
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"advice-{adviceFrame.SchemaVersion}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        window.Close();
+    }
     var nativeFile = Path.Combine(evidence, $"native-observation-{Guid.NewGuid():N}.json");
     var nativeLibraryFile = Path.Combine(evidence, $"observed-library-{Guid.NewGuid():N}.json");
     var nativeLibrary = new ClientLibrary(nativeLibraryFile);
