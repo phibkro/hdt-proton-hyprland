@@ -25,6 +25,8 @@ x11rb = { version = "0.13", features = ["composite", "render", "xinput", "shape"
 quick-xml = "0.42"
 
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false }
+proptest = { version = "1.12.0", default-features = false, features = ["std"] }
 tempfile = "3"
 
 [lints.rust]
@@ -37,3 +39,7 @@ all = "warn"
 lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
+
+[[bench]]
+name = "input_protocol"
+harness = false

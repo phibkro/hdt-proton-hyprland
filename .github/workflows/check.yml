@@ -81,6 +81,10 @@ jobs:
         run: nix develop --command cargo fetch --locked
       - name: Check native Rust host
         run: nix develop --command bun scripts/quality.ts check rust
+      - name: Bounded coverage-guided fuzz smoke
+        run: nix develop --command bash scripts/check-fuzz.sh
+      - name: Compile and smoke-test parser benchmarks
+        run: nix develop --command bash scripts/bench-host.sh --test
 
   nix-check:
     needs: scope

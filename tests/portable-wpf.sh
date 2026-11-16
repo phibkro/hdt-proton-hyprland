@@ -26,9 +26,9 @@ move() {
 }
 wait_for 'WPF control layout' '.desktopControl!=null' "$state"
 jq -e '.overlayExtendedStyle / 134217728 | floor % 2 == 1' "$state" >/dev/null
-for variant in wrong-session stale future wrong-hwnd not-ready; do
+for variant in wrong-session stale future wrong-hwnd fractional not-ready; do
     jq -n --arg variant "$variant" --argjson hwnd "$(jq .overlayHwnd "$state")" \
-        '{backend:"x11",overlayHwnd:(if $variant=="wrong-hwnd" then $hwnd+1 else $hwnd end),session:(if $variant=="wrong-session" then "wrong" else "isolated-replay" end),nativeReady:($variant!="not-ready"),observedMS:(now*1000-(if $variant=="stale" then 5000 elif $variant=="future" then -5000 else 0 end))}' >"$ack"
+        '{backend:"x11",overlayHwnd:(if $variant=="wrong-hwnd" then $hwnd+1 else $hwnd end),session:(if $variant=="wrong-session" then "wrong" else "isolated-replay" end),nativeReady:($variant!="not-ready"),observedMS:((if $variant=="fractional" then now*1000+0.5 else (now*1000|floor) end)-(if $variant=="stale" then 5000 elif $variant=="future" then -5000 else 0 end))}' >"$ack"
     sleep 0.3
     jq -e '.overlayExtendedStyle / 134217728 | floor % 2 == 1' "$state" >/dev/null
 done
@@ -41,6 +41,10 @@ cleanup() {
 trap cleanup EXIT
 "$host" x11-desktop windows steam_app_1234567890 >"$run/portable-windows.json"
 game=$(jq -er '.[]|select(.title=="Hearthstone")|.address' "$run/portable-windows.json")
+# Retain property types/terminators when Wine's native identity differs.
+xwininfo -root -tree | awk '/"HearthstoneOverlay"|"Hearthstone Deck Tracker"/ {print $1}' | while read -r xid; do
+    xprop -id "$xid" WM_NAME WM_CLASS _NET_WM_PID
+done >"$run/portable-properties.txt"
 read -r ox oy ow oh < <(jq -er '.[]|select(.title=="HearthstoneOverlay")|[.at[],.size[]]|@tsv' "$run/portable-windows.json")
 xdotool windowsize "$game" "$ow" "$oh"
 xdotool windowmove "$game" "$ox" "$oy"

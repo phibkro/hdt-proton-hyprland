@@ -37,6 +37,12 @@ use crate::x11::{atom, identity, vanished};
 
 const MAX_RECTANGLES: usize = 2048;
 
+/// Validate the production wire format without opening a display or changing state.
+/// Shared by offline fuzzing and benchmarks, so they exercise the real parser.
+pub fn validate_input_frame(bytes: &[u8]) -> Result<()> {
+    Frame::parse(std::str::from_utf8(bytes)?).map(|_| ())
+}
+
 #[derive(Debug)]
 struct Frame {
     width: u16,
@@ -893,6 +899,62 @@ pub fn run(args: &[OsString]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+        #[test]
+        fn arbitrary_wire_data_never_panics(bytes in proptest::collection::vec(any::<u8>(), 0..70_000)) {
+            let _ = validate_input_frame(&bytes);
+        }
+
+        #[test]
+        fn accepted_rectangles_are_inside_the_actual_window(
+            width in 1u16..=u16::MAX, height in 1u16..=u16::MAX,
+            x in any::<u16>(), y in any::<u16>(), w in any::<u16>(), h in any::<u16>()
+        ) {
+            let expected = x <= i16::MAX as u16 && y <= i16::MAX as u16 && w > 0 && h > 0 &&
+                u32::from(x) + u32::from(w) <= u32::from(width) &&
+                u32::from(y) + u32::from(h) <= u32::from(height);
+            let wire = format!("v1 {width} {height} 1 {x} {y} {w} {h}");
+            prop_assert_eq!(validate_input_frame(wire.as_bytes()).is_ok(), expected);
+        }
+
+        #[test]
+        fn producer_sequences_reject_expiry_resize_and_replaced_sessions(
+            operations in proptest::collection::vec((0u8..6, 0i64..4000), 1..100)
+        ) {
+            // Reference model tracks the producer and native geometry separately;
+            // restarting or resizing must never revive an old snapshot.
+            let mut now = 10_000i64;
+            let mut width = 100u16;
+            let mut generation = 0u32;
+            let mut published_generation = 0u32;
+            let mut published_width = 100u16;
+            let mut published_time = now;
+            let mut has_handle = true;
+            let mut producer = Producer {session:"0".into(), observed_ms:now,
+                hwnd:1,width,height:80,rectangles:vec![]};
+            for (operation, delta) in operations {
+                match operation {
+                    0 => { now += delta; },
+                    1 => { width = if width == 100 { 101 } else { 100 }; },
+                    2 => { generation += 1; },
+                    3 => {
+                        published_generation = generation; published_width = width;
+                        published_time = now; has_handle = true;
+                        producer = Producer {session:generation.to_string(),observed_ms:now,
+                            hwnd:1,width,height:80,rectangles:vec![]};
+                    },
+                    4 => { has_handle = false; producer.hwnd = 0; },
+                    _ => { now -= delta; },
+                }
+                let expected = has_handle && generation == published_generation && width == published_width &&
+                    now >= published_time - 1499 && now <= published_time + 1499;
+                prop_assert_eq!(producer.current(&generation.to_string(), width, 80, now), expected);
+            }
+        }
+    }
     #[test]
     fn producer_requires_matching_session_dimensions_and_recent_time() {
         let mut producer = Producer {

@@ -233,9 +233,9 @@ jq -e --argjson levels "$levels" --argjson emitters "$emitters" '.cards==["CS2_0
 jq -e '.cards==[] and .arenaVisibility=="Collapsed" and .visibleScores==[]' "$run/menu.json" >/dev/null
 if [[ "$plugin" == true ]]; then
     jq -e '.pluginUpdates>0' "$run/draft-2.json" >/dev/null
-    jq -e '.state.arenaClientState=="None"' "$run/plugin-input.json" >/dev/null
+    jq -e '.state.arenaClientState=="None"' "$HDT_INPUT_REGION_FILE" >/dev/null
     if [[ "$particles" == true && ("$level" == mixed || "$level" == 5) ]]; then
-        jq -e '.state.arenaParticleEmittersSuppressed>=1' "$run/plugin-input.json" >/dev/null
+        jq -e '.state.arenaParticleEmittersSuppressed>=1' "$HDT_INPUT_REGION_FILE" >/dev/null
     fi
 fi
 mapfile -t mains < <(xdotool search --onlyvisible --name '^Hearthstone Deck Tracker$')

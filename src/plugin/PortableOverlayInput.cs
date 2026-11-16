@@ -53,6 +53,13 @@ sealed class PortableOverlayInput
         catch (UnauthorizedAccessException) { return null; }
         catch (ArgumentException) { return null; }
         catch (InvalidOperationException) { return null; }
+        catch (Exception error)
+        {
+            // Framework's ObjectConverter wraps malformed numeric fields in
+            // System.Exception. Invalid IPC must not escape onto the UI thread.
+            Log.Warn("Rejected portable input acknowledgement: " + error.GetType().Name);
+            return null;
+        }
     }
 
     public void Update(Window overlay)

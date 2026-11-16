@@ -637,7 +637,136 @@ fn portable_bridge_acceptance(conn: &RustConnection, display: &str, root: u32, p
         None,
         "rejected game identity cannot alter the overlay"
     );
+    portable_controller_faults(conn, display, &[overlay, game, main]);
     for window in [overlay, game, main, wrapper] {
         conn.destroy_window(window).unwrap().check().unwrap();
     }
+}
+
+fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u32; 3]) {
+    use serde_json::json;
+    let [overlay, game, main] = *windows;
+    for window in [overlay, game, main] {
+        conn.change_property8(
+            PropMode::REPLACE,
+            window,
+            AtomEnum::WM_CLASS,
+            AtomEnum::STRING,
+            b"fixture\0steam_app_123\0",
+        )
+        .unwrap()
+        .check()
+        .unwrap();
+    }
+    let temp = tempfile::tempdir().unwrap();
+    let evidence = temp.path().join("evidence");
+    std::fs::create_dir(&evidence).unwrap();
+    let region = evidence.join("input-region.json");
+    let ack = evidence.join("control-input.json");
+    let publish = |session: &str, age: i64| {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        std::fs::write(
+            &region,
+            serde_json::to_vec(&json!({"session":session,"observedMS":now-age,
+            "overlayHwnd":123,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
+            .unwrap(),
+        )
+        .unwrap();
+    };
+    let active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    conn.change_property32(
+        PropMode::REPLACE,
+        conn.setup().roots[0].root,
+        active,
+        AtomEnum::WINDOW,
+        &[game],
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    let executable = std::env::var_os("HDT_TEST_HOST_BINARY").unwrap();
+    let command = || {
+        let mut command = Command::new(&executable);
+        command
+            .args(["x11-control", "owned"])
+            .env("DISPLAY", display)
+            .env("HS_APP_ID", "123")
+            .env("HDT_PROJECT_DIR", temp.path())
+            .env("HOME", temp.path());
+        command
+    };
+    let mut owner = Server(
+        command()
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    let wait_ack = |check: &dyn Fn(&serde_json::Value) -> bool| {
+        let deadline = Instant::now() + Duration::from_secs(4);
+        loop {
+            if let Ok(bytes) = std::fs::read(&ack)
+                && let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes)
+                && check(&value)
+            {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "controller acknowledgement timeout"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    };
+    publish("owned", 0);
+    wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
+    let second = command().output().unwrap();
+    assert!(!second.status.success());
+    assert!(String::from_utf8_lossy(&second.stderr).contains("another portable controller"));
+    assert_eq!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1
+    );
+    // Corrupt producer, wrong generation, old/future timestamp, then recovery.
+    std::fs::write(&region, b"{").unwrap();
+    wait_ack(&|v| v["nativeReady"] == false);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty()
+    );
+    for (session, age) in [("other", 0), ("owned", 5000), ("owned", -5000)] {
+        publish("owned", 0);
+        wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
+        publish(session, age);
+        wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == false && v["controls"] == 0);
+    }
+    publish("owned", 0);
+    wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
+    std::fs::remove_file(&region).unwrap();
+    wait_ack(&|v| v["fresh"] == false && v["controls"] == 0);
+    nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(owner.0.id() as i32),
+        nix::sys::signal::Signal::SIGTERM,
+    )
+    .unwrap();
+    assert!(owner.0.wait().unwrap().success());
+    wait_ack(&|v| v["nativeReady"] == false);
+    assert_eq!(property(conn, overlay), None);
 }

@@ -225,6 +225,14 @@ switch (language) {
     run([
       "cargo",
       "fmt",
+      "--manifest-path",
+      "fuzz/Cargo.toml",
+      "--all",
+      ...(mode === "check" ? ["--", "--check"] : []),
+    ]);
+    run([
+      "cargo",
+      "fmt",
       "--all",
       ...(mode === "check" ? ["--", "--check"] : []),
     ]);
@@ -249,6 +257,8 @@ switch (language) {
       "nextest",
       "run",
       "--locked",
+      "--profile",
+      "ci",
       "--config-file",
       "tooling/rust/nextest.toml",
       "--test-threads",
