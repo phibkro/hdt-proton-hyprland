@@ -25,7 +25,7 @@ with pkgs;
   libx11
   libxi
   bubblewrap
-  xorg.xorgserver
+  xorg-server
   libxcomposite
   libxrender
   stylua
