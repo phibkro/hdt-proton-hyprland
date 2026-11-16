@@ -7,13 +7,13 @@ public sealed record ProtonState(long ObservedMS, ProtonGameState State);
 public sealed record ProtonGameState(string Mode, string ArenaClientState, string ArenaSessionState, bool ArenaDrafting, bool ArenaAvailable);
 public sealed class ProtonStateReader(string path)
 {
-    public string Read(DateTimeOffset now)
+    public async Task<string> ReadAsync(DateTimeOffset? observedNow = null, CancellationToken cancellation = default)
     {
-        using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        var snapshot = JsonSerializer.Deserialize<ProtonState>(input, ReplaySource.JsonOptions)
-            ?? throw new InvalidDataException("Empty Proton state.");
+        var snapshot = await SnapshotFiles.ReadJsonAsync<ProtonState>(path, SnapshotFiles.StatusBytes, cancellation).ConfigureAwait(false);
+        var now = observedNow ?? DateTimeOffset.UtcNow;
         if (snapshot.State is null || snapshot.ObservedMS <= 0 || snapshot.State.Mode is null
-            || snapshot.State.ArenaClientState is null || snapshot.State.ArenaSessionState is null)
+            || snapshot.State.ArenaClientState is null || snapshot.State.ArenaSessionState is null
+            || snapshot.State.Mode.Length > 128 || snapshot.State.ArenaClientState.Length > 128 || snapshot.State.ArenaSessionState.Length > 128)
             throw new InvalidDataException("Proton state requires observation time and game/Arena states.");
         var age = now.ToUnixTimeMilliseconds() - snapshot.ObservedMS;
         if (age < -5000) throw new InvalidDataException("Proton observation is in the future.");

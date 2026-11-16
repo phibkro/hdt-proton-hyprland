@@ -16,7 +16,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      docs-only: ${{ steps.scope.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Classify the complete change
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          docs_only=$(bash scripts/ci-scope.sh "$BASE_SHA" "$HEAD_SHA")
+          echo "docs-only=$docs_only" >> "$GITHUB_OUTPUT"
+
   native-ui:
+    needs: scope
+    if: ${{ needs.scope.outputs.docs-only == 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -27,9 +48,13 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+      - name: Build and check bounded native snapshot reader
+        run: nix-shell avalonia/shell.nix --run 'cargo build --locked -j2 && cargo test --locked -j2 --test rust-snapshot'
       - name: Restore exact dependency graph
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet restore Hdt.Checks/Hdt.Checks.csproj --locked-mode'
       - name: Build native application and acceptance driver
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilation=false'
+      - name: Check native C# formatting
+        run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet format whitespace Hdt.Avalonia/Hdt.Avalonia.csproj --no-restore --verify-no-changes && dotnet format whitespace Hdt.Checks/Hdt.Checks.csproj --no-restore --verify-no-changes'
       - name: Exercise rendered native controls
         run: nix-shell avalonia/shell.nix --run 'cd avalonia && dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalonia-evidence'

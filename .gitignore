@@ -225,10 +225,25 @@
 !/scripts/bench-host.sh
 !/scripts/evaluate.sh
 
-# Independently authored Avalonia migration; no upstream assets or runtime state.
+# Independently authored Avalonia migration; runtime captures remain denied.
 !/avalonia/
-/avalonia/**/bin/
-/avalonia/**/obj/
-/avalonia/**/.avalonia-build-tasks/
-/avalonia/local/
+/avalonia/*
+!/avalonia/README.md
+!/avalonia/Directory.Build.props
+!/avalonia/global.json
+!/avalonia/shell.nix
+!/avalonia/Hdt.Avalonia/
+/avalonia/Hdt.Avalonia/*
+!/avalonia/Hdt.Avalonia/*.cs
+!/avalonia/Hdt.Avalonia/Hdt.Avalonia.csproj
+!/avalonia/Hdt.Avalonia/packages.lock.json
+!/avalonia/Hdt.Checks/
+/avalonia/Hdt.Checks/*
+!/avalonia/Hdt.Checks/*.cs
+!/avalonia/Hdt.Checks/Hdt.Checks.csproj
+!/avalonia/Hdt.Checks/packages.lock.json
+!/avalonia/fixtures/
+/avalonia/fixtures/*
+!/avalonia/fixtures/draft.json
 !/.github/workflows/avalonia.yml
+!/tests/rust-snapshot.rs

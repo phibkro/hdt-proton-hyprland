@@ -62,7 +62,7 @@ from `hdt-status`, not just a healthy CLI. Re-do doctor or reset after any failu
 
 ## Drive
 
-Follow all three indexed feature files. The coordinator owns all runtime actions;
+Follow all indexed feature files. The coordinator owns all runtime actions;
 source-review agents may read only. Run each mapped entry point or record its
 attempt and concrete missing prerequisite. Never replace a live path with a
 mock and label it passed. Mutation tests use a new owned data directory; preserve

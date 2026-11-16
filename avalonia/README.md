@@ -1,6 +1,6 @@
 # Native Avalonia migration — first executable slice
 
-An independently authored .NET/Avalonia application. This is a migration preview,
+An independently authored .NET/Avalonia application with a Linux-first Rust IO boundary. This is a migration preview,
 not a replacement for HDT. It opens a native window with a working Arena replay
 view and local Arena preferences. It never reads game memory or sends game input.
 
@@ -16,6 +16,8 @@ From the repository root:
 
 ```sh
 nix-shell avalonia/shell.nix
+cargo build --locked -j2
+cargo test --locked -j2 --test rust-snapshot
 cd avalonia
 dotnet restore Hdt.Checks/Hdt.Checks.csproj --locked-mode
 dotnet build Hdt.Checks/Hdt.Checks.csproj --no-restore -m:2 -p:UseSharedCompilation=false
@@ -45,12 +47,16 @@ and does not modify the file, Windows configuration or installed plugin.
 
 Settings default to the platform's LocalApplicationData `hdt-avalonia/settings.json`.
 They are separate from Windows HDT settings and use an atomic same-directory
-replacement. Pass `--settings` to isolate each session.
+replacement. Settings initialization, replay reads, status reads, parsing and
+settings writes run off the UI dispatcher. Preference controls have one pending
+write owner, and guarded rollback never triggers another save. Pass `--settings` to isolate each session.
 
 Toolchain: .NET SDK **10.0.401** (roll-forward disabled), Avalonia **12.1.6**,
 NuGet transitive versions and content hashes in each `packages.lock.json`.
 `shell.nix` reuses the repository's `devenv.lock` as the one nixpkgs pin, including
-native graphics/font/X11 libraries. No extra nixpkgs pin or downloaded SDK script.
+native graphics/font/X11 libraries. No extra nixpkgs pin or downloaded SDK script. The shell selects the built
+Rust host through explicit `HDT_HOST_BINARY`; an older/missing host is a visible
+input failure. This slice currently requires Linux for that boundary.
 C# is used because this is a WPF-to-Avalonia migration; the repository's preferred
 TypeScript stack cannot supply native Avalonia controls.
 
@@ -74,12 +80,47 @@ picked-deck changes, removal of scores, and removal of all offers when leaving
 the draft. This verifies Avalonia rendering and application input handling; it
 does not prove a display-server, Proton or Hearthstone integration journey.
 
-A separate `Avalonia migration` CI job restores with locked mode, builds this
-slice and runs the same rendered journey. CI is defined here; no remote CI run
+A separate `Avalonia migration` CI job uses the existing complete-change scope
+classifier, skips builds for documentation-only changes, restores with locked
+mode, builds the Rust host and native UI, and runs the same rendered journey. CI is defined here; no remote CI run
 is claimed by a local acceptance result. A private Xvfb smoke run also opened the
 ordinary X11 window at 1120×760 and saved `native-x11.png`; both owned processes
 were then stopped. That smoke proves a native display-server launch, not game
 integration.
+
+The fault journey additionally invokes the real Rust process on oversized,
+malformed, directory, symlink, character-device and FIFO inputs. Real dispatcher
+polling proves stale → fresh recovery and mode changes. A slow owned helper
+proves the watchdog while pointer navigation stays responsive, then proves child
+reaping and recovery. `status-stale.png`, `status-recovered.png` and
+`settings-failure.png` retain rendered evidence. The slow helper exercises process
+supervision; it supplies no pretend acquisition facts. Unavailable preferences
+storage must visibly fail, roll controls back without reentrant writes, and save
+successfully after storage recovers.
+
+## Bounded external-file contract
+
+All JSON input uses `SnapshotFiles` and the existing Rust host's explicit
+`read-snapshot MAX_BYTES PATH` command. That command opens read-only with
+`O_NONBLOCK | O_NOFOLLOW`, checks the same opened handle's `is_file()` and size,
+then reads at most the caller's bound plus one byte before emitting any stdout.
+It rejects final symlinks, FIFO/socket/device/directory inputs and files that grow
+past the bound. Missing files have a distinct exit code; only missing local
+settings select defaults. Other settings read failures remain visible.
+
+The managed process actor owns at most one child, bounds stdout/stderr, and
+applies a two-second deadline. It kills only that child on cancellation/timeout;
+the slot remains owned until it is reaped, so a kernel-stalled reader cannot
+spawn an unbounded replacement chain. No external file open, process start or
+JSON parsing happens on the dispatcher. Replay input is limited to 8 MiB, status
+to 64 KiB and settings to 16 KiB. Validated text/collection limits also bound the
+work needed to render one observation. These are explicit preview limits;
+inputs outside them fail rather than truncate or masquerade as complete data.
+
+The Linux metadata and descriptor handling reuse the repository's existing Rust
+`nix` dependency and standard-library file APIs; no platform struct layouts or
+new native C shim were introduced. The IO watchdog fake is separate from real
+regular-file/fault acceptance.
 
 ## Parity inventory
 

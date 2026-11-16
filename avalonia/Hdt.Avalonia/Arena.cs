@@ -38,16 +38,15 @@ public sealed record ArenaObservation(int SchemaVersion, string SessionId, DateT
 public interface IArenaObservationSource
 {
     string Description { get; }
-    IReadOnlyList<ArenaObservation> Read();
+    Task<IReadOnlyList<ArenaObservation>> ReadAsync(CancellationToken cancellation = default);
 }
 public sealed class ReplaySource(string path) : IArenaObservationSource
 {
     public string Description => "Replay file • no live game connection";
-    public IReadOnlyList<ArenaObservation> Read()
+    public async Task<IReadOnlyList<ArenaObservation>> ReadAsync(CancellationToken cancellation = default)
     {
-        var frames = JsonSerializer.Deserialize<ArenaObservation[]>(File.ReadAllText(path), JsonOptions)
-            ?? throw new InvalidDataException("Replay must contain an observation array.");
-        if (frames.Length == 0) throw new InvalidDataException("Replay contains no observations.");
+        var frames = await SnapshotFiles.ReadJsonAsync<ArenaObservation[]>(path, SnapshotFiles.ReplayBytes, cancellation).ConfigureAwait(false);
+        if (frames.Length is < 1 or > 4096) throw new InvalidDataException("Replay requires 1..4096 observations.");
         var previous = -1;
         foreach (var frame in frames)
         {
@@ -56,14 +55,22 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
                 || frame.Sequence <= previous || string.IsNullOrWhiteSpace(frame.Hero)
                 || frame.PickedDeck is null || frame.Offers is null || frame.Description is null)
                 throw new InvalidDataException("Observations require schema 1, session/time, known mode, increasing sequence, hero, deck, offers and description.");
+            if (frame.PickedDeck.Length > 100 || frame.Offers.Length > 12 || frame.Hero.Length > 128 || frame.SessionId.Length > 128 || frame.Description.Length > 2048)
+                throw new InvalidDataException("Replay exceeds preview collection/text limits.");
             if (frame.Offers.Any(offer => offer is null)) throw new InvalidDataException("Offers cannot be null.");
             foreach (var card in frame.PickedDeck.Concat(frame.Offers.Select(o => o.Card)))
-                if (card is null || string.IsNullOrWhiteSpace(card.Id) || string.IsNullOrWhiteSpace(card.Name) || card.Mana < 0)
+                if (card is null || string.IsNullOrWhiteSpace(card.Id) || string.IsNullOrWhiteSpace(card.Name) || card.Mana < 0 || card.Id.Length > 128 || card.Name.Length > 512)
                     throw new InvalidDataException("Cards require an ID, name and nonnegative mana.");
             foreach (var offer in frame.Offers)
                 if (offer.Enabled?.Direct is null || offer.Enabled.Indirect is null
                     || offer.EnhancedBy?.Direct is null || offer.EnhancedBy.Indirect is null)
                     throw new InvalidDataException("Offers require explicit related-card sets.");
+            foreach (var rating in frame.Offers.SelectMany(offer => new[] { offer.BaseRating, offer.DynamicRating }))
+                if (rating?.Score?.Length > 64) throw new InvalidDataException("Rating text exceeds preview limit.");
+            foreach (var relation in frame.Offers.SelectMany(offer => new[] { offer.Enabled, offer.EnhancedBy }))
+                if (relation.Direct.Length + relation.Indirect.Length > 1024
+                    || relation.All.Any(id => string.IsNullOrWhiteSpace(id) || id.Length > 128))
+                    throw new InvalidDataException("Related-card sets exceed preview limits or contain invalid IDs.");
             if (frame.PickIndex != frame.PickedDeck.Length || (frame.Mode == ArenaMode.Inactive && frame.Offers.Length != 0)
                 || (frame.SelectedCardId is not null && !frame.PickedDeck.Any(card => card.Id == frame.SelectedCardId)))
                 throw new InvalidDataException("Pick index must match picked cards, selected card must be picked, and inactive observations must have no offers.");
@@ -71,6 +78,10 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
         }
         return frames;
     }
-    public static JsonSerializerOptions JsonOptions { get; } = new() { PropertyNameCaseInsensitive = true, WriteIndented = true,
-        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter<ArenaMode>(allowIntegerValues: false) } };
+    public static JsonSerializerOptions JsonOptions { get; } = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter<ArenaMode>(allowIntegerValues: false) }
+    };
 }
