@@ -663,18 +663,19 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
     std::fs::create_dir(&evidence).unwrap();
     let region = evidence.join("input-region.json");
     let ack = evidence.join("control-input.json");
-    let publish = |session: &str, age: i64| {
+    let publish = |session: &str, age: i64, win32_input: &str| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_millis() as i64;
         std::fs::write(
-            &region,
+            region.with_extension("next"),
             serde_json::to_vec(&json!({"session":session,"observedMS":now-age,
-            "overlayHwnd":123,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
+            "overlayHwnd":123,"controllerGeneration":std::fs::read(&ack).ok().and_then(|bytes|serde_json::from_slice::<serde_json::Value>(&bytes).ok()).and_then(|v|v["controllerGeneration"].as_str().map(str::to_owned)),"win32Input":win32_input,"width":32,"height":32,"rectangles":[[8,8,8,8]]}))
             .unwrap(),
         )
         .unwrap();
+        std::fs::rename(region.with_extension("next"), &region).unwrap();
     };
     let active = conn
         .intern_atom(false, b"_NET_ACTIVE_WINDOW")
@@ -721,12 +722,48 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             }
             assert!(
                 Instant::now() < deadline,
-                "controller acknowledgement timeout"
+                "controller acknowledgement timeout: {:?}",
+                std::fs::read_to_string(&ack)
             );
             std::thread::sleep(Duration::from_millis(10));
         }
     };
-    publish("owned", 0);
+    wait_ack(&|v| v["nativeReady"] == true);
+    publish("owned", 0, "Unprepared");
+    wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == true && v["controls"] == 0);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty(),
+        "native input stays empty until Win32 is prepared"
+    );
+    publish("owned", 0, "Prepared");
+    wait_ack(&|v| v["fresh"] == true && v["controls"] == 1 && v["inputControls"] == 1);
+    assert_eq!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1,
+        "prepared controls remain admitted independently of WPF activation"
+    );
+    publish("owned", 0, "Unprepared");
+    wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == true && v["controls"] == 0);
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty(),
+        "losing Win32 preparation removes native input immediately"
+    );
+    publish("owned", 0, "Prepared");
     wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
     let second = command().output().unwrap();
     assert!(!second.status.success());
@@ -751,8 +788,11 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .rectangles
             .is_empty()
     );
+    // After a fault, reacquire the new owner before echoing its preparation.
+    publish("owned", 0, "Unprepared");
+    wait_ack(&|v| v["nativeReady"] == true);
     for (session, age) in [("other", 0), ("owned", 5000), ("owned", -5000)] {
-        publish("owned", 0);
+        publish("owned", 0, "Prepared");
         wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
         assert_eq!(
             conn.shape_get_rectangles(overlay, SK::INPUT)
@@ -763,7 +803,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
                 .len(),
             1
         );
-        publish(session, age);
+        publish(session, age, "Prepared");
         wait_ack(&|v| v["nativeReady"] == true && v["fresh"] == false && v["controls"] == 0);
         assert!(
             conn.shape_get_rectangles(overlay, SK::INPUT)
@@ -774,7 +814,7 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
                 .is_empty()
         );
     }
-    publish("owned", 0);
+    publish("owned", 0, "Prepared");
     wait_ack(&|v| v["fresh"] == true && v["controls"] == 1);
     assert_eq!(
         conn.shape_get_rectangles(overlay, SK::INPUT)
@@ -785,6 +825,50 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
             .len(),
         1
     );
+    // A fresh snapshot from the previous owner must not bootstrap a new one.
+    let previous_generation: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&ack).unwrap()).unwrap();
+    nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(owner.0.id() as i32),
+        nix::sys::signal::Signal::SIGTERM,
+    )
+    .unwrap();
+    assert!(owner.0.wait().unwrap().success());
+    owner = Server(
+        command()
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    wait_ack(&|v| {
+        v["nativeReady"] == true
+            && v["controllerGeneration"] != previous_generation["controllerGeneration"]
+    });
+    let restarted: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&ack).unwrap()).unwrap();
+    assert_eq!(restarted["fresh"], false);
+    assert_eq!(restarted["inputControls"], 0);
+    let snapshot: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&region).unwrap()).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    assert!(
+        now.abs_diff(snapshot["observedMS"].as_i64().unwrap()) < 1500,
+        "restart must reject the old generation while its timestamp is still fresh"
+    );
+    assert!(
+        conn.shape_get_rectangles(overlay, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .is_empty()
+    );
+    publish("owned", 0, "Prepared");
+    wait_ack(&|v| v["fresh"] == true && v["inputControls"] == 1);
     std::fs::remove_file(&region).unwrap();
     wait_ack(&|v| v["fresh"] == false && v["controls"] == 0);
     assert!(

@@ -33,9 +33,44 @@ sealed class ReplayHost
     static int pluginUpdates;
     static Button desktopControl;
     static int desktopClicks;
+    static int pointerMessages;
+    static int overlayTransparencyChanges;
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out NativePoint point);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(NativePoint point);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool MoveFileEx(string source, string destination, int flags);
+    static IntPtr ObservePointerMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (desktopControl != null && overlay != null && hwnd == new WindowInteropHelper(overlay).Handle &&
+            message == 0x7d && wParam.ToInt64() == -20 &&
+            ((Marshal.ReadInt32(lParam, 0) ^ Marshal.ReadInt32(lParam, 4)) & 0x20) != 0)
+            overlayTransparencyChanges++;
+        if (desktopControl != null && pointerMessages < 512 &&
+            (message == 0x200 || message == 0x201 || message == 0x202 || message == 0x2a3 ||
+             message == 0x20 || message == 0x21 || message == 0x84 || message == 7 || message == 8 ||
+             (message == 0x7d && wParam.ToInt64() == -20)))
+        {
+            pointerMessages++;
+            NativePoint cursor;
+            GetCursorPos(out cursor);
+            File.AppendAllText(Path.Combine(directory, "pointer-messages.jsonl"), serializer.Serialize(new
+            {
+                observedUTC = DateTime.UtcNow.ToString("o"),
+                hwnd = hwnd.ToInt64(),
+                message,
+                oldStyle = message == 0x7d ? (int?)Marshal.ReadInt32(lParam, 0) : null,
+                newStyle = message == 0x7d ? (int?)Marshal.ReadInt32(lParam, 4) : null,
+                wParam = wParam.ToInt64(),
+                lParam = lParam.ToInt64(),
+                screenX = cursor.X,
+                screenY = cursor.Y
+            }) + Environment.NewLine);
+        }
+        // Observe only: preserve WPF's normal message handling and result.
+        return IntPtr.Zero;
+    }
     static int? plaqueLevel;
     static JavaScriptSerializer serializer = new JavaScriptSerializer();
     static void Record(string phase, Exception error)
@@ -282,6 +317,8 @@ sealed class ReplayHost
                         VerticalAlignment = VerticalAlignment.Top
                     };
                     desktopControl.Click += (sender, e) => desktopClicks++;
+                    HwndSource.FromHwnd(new WindowInteropHelper(overlay).Handle).AddHook(ObservePointerMessage);
+                    HwndSource.FromHwnd(new WindowInteropHelper(main).Handle).AddHook(ObservePointerMessage);
                     hdt.GetType("Hearthstone_Deck_Tracker.Utility.Extensions.OverlayExtensions").GetMethod("SetIsOverlayHitTestVisible")
                         .Invoke(null, new object[] { desktopControl, true });
                     Panel.SetZIndex(desktopControl, Int32.MaxValue);
@@ -335,11 +372,29 @@ sealed class ReplayHost
             ids.Add((string)Get(Get(card, "Card"), "Id"));
             plaqueLevels.Add((int)Get(Get(card, "PlaqueViewModel"), "Level"));
         }
-        object desktopBounds = null;
+        object desktopBounds = null, desktopPointer = null;
         if (desktopControl != null && desktopControl.IsVisible)
         {
             var point = desktopControl.PointToScreen(new Point(desktopControl.ActualWidth / 2, desktopControl.ActualHeight / 2));
             desktopBounds = new { x = (int)point.X, y = (int)point.Y };
+            NativePoint cursor;
+            if (GetCursorPos(out cursor))
+            {
+                var position = Mouse.GetPosition(desktopControl);
+                var hit = overlay.InputHitTest(overlay.PointFromScreen(new Point(cursor.X, cursor.Y)));
+                desktopPointer = new
+                {
+                    screenX = cursor.X,
+                    screenY = cursor.Y,
+                    windowFromPoint = WindowFromPoint(cursor).ToInt64(),
+                    wpfX = position.X,
+                    wpfY = position.Y,
+                    directlyOver = Mouse.DirectlyOver == null ? null : Mouse.DirectlyOver.GetType().FullName,
+                    hitTest = hit == null ? null : hit.GetType().FullName,
+                    enabled = desktopControl.IsEnabled,
+                    hitTestVisible = desktopControl.IsHitTestVisible
+                };
+            }
         }
         var bgsContent = (FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent");
         var data = new
@@ -352,8 +407,11 @@ sealed class ReplayHost
             desktopClicks,
             desktopControl = desktopBounds,
             desktopControlHovered = desktopControl != null && desktopControl.IsMouseOver,
+            desktopPointer,
             overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
+            overlayActive = overlay.IsActive,
             foregroundHwnd = GetForegroundWindow().ToInt64(),
+            overlayTransparencyChanges,
             overlayExtendedStyle = WindowStyle(new WindowInteropHelper(overlay).Handle, -20),
             clickthrough = Get(overlay, "_clickthrough"),
             battlegroundsContent = new

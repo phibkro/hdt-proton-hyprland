@@ -471,6 +471,7 @@ impl Bridge {
         &mut self,
         frame: Option<&(Frame, Instant)>,
         previous: &mut Option<(bool, bool)>,
+        win32_input: Option<Win32Input>,
     ) -> Result<Value> {
         self.validate()?;
         let attr = self
@@ -489,7 +490,6 @@ impl Bridge {
         let rectangles = frame
             .filter(|_| fresh && active)
             .map_or(&[][..], |(f, _)| f.rectangles.as_slice());
-        self.display.shape(self.overlay, rectangles)?;
         let pointer = self.display.conn.query_pointer(self.overlay)?.reply()?;
         let hit = pointer.same_screen
             && rectangles.iter().any(|r| {
@@ -499,6 +499,14 @@ impl Bridge {
                     && i32::from(pointer.win_y) < i32::from(r.y) + i32::from(r.height)
             });
         self.focus(active, hit)?;
+        // Prepare Wine before admitting controls, then retain their shape
+        // across asynchronous focus notifications. Focus is not input readiness.
+        let admitted = match win32_input {
+            None => rectangles,
+            Some(Win32Input::Prepared) => rectangles,
+            _ => &[],
+        };
+        self.display.shape(self.overlay, admitted)?;
         if *previous != Some((active, attr.override_redirect)) {
             if attr.override_redirect {
                 self.display
@@ -522,7 +530,9 @@ impl Bridge {
         Ok(
             json!({"kind":"state","observedMS":SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
             "fresh":fresh,"active":active,"focused":self.display.focused_within(self.overlay)?,
-            "pointerOverControl":hit,"controls":rectangles.len()}),
+            "pointerOverControl":hit,"pointerInsideOverlay":pointer.same_screen && pointer.win_x >= 0 && pointer.win_y >= 0 && i32::from(pointer.win_x)<i32::from(geometry.width) && i32::from(pointer.win_y)<i32::from(geometry.height),
+            "pointerScreenX":pointer.root_x,"pointerScreenY":pointer.root_y,
+            "controls":rectangles.len(),"inputControls":admitted.len()}),
         )
     }
     fn cleanup(&mut self) -> Result<()> {
@@ -640,7 +650,10 @@ fn bridge(mut owner: Bridge) -> Result<()> {
                     pending.drain(..=end);
                 }
             }
-            emit(&mut output, &owner.tick(frame.as_ref(), &mut previous)?)?;
+            emit(
+                &mut output,
+                &owner.tick(frame.as_ref(), &mut previous, None)?,
+            )?;
         }
         Ok(())
     })();
@@ -650,6 +663,12 @@ fn bridge(mut owner: Bridge) -> Result<()> {
     result
 }
 
+#[derive(Clone, Copy, Deserialize)]
+enum Win32Input {
+    Unprepared,
+    Prepared,
+}
+
 #[derive(Deserialize)]
 struct Producer {
     session: String,
@@ -657,13 +676,18 @@ struct Producer {
     observed_ms: i64,
     #[serde(rename = "overlayHwnd")]
     hwnd: u32,
+    #[serde(rename = "win32Input")]
+    win32_input: Win32Input,
+    #[serde(rename = "controllerGeneration")]
+    controller_generation: Option<String>,
     width: u16,
     height: u16,
     rectangles: Vec<[u16; 4]>,
 }
 impl Producer {
-    fn current(&self, session: &str, width: u16, height: u16, now: i64) -> bool {
-        self.session == session
+    fn current(&self, owner: &str, session: &str, width: u16, height: u16, now: i64) -> bool {
+        self.controller_generation.as_deref() == Some(owner)
+            && self.session == session
             && self.hwnd != 0
             && self.width == width
             && self.height == height
@@ -721,6 +745,7 @@ pub fn control(cfg: &crate::config::Config, args: &[OsString]) -> Result<()> {
         .into_iter()
         .collect::<std::io::Result<Vec<_>>>()?;
     let mut owner: Option<Bridge> = None;
+    let mut owner_generation = uuid::Uuid::new_v4().to_string();
     let mut previous = None;
     let mut last_failure = String::new();
     let result = (|| {
@@ -754,6 +779,7 @@ pub fn control(cfg: &crate::config::Config, args: &[OsString]) -> Result<()> {
                         cfg.window_class.clone(),
                     )?);
                     previous = None;
+                    owner_generation = uuid::Uuid::new_v4().to_string();
                 }
                 let bridge = owner.as_mut().context("missing native owner")?;
                 let geometry = bridge.display.conn.get_geometry(bridge.overlay)?.reply()?;
@@ -779,19 +805,34 @@ pub fn control(cfg: &crate::config::Config, args: &[OsString]) -> Result<()> {
                     .duration_since(UNIX_EPOCH)?
                     .as_millis()
                     .try_into()?;
-                let fresh = producer
-                    .as_ref()
-                    .is_some_and(|p| p.current(session, geometry.width, geometry.height, now));
+                let fresh = producer.as_ref().is_some_and(|p| {
+                    p.current(
+                        &owner_generation,
+                        session,
+                        geometry.width,
+                        geometry.height,
+                        now,
+                    )
+                });
                 let frame = Frame::new(
                     geometry.width,
                     geometry.height,
                     producer
                         .as_ref()
-                        .filter(|_| fresh)
+                        .filter(|p| fresh && !matches!(p.win32_input, Win32Input::Unprepared))
                         .map_or(&[][..], |p| p.rectangles.as_slice()),
                 )?;
-                let mut state = bridge.tick(Some(&(frame, Instant::now())), &mut previous)?;
+                let mut state = bridge.tick(
+                    Some(&(frame, Instant::now())),
+                    &mut previous,
+                    Some(
+                        producer
+                            .as_ref()
+                            .map_or(Win32Input::Unprepared, |p| p.win32_input),
+                    ),
+                )?;
                 state["fresh"] = json!(fresh && state["fresh"] == true);
+                state["controllerGeneration"] = json!(owner_generation);
                 state["session"] = json!(session);
                 state["backend"] = json!("x11");
                 state["nativeReady"] = json!(true);
@@ -938,7 +979,7 @@ mod tests {
             let mut published_width = 100u16;
             let mut published_time = now;
             let mut has_handle = true;
-            let mut producer = Producer {session:"0".into(), observed_ms:now,
+            let mut producer = Producer {controller_generation:Some("owner".into()), session:"0".into(), observed_ms:now, win32_input:Win32Input::Unprepared,
                 hwnd:1,width,height:80,rectangles:vec![]};
             for (operation, delta) in operations {
                 match operation {
@@ -948,7 +989,7 @@ mod tests {
                     3 => {
                         published_generation = generation; published_width = width;
                         published_time = now; has_handle = true;
-                        producer = Producer {session:generation.to_string(),observed_ms:now,
+                        producer = Producer {controller_generation:Some("owner".into()), session:generation.to_string(),observed_ms:now,win32_input:Win32Input::Unprepared,
                             hwnd:1,width,height:80,rectangles:vec![]};
                     },
                     4 => { has_handle = false; producer.hwnd = 0; },
@@ -956,27 +997,30 @@ mod tests {
                 }
                 let expected = has_handle && generation == published_generation && width == published_width &&
                     now >= published_time - 1499 && now <= published_time + 1499;
-                prop_assert_eq!(producer.current(&generation.to_string(), width, 80, now), expected);
+                prop_assert_eq!(producer.current("owner", &generation.to_string(), width, 80, now), expected);
             }
         }
     }
     #[test]
     fn producer_requires_matching_session_dimensions_and_recent_time() {
         let mut producer = Producer {
+            controller_generation: Some("owner".into()),
             session: "owned".into(),
             observed_ms: 10000,
             hwnd: 1,
+            win32_input: Win32Input::Unprepared,
             width: 100,
             height: 80,
             rectangles: vec![],
         };
-        assert!(producer.current("owned", 100, 80, 10000));
-        assert!(!producer.current("other", 100, 80, 10000));
-        assert!(!producer.current("owned", 101, 80, 10000));
-        assert!(!producer.current("owned", 100, 80, 11500));
-        assert!(!producer.current("owned", 100, 80, 8500));
+        assert!(producer.current("owner", "owned", 100, 80, 10000));
+        assert!(!producer.current("owner", "other", 100, 80, 10000));
+        assert!(!producer.current("owner", "owned", 101, 80, 10000));
+        assert!(!producer.current("owner", "owned", 100, 80, 11500));
+        assert!(!producer.current("owner", "owned", 100, 80, 8500));
+        assert!(!producer.current("previous-owner", "owned", 100, 80, 10000));
         producer.hwnd = 0;
-        assert!(!producer.current("owned", 100, 80, 10000));
+        assert!(!producer.current("owner", "owned", 100, 80, 10000));
     }
     #[test]
     fn frames_cannot_extend_input_outside_the_overlay() {

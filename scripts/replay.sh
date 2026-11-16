@@ -144,6 +144,13 @@ if [[ -n "$libxi_library" ]]; then
     libxi_library=$("$host" libxi-check "$libxi_library")
 fi
 cp "$host" "$run/source/hdt-host"
+if [[ "$desktop_input" == true ]]; then
+    # Compile with the pinned development headers before entering the cleared
+    # Steam namespace. The executable joins the read-only, hashed source snapshot.
+    read -r -a observer_flags <<<"$(pkg-config --cflags --libs x11)"
+    cc -std=c11 -Wall -Wextra -Werror "$run/source/tests/replay/pointer-observer.c" \
+        -o "$run/source/pointer-observer" "${observer_flags[@]}"
+fi
 (
     cd "$run/source"
     rg --files --hidden --no-ignore -0 | sort -z | xargs -0 sha256sum

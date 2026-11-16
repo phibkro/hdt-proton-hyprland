@@ -360,6 +360,8 @@ public sealed class ProtonCompatibility : IPlugin
                 {
                     session = Environment.GetEnvironmentVariable("HDT_INPUT_SESSION"),
                     overlayHwnd = new WindowInteropHelper(overlay).Handle.ToInt64(),
+                    controllerGeneration = portableInput == null ? null : portableInput.OwnerGeneration,
+                    win32Input = portableInput == null ? "Unprepared" : portableInput.InputState(overlay),
                     observedMS = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     width = (int)Math.Round(clip.Width),
                     height = (int)Math.Round(clip.Height),
