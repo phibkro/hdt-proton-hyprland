@@ -47,6 +47,7 @@ sealed class PortableOverlayInput
     IList clickableElements;
     FrameworkElement inputSurface;
     bool surfaceOwned;
+    MethodInfo setClickthrough;
     public string OwnerGeneration { get; private set; }
     bool PointerInsideSurface(Window overlay, Acknowledgement ack)
     {
