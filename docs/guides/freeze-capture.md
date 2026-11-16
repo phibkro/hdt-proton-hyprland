@@ -39,9 +39,11 @@ for the distinction between collected bytes and processed game events.
 4. Keep the terminal open while you play. Capture from before the next match
    through the return to the Arena lobby.
 
-`--from end` skips bytes already present at the first poll. Use `--from start`
-to capture existing file contents too. The output directory must be new. The
-512 MiB limit includes journal metadata and base64 expansion.
+For files discovered under the selected roots, `--from end` records each
+existing file's end offset during startup; files appearing afterward start at
+zero. Explicit `--source` files establish their initial offset at the first
+poll. Use `--from start` to capture existing contents too. The output directory
+must be new. The 512 MiB limit includes journal metadata and base64 expansion.
 
 ## Preserve a failure
 
