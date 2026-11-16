@@ -32,7 +32,7 @@ mkdir "$HDT_VERIFY_ROOT/data" "$HDT_VERIFY_ROOT/home"
 Use a fresh CLI subprocess for each drive.
 Run the doctor below before its first drive and after a surprising result.
 For WPF, use the existing `hdt-replay` seed preparation in
-[UI-REPLAY.md](../../../docs/UI-REPLAY.md) (resolve repository docs from the
+[UI-REPLAY.md](../../../docs/guides/ui-replay.md) (resolve repository docs from the
 checkout, not this directory). A seed needs original HDT assemblies, native CLR,
 an installed Proton and copied Steam runtime; an empty data directory cannot
 supply proprietary binaries. Missing prerequisites are an explicit unreachable

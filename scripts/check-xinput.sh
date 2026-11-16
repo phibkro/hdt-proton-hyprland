@@ -4,7 +4,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 mkdir -p evidence
 run=$(mktemp -d "$PWD/evidence/xinput-race-XXXXXXXX")
 chmod 700 "$run"
-cp tests/xinput-race.c tests/xinput-race.ts "$run/"
+cp tests/native/xinput-race.c tests/native/xinput-race.ts "$run/"
 read -r -a flags <<<"$(pkg-config --cflags --libs x11 xi)"
 cc -Wall -Wextra -Werror "$run/xinput-race.c" -o "$run/xinput-race" "${flags[@]}"
 (

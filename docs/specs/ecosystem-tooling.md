@@ -103,8 +103,8 @@ Microsoft runtime binaries.
   The changed watcher, Steam wrapper, desktop, and replay boundary tests pass
   the strict rules. Remaining files are input-journal.test.ts, xinput-race.ts,
   config.test.ts, and trace-export.test.ts.
-- Clang-Tidy covered tests/xinput-race.c. Roslyn core covered
-  tests/FlightRecorderChecks.cs with zero build warnings/errors.
+- Clang-Tidy covered tests/native/xinput-race.c. Roslyn core covered
+  tests/replay/FlightRecorderChecks.cs with zero build warnings/errors.
 - Lua's discovery symlinks resolve correctly with StyLua and Selene.
 - ShellCheck and shfmt pass for all owned shell entry points.
 

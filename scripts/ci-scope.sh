@@ -19,7 +19,7 @@ git diff --no-renames --name-only -z "$base" "$head" -- >"$changes"
 docs_only=false
 while IFS= read -r -d '' file; do
     case "$file" in
-        README.md | avalonia/README.md | docs/*.md | .cursor/skills/verify-hdt-proton/*.md) docs_only=true ;;
+        README.md | avalonia/README.md | avalonia/THIRD_PARTY_NOTICES.md | docs/*.md | .cursor/skills/verify-hdt-proton/*.md) docs_only=true ;;
         *)
             echo false
             exit 0

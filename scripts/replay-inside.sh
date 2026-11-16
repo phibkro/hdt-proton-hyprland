@@ -66,7 +66,7 @@ fi
 if [[ "$diagnostics" == true ]]; then
     timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
         /nologo /target:exe /platform:x64 /out:FlightRecorderChecks.exe /r:System.Web.Extensions.dll \
-        "$(winpath "$snapshot/tests/FlightRecorderChecks.cs")" "$(winpath "$snapshot/src/plugin/FlightRecorder.cs")" >"$run/recorder-compile.log" 2>&1
+        "$(winpath "$snapshot/tests/replay/FlightRecorderChecks.cs")" "$(winpath "$snapshot/src/plugin/FlightRecorder.cs")" >"$run/recorder-compile.log" 2>&1
     timeout --kill-after=3s 10 "$proton/files/bin/wine" "$run/app/FlightRecorderChecks.exe" "$(winpath "$run/recorder-checks")" >"$run/recorder-checks.log" 2>&1
 fi
 timeout --kill-after=3s 35 "$proton/files/bin/wine" 'C:\windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' \
@@ -181,7 +181,7 @@ fi
 settings
 if [[ "$desktop_input" == true ]]; then
     send desktop-control
-    bash "$snapshot/tests/portable-wpf.sh" "$root" "$run" >"$run/desktop-input.log" 2>&1
+    bash "$snapshot/tests/replay/portable-wpf.sh" "$root" "$run" >"$run/desktop-input.log" 2>&1
     send desktop-control-hide
 fi
 if [[ "$diagnostics" == true ]]; then
