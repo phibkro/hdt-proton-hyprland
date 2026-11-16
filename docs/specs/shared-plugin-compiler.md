@@ -16,6 +16,13 @@ Use legacy-supported, file-local warning pragmas only for nullable diagnostics
 observed in these shared C# 5 sources. Preserve nullable analysis elsewhere and
 do not create manually maintained copies or broaden global warning suppression.
 
+The actual Framework compile also exposed the HDT Card.Id init-only setter:
+its ordinary string getter is usable but legacy C# rejects importing the whole
+property. Bind that getter once lazily through a typed delegate; preserve the
+original ID and existing bounds/failure handling. No per-card reflection or
+compiler replacement. Validate the getter against an owned instance of the
+original Card type during replay startup.
+
 ## Acceptance
 
 - The actual Framework compiler builds every plugin source in the private WPF
