@@ -35,6 +35,7 @@ done
 [[ -s /capture/display-number ]]
 export DISPLAY=":$(cat /capture/display-number)"
 cd /capture/source
+dotnet --version >/capture/sdk-version.txt 2>&1
 bash avalonia/dev.sh watch >/capture/watch.log 2>&1 &
 watcher=$!
 window_for_color() {
@@ -52,6 +53,9 @@ window_for_color() {
             fi
         fi
         sleep 0.1
+    done
+    for status in /proc/[0-9]*/status; do
+        [[ -r $status ]] && sed -n '1,7p' "$status" >>/capture/processes.txt
     done
     cat /capture/watch.log >&2
     echo "Timed out waiting for rendered palette $color" >&2
@@ -84,7 +88,7 @@ timeout --kill-after=5s 150 bwrap --unshare-all --die-with-parent --new-session 
     --dir /bin --ro-bind "$shell" /bin/sh --bind "$run" /capture \
     --bind "$NUGET_PACKAGES" /packages --chdir /capture \
     --setenv PATH "$PATH" --setenv HOME /capture/home \
-    --setenv DOTNET_CLI_HOME /capture/dotnet --setenv NUGET_PACKAGES /packages \
+    --setenv DOTNET_ROOT "$DOTNET_ROOT" --setenv DOTNET_CLI_HOME /capture/dotnet --setenv NUGET_PACKAGES /packages \
     --setenv LD_LIBRARY_PATH "$LD_LIBRARY_PATH" --setenv DOTNET_PROCESSOR_COUNT 2 \
     --setenv DOTNET_CLI_TELEMETRY_OPTOUT 1 --setenv DOTNET_NOLOGO 1 \
     --setenv DOTNET_SKIP_FIRST_TIME_EXPERIENCE 1 --setenv DOTNET_SYSTEM_GLOBALIZATION_INVARIANT 0 \
