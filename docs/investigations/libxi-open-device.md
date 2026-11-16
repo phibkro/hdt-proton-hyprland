@@ -67,9 +67,13 @@ unchanged. The patched library is used only by the isolated check.
 
 Target: [libXi merge requests](https://gitlab.freedesktop.org/xorg/lib/libXi/-/merge_requests),
 following [X.Org's patch workflow](https://www.x.org/wiki/Development/Documentation/SubmittingPatches/).
-The source repository was read successfully through Git. A GitLab submission
-has not been made. The author reviewed the Developer Certificate of Origin and
-authorized the patch's `Signed-off-by` certification on 16 November 2026.
+The source repository was read successfully through Git. The author reviewed
+the Developer Certificate of Origin and authorized the patch's `Signed-off-by`
+certification on 16 November 2026. The signed patch was sent as plain text to
+`xorg-devel@lists.x.org` that day, using X.Org's documented email workflow.
+Its subject is `[PATCH libXi] XOpenDevice: retain the requested ID across the reply wait`.
+The mail service confirmed it was sent; mailing-list acceptance and maintainer
+review remain pending. No GitLab merge request has been created.
 
 Suggested title: **XOpenDevice: retain the requested ID across the reply wait**.
 
