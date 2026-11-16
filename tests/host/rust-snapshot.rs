@@ -30,8 +30,13 @@ fn accepts_only_bounded_regular_files_and_preserves_exact_bytes() {
     let result = read(&path, &data.len().to_string());
     assert!(result.status.success());
     assert_eq!(result.stdout, data);
-    for maximum in ["0", "8388609", "bad", "1"] {
-        let result = read(&path, maximum);
+    for maximum in [
+        "0".to_owned(),
+        (hdt_host::snapshot::MAX_BYTES + 1).to_string(),
+        "bad".to_owned(),
+        "1".to_owned(),
+    ] {
+        let result = read(&path, &maximum);
         assert!(!result.status.success());
         assert!(result.stdout.is_empty());
     }

@@ -166,9 +166,10 @@ pub enum Request {
         expected_revision: u64,
         id: Option<String>,
     },
-    ArchiveDeck {
+    SetArchived {
         expected_revision: u64,
         id: String,
+        archived: bool,
     },
     RecordMatch {
         expected_revision: u64,
@@ -265,7 +266,7 @@ pub fn execute(path: &Path, request: Request) -> Result<serde_json::Value> {
         | Request::SelectDeck {
             expected_revision, ..
         }
-        | Request::ArchiveDeck {
+        | Request::SetArchived {
             expected_revision, ..
         }
         | Request::RecordMatch {
@@ -302,14 +303,15 @@ pub fn execute(path: &Path, request: Request) -> Result<serde_json::Value> {
             },
         )?,
         Request::SelectDeck { id, .. } => state.selected_deck_id = id,
-        Request::ArchiveDeck { id, .. } => {
-            state
+        Request::SetArchived { id, archived, .. } => {
+            let deck = state
                 .decks
                 .iter_mut()
                 .find(|deck| deck.id == id)
-                .context("deck does not exist")?
-                .archived = true;
-            if state.selected_deck_id.as_ref() == Some(&id) {
+                .context("deck does not exist")?;
+            deck.archived = archived;
+            deck.updated_at = chrono::Utc::now().to_rfc3339();
+            if archived && state.selected_deck_id.as_ref() == Some(&id) {
                 state.selected_deck_id = None;
             }
         }

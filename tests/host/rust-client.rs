@@ -77,10 +77,25 @@ fn deck_edit_import_export_archive_and_history_are_atomic_and_revision_checked()
     );
     let archived = ok(
         &path,
-        json!({"operation":"archiveDeck","expectedRevision":4,"id":id}),
+        json!({"operation":"setArchived","expectedRevision":4,"id":id,"archived":true}),
     );
     assert_eq!(archived["decks"][0]["archived"], true);
     assert_eq!(archived["decks"][0]["notes"], "Original note");
+    let restored = ok(
+        &path,
+        json!({"operation":"setArchived","expectedRevision":5,"id":id,"archived":false}),
+    );
+    assert_eq!(restored["decks"][0]["archived"], false);
+    assert_eq!(restored["decks"][0]["content"], content);
+    assert_eq!(restored["decks"][0]["notes"], "Original note");
+    assert_eq!(
+        restored["selectedDeckId"], imported["selectedDeckId"],
+        "restoring must not silently change tracking selection"
+    );
+    assert_eq!(
+        restored["matches"], updated["matches"],
+        "archive/restore must preserve historical association"
+    );
     use std::os::unix::fs::PermissionsExt;
     assert_eq!(
         fs::metadata(path).unwrap().permissions().mode() & 0o777,

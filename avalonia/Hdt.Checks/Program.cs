@@ -238,12 +238,55 @@ window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-history.png")
 Click((TabItem)clientTabs.Items[0]!);
 Click(editor.ArchiveButton); Wait(editor.PendingAction);
 Check(window.Library.State.Decks[1].Archived && window.Library.State.Decks[1].Notes == "Edited persistent notes", "native archive preserves deck content and notes");
+Click(editor.ShowArchived);
+Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single());
+Check(editor.ArchiveButton.Content?.ToString() == "Restore" && !editor.SaveButton.IsEnabled && !editor.UseButton.IsEnabled,
+    "archived browser exposes preserved deck for explicit restore without permitting tracking");
+Click(editor.ArchiveButton); Wait(editor.PendingAction);
+Check(!window.Library.State.Decks[1].Archived && window.Library.State.Decks[1].Notes == "Edited persistent notes"
+    && window.Library.State.SelectedDeckId is null && window.Library.State.Matches.Single().DeckId == record.DeckId,
+    "pointer restore preserves identity, notes and historical association without silently selecting the deck");
+Click(editor.NewButton);
+Check(editor.ShowArchived.IsChecked == false && !editor.NameBox.IsReadOnly && editor.NameBox.Text == "" && editor.SaveButton.IsEnabled,
+    "new deck leaves archive-only browsing so newly saved decks cannot disappear into a hidden active list");
 var savedLibrary = window.Library.State;
 Fill(editor.CodeBox, "invalid deck code");
 Click(editor.ImportButton); Wait(editor.PendingAction);
 Check(!window.Library.Ready && window.Library.State.Revision == savedLibrary.Revision && !editor.SaveButton.IsEnabled, "invalid native import leaves the saved library intact and requires explicit reload");
 Click(editor.ReloadButton); Wait(editor.PendingAction);
 Check(window.Library.Ready && window.Library.State.Decks.Length == savedLibrary.Decks.Length && window.Library.State.Matches.Length == 1, "native library recovers from failed import by verifying the actual persisted state");
+Click(editor.NewButton);
+var catalogPath = Path.Combine(evidence, "illustrative-catalog.json");
+var catalogJson = "[{\"dbfId\":777,\"id\":\"FIXTURE_CATALOG\",\"name\":\"Illustrative catalog card\",\"type\":\"MINION\",\"cardClass\":\"MAGE\",\"cost\":2,\"collectible\":true},{\"dbfId\":637,\"id\":\"HERO_FIXTURE\",\"name\":\"Illustrative base hero\",\"type\":\"HERO\",\"cardClass\":\"MAGE\"}]";
+File.WriteAllText(catalogPath, catalogJson);
+var catalog = editor.Catalog;
+Click((Expander)catalog.Content!);
+Fill(catalog.PathBox, catalogPath); Fill(catalog.QueryBox, "catalog mage");
+Click(catalog.SearchButton); Wait(catalog.PendingSearch);
+Click(catalog.Results.GetVisualDescendants().OfType<ListBoxItem>().Single());
+Click(catalog.AddButton); Click(catalog.AddButton);
+Click(catalog.RemoveButton);
+Check(editor.CardsBox.Text == "777 1", "catalog remove action decrements the selected card without changing its identity");
+Click(catalog.RemoveButton);
+Check(editor.CardsBox.Text == "", "removing the final catalog copy removes the card rather than persisting a zero count");
+Click(catalog.AddButton); Click(catalog.AddButton);
+Check(editor.CardsBox.Text == "777 2" && !catalog.HeroButton.IsEnabled,
+    "pointer catalog search reads real external JSON through Rust and adds named cards with exact multiplicity");
+Click(catalog.IncludeNonCollectible); Fill(catalog.QueryBox, "hero");
+Click(catalog.SearchButton); Wait(catalog.PendingSearch);
+Click(catalog.Results.GetVisualDescendants().OfType<ListBoxItem>().Single()); Click(catalog.HeroButton);
+Check(editor.HeroBox.Text == "637" && editor.ClassBox.Text == "MAGE", "explicit catalog hero choice sets exact hero identity without guessing a class mapping");
+window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "native-card-catalog.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+var catalogRevision = window.Library.State.Revision;
+File.WriteAllText(catalogPath, "{}"); Click(catalog.SearchButton); Wait(catalog.PendingSearch);
+Check(catalog.Results.ItemCount == 0 && !catalog.AddButton.IsEnabled && catalog.Status.Contains("unavailable") && window.Library.State.Revision == catalogRevision,
+    "malformed local catalog clears stale results and cannot alter saved decks");
+File.WriteAllText(catalogPath, catalogJson); Click(catalog.SearchButton); Wait(catalog.PendingSearch);
+Check(catalog.Results.ItemCount == 1 && !catalog.Status.Contains("unavailable"), "local catalog search recovers after its actual source is repaired");
+Click((Expander)catalog.Content!); Fill(editor.NameBox, "Catalog-built native deck");
+Click(editor.SaveButton); Wait(editor.PendingAction);
+Check(window.Library.State.Decks.Last().Name == "Catalog-built native deck" && window.Library.State.Decks.Last().Content.Cards.Single() == new CardCount(777, 2)
+    && window.Library.State.Decks.Last().Content.HeroDbfId == 637, "catalog-built deck persists through real Rust library transaction");
 window.Close();
 var nativeFile = Path.Combine(evidence, $"native-observation-{Guid.NewGuid():N}.json");
 var nativeLibraryFile = Path.Combine(evidence, $"observed-library-{Guid.NewGuid():N}.json");

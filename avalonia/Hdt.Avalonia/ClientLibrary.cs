@@ -30,7 +30,7 @@ public sealed class ClientLibrary(string path, CancellationToken cancellation = 
     public Task ImportAsync(string? name, string code)
         => ExecuteAsync(new { operation = "importDeck", expectedRevision = State.Revision, name, code });
     public Task SelectAsync(string id) => ExecuteAsync(new { operation = "selectDeck", expectedRevision = State.Revision, id });
-    public Task ArchiveAsync(string id) => ExecuteAsync(new { operation = "archiveDeck", expectedRevision = State.Revision, id });
+    public Task SetArchivedAsync(string id, bool archived) => ExecuteAsync(new { operation = "setArchived", expectedRevision = State.Revision, id, archived });
     public Task RecordAsync(MatchRecord record) => ExecuteAsync(new { operation = "recordMatch", expectedRevision = State.Revision, record });
     public async Task<DeckExport> ExportAsync(string id)
         => await RequestAsync<DeckExport>(new { operation = "exportDeck", id });

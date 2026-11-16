@@ -129,3 +129,16 @@ The ordinary Rust route without the frame argument reports protocol-only pixels.
 This is isolated X11 acceptance; actual Hearthstone/compositor and complete
 Options-enable → child streaming acceptance remain unverified. Do not use the
 operator's game or display to fill that gap without separate authorization.
+
+## Local catalog and archive restore
+
+Feature IDs: `native-card-catalog`, `native-archive-restore`. The ordinary rendered
+driver must search an actual owned illustrative catalog file through the Rust
+reader, select/add/remove copies with pointer input, choose an explicit hero,
+recover after replacing that source with malformed JSON, and persist the resulting
+deck. Inspect `native-card-catalog.png`. No current card data is bundled. A separate
+manual CLI probe of a current public catalog can establish format compatibility;
+retain URL/time/hash privately and never turn its data into a tracked fixture.
+The driver must also browse archived entries and restore one without changing its
+stable identity, notes, history association or tracking selection. The native file
+chooser and full Options-enable → overlay stream remain separate unverified routes.

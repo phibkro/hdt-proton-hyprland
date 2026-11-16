@@ -50,11 +50,14 @@ converts visibility flags into offers, picks or ratings. The reader owns no writ
 and does not modify the file, Windows configuration or installed plugin.
 
 **My Decks** supports new decks, edits and notes, commented deckstring import,
-export/copy, native tracking selection and archiving. The editor currently uses
-numeric DBF IDs because no current card catalog or artwork is bundled. A decoded
+export/copy, native tracking selection, archiving and explicit restore.
+The editor supports numeric DBF IDs and optional card-name search from a local
+catalog you supply; no catalog or artwork is bundled. A decoded
 code is structurally checked, not certified legal for a Hearthstone format.
 Sideboards are preserved. Archiving retains the deck and notes in the library;
-this preview has no restore/archive-browser UI yet. Tracking selection affects
+**Show archived decks** opens preserved entries; **Restore** retains their stable
+identity and historical associations without silently changing tracking selection.
+Archived entries cannot be saved or selected for tracking. Tracking selection affects
 only this native client; it does not select a deck inside the game or Windows HDT.
 
 `--client-data` selects a separate native JSON library; by default it is
@@ -92,8 +95,11 @@ dotnet run --no-build --project Hdt.Checks -- fixtures/draft.json ../local/avalo
 
 The native-library rendered journey additionally uses pointer and keyboard input
 to create a deck, export a known deckstring, import it as another deck, select it,
-edit notes and archive it. It verifies the Rust-backed persisted history view,
-invalid-import failure and reload recovery. `native-library.png` and
+edit notes, archive and restore it. It also searches an owned catalog by card
+name/class, adds/removes exact copies, explicitly selects a hero, saves that deck,
+and proves malformed-source clearing/recovery without saved-library mutation.
+It verifies the Rust-backed persisted history view,
+invalid-import failure and reload recovery. `native-card-catalog.png`, `native-library.png` and
 `native-history.png` retain rendered evidence. Rust CLI tests separately assert
 revision conflict leaves exact stored bytes unchanged, private file permissions,
 history identity deduplication and sideboard codec roundtrip. A supplied anonymous
@@ -170,7 +176,8 @@ regular-file/fault acceptance.
 | HearthMirror / game memory / log watcher | Retained Proton acquisition when optional producer is used | No native memory/log acquisition port; bridge reads public observed models only |
 | Hero/hero-power/package selection, redraft, related tooltips | Absent | Separate observation variants and views required |
 | Native overlay placement/input pass-through | Native X11 preview | Rust-owned opaque panel; private-display pixels/shape/focus/stale checks pass; real-game/compositor acceptance pending |
-| Deck editing / notes / archive / selection | Native | Real private library, revision conflicts, stable IDs, atomic persistence; no game write |
+| Deck editing / notes / archive / restore / selection | Native | Real private library, revision conflicts, stable IDs, atomic persistence; no game write |
+| Card-name search / deck building | Native, optional local catalog | Read-only localized HearthstoneJSON projection, exact DBF identities, add/remove copies and explicit hero choice; no ownership/legality inference |
 | Hearthstone deckstring import / export | Native, structural validation | Golden version-1 bytes, comments, sideboards; no current catalog / legality check |
 | Match history / basic win-loss counts | Native storage/view + optional completed-observation ingestion | Stable source IDs deduplicate; native deck association only after observing match start; Windows database import absent |
 | Menu / constructed / Battlegrounds state and known cards | Native consumer + optional source-only Proton producer | Owned worker → Rust file reader → rendered timer journey; no combat odds or recommendations |
@@ -338,3 +345,39 @@ acceptance. The managed driver separately proves changing rendered offers and a
 stalled helper's deadline/reaping while pointer navigation remains responsive.
 The complete Options-enable → streaming-child flow is not yet an automated
 rendered end-to-end route.
+
+## Optional local card catalog
+
+In **My Decks**, expand **Find cards by name**, choose a local JSON file (or enter
+its path), type a name/class/type/card ID/DBF ID and press **Search local catalog**.
+Select a result and add or remove copies in the unsaved editor; **Save deck**
+persists the result. **Include noncollectible cards** exposes additional
+entries, and **Use selected hero** explicitly sets that hero's DBF ID and
+class. No default hero mapping is guessed. Full and collectible-only localized
+[HearthstoneJSON arrays](https://hearthstonejson.com/docs/cards.html) are supported;
+hero choices depend on the supplied catalog's entries. Multi-class metadata is
+preserved and searched alongside a card's primary class. The
+catalog path is session-only; an older imported deck still opens without one.
+No catalog metadata is written into the source file or copied into this repository.
+
+The Rust reader owns regular-file/no-final-symlink checks, validation and search.
+Its shared read primitive has a 32 MiB hard ceiling to accommodate full catalogs;
+existing replay/observation/settings callers retain their smaller explicit limits.
+Catalogs require at most 50,000 unique positive DBF/card identities with bounded
+plain metadata. Type, class and cost can be absent and remain visibly unknown.
+Search requests are bounded to 4 KiB and a 256-byte query, and return at most 100
+results plus the total match count. Missing/malformed/oversized catalogs clear
+previous results and require a new search after repair. The UI owns no download,
+account call, collection-ownership claim, format legality claim or licensed art.
+
+This is independently authored format consumption. No HearthstoneJSON client
+source was copied. Developer acceptance additionally reads current public full
+and collectible JSON files in ignored private evidence; no data file is bundled.
+The rendered automated journey enters the file path and drives the remaining
+controls. The native operating-system file chooser itself has not been automated.
+
+The format provider explicitly identifies its JSON content as Blizzard
+copyright with all rights reserved; its website's CC0 notice does not license
+that data. This client reads supplied runtime files and distributes none of
+those files, card text or artwork. See the provider's
+[copyright notice](https://hearthstonejson.com/docs/cards.html).

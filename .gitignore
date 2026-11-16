@@ -260,3 +260,6 @@
 !/avalonia/Hdt.Avalonia/NativeOverlayActor.cs
 
 !/avalonia/Hdt.Avalonia/NativeOverlayControls.cs
+
+!/src/host/catalog.rs
+!/avalonia/Hdt.Avalonia/CardCatalogView.cs

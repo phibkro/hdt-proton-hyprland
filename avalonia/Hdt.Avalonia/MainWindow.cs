@@ -56,7 +56,7 @@ public sealed class MainWindow : Window
         Width = 1120; Height = 760; MinWidth = 800; MinHeight = 540;
         _store = new(options.Settings);
         Library = new(options.ClientData ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.Settings))!, "library.json"), _lifetime.Token);
-        DeckLibrary = new(Library);
+        DeckLibrary = new(Library, _lifetime.Token);
         NativeOverlay = new(options.NativeState is not null, _lifetime.Token);
         ScoresToggle.IsEnabled = SynergiesToggle.IsEnabled = false;
         ScoresToggle.IsCheckedChanged += (_, _) => StartPreferencesSave();

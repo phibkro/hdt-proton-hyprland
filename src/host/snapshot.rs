@@ -8,7 +8,9 @@ use std::{
     path::Path,
 };
 
-pub const MAX_BYTES: usize = 8 * 1024 * 1024;
+// The explicit caller bound remains authoritative. Full localized catalogs can
+// exceed the replay limit; preview replay callers still request only 8 MiB.
+pub const MAX_BYTES: usize = 32 * 1024 * 1024;
 
 pub fn read(path: &Path, maximum: usize) -> Result<Option<Vec<u8>>> {
     ensure!(
