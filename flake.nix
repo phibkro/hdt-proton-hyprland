@@ -20,6 +20,7 @@
         default = package;
         hdt-proton = package;
         hdt-host = host;
+        libxi-steam-runtime = (pkgs.callPackage ./nix/libxi.nix { }).steamRuntime;
       };
       apps.${system}.default = {
         type = "app";
@@ -35,6 +36,7 @@
       checks.${system} = {
         inherit package host;
         libxi-regression = pkgs.callPackage ./nix/libxi-regression.nix { };
+        libxi-steam-runtime = (pkgs.callPackage ./nix/libxi.nix { }).steamRuntime;
         native-quality = pkgs.runCommand "hdt-native-source-quality" {
           nativeBuildInputs = import ./nix/tooling.nix { inherit pkgs; };
         } ''

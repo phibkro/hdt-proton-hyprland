@@ -1,8 +1,6 @@
 { pkgs }:
 let
-  patched = pkgs.libxi.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ ../patches/libxi/0001-retain-open-device-id.patch ];
-  });
+  patched = (pkgs.callPackage ./libxi.nix { }).patched;
 in
 pkgs.runCommand "libxi-open-device-regression" {
   nativeBuildInputs = [ pkgs.stdenv.cc pkgs.pkg-config pkgs.xorg-server pkgs.coreutils pkgs.ripgrep ];

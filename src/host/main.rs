@@ -47,6 +47,14 @@ fn run() -> Result<i32> {
             };
             Ok(0)
         }
+        "libxi-check" => {
+            anyhow::ensure!(args.len() == 1, "Usage: hdt-host libxi-check LIBRARY");
+            println!(
+                "{}",
+                launch::libxi_library(std::path::Path::new(&args[0]))?.display()
+            );
+            Ok(0)
+        }
         "raw-launch" => launch::run(&Config::from_env()?, &args),
         "control-input" => {
             control::run(&Config::from_env()?, &args)?;
@@ -87,7 +95,7 @@ fn run() -> Result<i32> {
         }
         "help" | "--help" | "-h" => {
             println!(
-                "Usage: hdt-host config|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export"
+                "Usage: hdt-host config|libxi-check|raw-launch|control-input|status|surface-check|install-plugin|configure-overlay|overlay-rule|overlay-link|surface-probe|x11-desktop|x11-control|observe|trace-export"
             );
             Ok(0)
         }

@@ -15,9 +15,75 @@ use std::{
 
 type Environment = BTreeMap<OsString, OsString>;
 #[derive(Debug)]
-struct Session {
+pub(crate) struct Session {
+    target_pid: String,
+    start_time: u64,
+    prefix: PathBuf,
     environment: Environment,
     proton: PathBuf,
+}
+impl Session {
+    fn namespace_command(&self, executable: &Path) -> Command {
+        let mut command = Command::new("nsenter");
+        command
+            .args([
+                "--target",
+                &self.target_pid,
+                "--user",
+                "--mount",
+                "--preserve-credentials",
+                "--root",
+                "--",
+            ])
+            .arg(executable);
+        command
+    }
+
+    fn display(&self) -> Result<&std::ffi::OsStr> {
+        self.environment
+            .get(std::ffi::OsStr::new("DISPLAY"))
+            .filter(|value| !value.is_empty())
+            .map(OsString::as_os_str)
+            .context("Selected Steam wineserver has no DISPLAY for the X11 link helper")
+    }
+    pub(crate) fn link_command(
+        &self,
+        executable: &Path,
+        arguments: &[OsString],
+    ) -> Result<Command> {
+        self.link_command_at(Path::new("/proc"), executable, arguments)
+    }
+    fn link_command_at(
+        &self,
+        proc_root: &Path,
+        executable: &Path,
+        arguments: &[OsString],
+    ) -> Result<Command> {
+        let current = session(proc_root, &self.target_pid, &self.prefix)
+            .context("Read selected Steam wineserver for X11 link helper")?;
+        ensure!(
+            current.start_time == self.start_time,
+            "Selected Steam wineserver identity changed"
+        );
+        let mut command = current.namespace_command(executable);
+        command.args(arguments).env("DISPLAY", current.display()?);
+        match current.environment.get(std::ffi::OsStr::new("XAUTHORITY")) {
+            Some(authority) => {
+                command.env("XAUTHORITY", authority);
+            }
+            None => {
+                command.env_remove("XAUTHORITY");
+            }
+        }
+        Ok(command)
+    }
+    fn controller_arguments(&self, nonce: &str) -> [OsString; 3] {
+        [
+            nonce.into(),
+            self.target_pid.clone().into(),
+            self.start_time.to_string().into(),
+        ]
+    }
 }
 
 pub fn tracker_environment(mut inherited: Environment) -> Environment {
@@ -41,8 +107,107 @@ pub fn tracker_environment(mut inherited: Environment) -> Environment {
     }
     inherited
 }
+/// Validate the explicitly selected Linux x86-64 shared library header.
+/// The loader still performs full dynamic-link validation when HDT starts.
+pub fn libxi_library(path: &Path) -> Result<PathBuf> {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    ensure!(path.is_absolute(), "HDT_LIBXI_LIBRARY must be absolute");
+    let path = fs::canonicalize(path).context("Resolve HDT_LIBXI_LIBRARY")?;
+    let text = path.to_str().context("HDT_LIBXI_LIBRARY must be UTF-8")?;
+    ensure!(
+        !text.chars().any(|c| c == ':' || c.is_whitespace()),
+        "HDT_LIBXI_LIBRARY cannot contain loader-list separators"
+    );
+    ensure!(
+        path.file_name().is_some_and(|name| name == "libXi.so.6"),
+        "HDT_LIBXI_LIBRARY must select the runtime bundle's libXi.so.6"
+    );
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK)
+        .open(&path)?;
+    let metadata = file.metadata()?;
+    ensure!(
+        metadata.is_file() && (64..=16 * 1024 * 1024).contains(&metadata.len()),
+        "HDT_LIBXI_LIBRARY must be a bounded regular shared-library file"
+    );
+    let mut header = [0u8; 64];
+    file.read_exact(&mut header)?;
+    ensure!(
+        &header[..4] == b"\x7fELF" && header[4..7] == [2, 1, 1] && header[16..20] == [3, 0, 62, 0],
+        "HDT_LIBXI_LIBRARY requires a Linux x86-64 ELF shared library"
+    );
+    Ok(path)
+}
+
+/// Affect only the environment of the selected HDT launch and its descendants.
+pub fn libxi_environment(environment: &mut Environment, library: &Path) -> Result<PathBuf> {
+    let selected = libxi_library(library)?;
+    let inherited = environment
+        .get(std::ffi::OsStr::new("LD_PRELOAD"))
+        .map(|value| value.to_str().context("Inherited LD_PRELOAD must be UTF-8"))
+        .transpose()?
+        .unwrap_or("");
+    let mut libraries = vec![selected.to_string_lossy().into_owned()];
+    for item in inherited
+        .split(|c: char| c == ':' || c.is_whitespace())
+        .filter(|s| !s.is_empty())
+    {
+        if Path::new(item)
+            .file_name()
+            .is_some_and(|name| name.as_encoded_bytes().starts_with(b"libXi.so"))
+        {
+            ensure!(
+                Path::new(item) == selected,
+                "Conflicting libXi in inherited LD_PRELOAD"
+            );
+        } else {
+            libraries.push(item.to_owned());
+        }
+    }
+    environment.insert("LD_PRELOAD".into(), libraries.join(":").into());
+    Ok(selected)
+}
+
+fn start_time(proc_root: &Path, pid: &str) -> Result<u64> {
+    let stat = fs::read_to_string(proc_root.join(pid).join("stat"))?;
+    stat.rsplit_once(") ")
+        .context("Invalid process stat")?
+        .1
+        .split_whitespace()
+        .nth(19)
+        .context("Missing process start time")?
+        .parse()
+        .context("Invalid process start time")
+}
+pub(crate) fn controller_session(prefix: &Path, args: &[OsString]) -> Result<Session> {
+    controller_session_at(Path::new("/proc"), prefix, args)
+}
+fn controller_session_at(proc_root: &Path, prefix: &Path, args: &[OsString]) -> Result<Session> {
+    ensure!(
+        args.len() == 3,
+        "Expected controller nonce, Steam wineserver PID and start time"
+    );
+    let pid = args[1].to_str().context("Invalid Steam wineserver PID")?;
+    ensure!(
+        !pid.is_empty() && pid.bytes().all(|b| b.is_ascii_digit()),
+        "Invalid Steam wineserver PID"
+    );
+    let expected: u64 = args[2]
+        .to_str()
+        .context("Invalid Steam wineserver start time")?
+        .parse()?;
+    let selected = session(proc_root, pid, &fs::canonicalize(prefix)?)?;
+    ensure!(
+        selected.start_time == expected,
+        "Selected Steam wineserver identity changed"
+    );
+    selected.display()?;
+    Ok(selected)
+}
 fn session(proc_root: &Path, pid: &str, prefix: &Path) -> Result<Session> {
     use std::os::unix::ffi::OsStringExt;
+    let before = start_time(proc_root, pid)?;
     let directory = proc_root.join(pid);
     let environment: Environment = fs::read(directory.join("environ"))?
         .split(|b| *b == 0)
@@ -82,7 +247,14 @@ fn session(proc_root: &Path, pid: &str, prefix: &Path) -> Result<Session> {
         .and_then(Path::parent)
         .context("Invalid Proton server path")?
         .join("proton");
+    ensure!(
+        before == start_time(proc_root, pid)?,
+        "Selected Steam wineserver identity changed"
+    );
     Ok(Session {
+        target_pid: pid.to_owned(),
+        start_time: before,
+        prefix: prefix.to_owned(),
         environment,
         proton,
     })
@@ -369,6 +541,10 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
                     .into_os_string(),
             );
         }
+        if let Some(library) = std::env::var_os("HDT_LIBXI_LIBRARY") {
+            let selected = libxi_environment(&mut environment, Path::new(&library))?;
+            println!("HDT-only libXi selected: {}", selected.display());
+        }
         let result = if enabled("HDT_DIRECT") {
             execute(
                 wine,
@@ -432,12 +608,14 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
         "X11 input-shape experiment retired; use HDT_CONTROL_INPUT=1 for compositor control gating."
     );
     let executable = std::env::current_exe()?;
+    let selected = session(Path::new("/proc"), &candidates[0], &canonical_prefix)?;
     let nonce = uuid::Uuid::new_v4().to_string();
     let _bridge = if enabled("HDT_CONTROL_INPUT") && !probe && !plugin {
+        selected.display()?;
         Helper(Some(
             Command::new(&executable)
                 .arg("control-input")
-                .arg(&nonce)
+                .args(selected.controller_arguments(&nonce))
                 .current_dir(&cfg.project_root)
                 .env("HDT_INPUT_SESSION", &nonce)
                 .spawn()?,
@@ -445,18 +623,8 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
     } else {
         Helper(None)
     };
-    let mut command = Command::new("nsenter");
+    let mut command = selected.namespace_command(&executable);
     command
-        .args([
-            "--target",
-            &candidates[0],
-            "--user",
-            "--mount",
-            "--preserve-credentials",
-            "--root",
-            "--",
-        ])
-        .arg(executable)
         .args([
             OsString::from("raw-launch"),
             OsString::from("--inside"),
@@ -478,6 +646,162 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
 mod tests {
     use super::*;
     use std::os::unix::fs::symlink;
+    fn write_stat(process: &Path, start: u64) -> Result<()> {
+        let mut fields = vec!["0".to_owned(); 20];
+        fields[0] = "S".into();
+        fields[19] = start.to_string();
+        fs::write(
+            process.join("stat"),
+            format!("123 (wine server) {}", fields.join(" ")),
+        )?;
+        Ok(())
+    }
+    #[test]
+    fn link_helpers_use_validated_namespace_display_and_optional_auth() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let prefix = temporary.path().join("prefix");
+        fs::create_dir(&prefix)?;
+        let process = temporary.path().join("123");
+        fs::create_dir_all(process.join("fd"))?;
+        write_stat(&process, 42)?;
+        symlink("/Steam/Proton/files/bin/wineserver", process.join("exe"))?;
+        for authority in [Some("/run/pressure-vessel/Xauthority"), None] {
+            let mut environment = format!("WINEPREFIX={}\0DISPLAY=:7\0", prefix.display());
+            if let Some(path) = authority {
+                environment.push_str(&format!("XAUTHORITY={path}\0"));
+            }
+            fs::write(process.join("environ"), environment)?;
+            let selected = session(temporary.path(), "123", &prefix)?;
+            let executable = Path::new("/owned/hdt-host");
+            let arguments = ["overlay-link".into(), "apply".into()];
+            let command = selected.link_command_at(temporary.path(), executable, &arguments)?;
+            assert_eq!(
+                selected.controller_arguments("nonce"),
+                [OsString::from("nonce"), "123".into(), "42".into()]
+            );
+            // Inspect explicit child overrides/removal. The separate environment
+            // projection below does not test this Command's inheritance policy.
+            let overrides: BTreeMap<_, _> = command.get_envs().collect();
+            assert_eq!(
+                overrides.get(std::ffi::OsStr::new("DISPLAY")),
+                Some(&Some(std::ffi::OsStr::new(":7")))
+            );
+            assert_eq!(
+                overrides.get(std::ffi::OsStr::new("XAUTHORITY")),
+                Some(&authority.map(std::ffi::OsStr::new))
+            );
+            assert!(!overrides.contains_key(std::ffi::OsStr::new("HDT_INPUT_SESSION")));
+            assert!(!overrides.contains_key(std::ffi::OsStr::new("HYPRLAND_INSTANCE_SIGNATURE")));
+            assert!(!overrides.contains_key(std::ffi::OsStr::new("HDT_LIBXI_LIBRARY")));
+            assert!(!overrides.contains_key(std::ffi::OsStr::new("XDG_RUNTIME_DIR")));
+            let mut expected: Vec<OsString> = selected
+                .namespace_command(executable)
+                .get_args()
+                .map(OsString::from)
+                .collect();
+            assert_eq!(
+                expected,
+                [
+                    "--target",
+                    "123",
+                    "--user",
+                    "--mount",
+                    "--preserve-credentials",
+                    "--root",
+                    "--",
+                    "/owned/hdt-host"
+                ]
+                .map(OsString::from)
+            );
+            expected.extend(arguments);
+            assert_eq!(command.get_program(), "nsenter");
+            assert_eq!(
+                command.get_args().map(OsString::from).collect::<Vec<_>>(),
+                expected
+            );
+
+            // Execute only the environment projection, not nsenter or X11.
+            let mut projection = Command::new("/bin/sh");
+            projection
+                .env("HDT_INPUT_SESSION", "nonce")
+                .env("DISPLAY", ":stale-host")
+                .env("XAUTHORITY", "/stale/host-auth")
+                .env("HYPRLAND_INSTANCE_SIGNATURE", "owned-synthetic")
+                .env("HDT_LIBXI_LIBRARY", "/synthetic/libXi.so.6")
+                .env("XDG_RUNTIME_DIR", "/synthetic/runtime");
+            for (key, value) in command.get_envs() {
+                match value {
+                    Some(value) => {
+                        projection.env(key, value);
+                    }
+                    None => {
+                        projection.env_remove(key);
+                    }
+                }
+            }
+            projection.args(["-c", "test \"$DISPLAY\" = :7 && test \"${XAUTHORITY-unset}\" = \"$1\" && test \"$HDT_INPUT_SESSION\" = nonce && test \"$HYPRLAND_INSTANCE_SIGNATURE\" = owned-synthetic && test \"$HDT_LIBXI_LIBRARY\" = /synthetic/libXi.so.6 && test \"$XDG_RUNTIME_DIR\" = /synthetic/runtime", "fixture", authority.unwrap_or("unset")]);
+            assert!(projection.status()?.success());
+            assert!(
+                controller_session_at(
+                    temporary.path(),
+                    &prefix,
+                    &selected.controller_arguments("nonce")
+                )
+                .is_ok()
+            );
+            write_stat(&process, 43)?;
+            assert!(
+                selected
+                    .link_command_at(
+                        temporary.path(),
+                        executable,
+                        &["overlay-link".into(), "restore".into()]
+                    )
+                    .unwrap_err()
+                    .to_string()
+                    .contains("identity changed")
+            );
+            assert!(
+                controller_session_at(
+                    temporary.path(),
+                    &prefix,
+                    &selected.controller_arguments("nonce")
+                )
+                .is_err()
+            );
+            write_stat(&process, 42)?;
+        }
+        for display in ["", "DISPLAY=\0"] {
+            fs::write(
+                process.join("environ"),
+                format!("WINEPREFIX={}\0{display}", prefix.display()),
+            )?;
+            assert!(
+                session(temporary.path(), "123", &prefix)?
+                    .link_command_at(
+                        temporary.path(),
+                        Path::new("/owned/hdt-host"),
+                        &["overlay-link".into()]
+                    )
+                    .unwrap_err()
+                    .to_string()
+                    .contains("no DISPLAY")
+            );
+        }
+        let other = temporary.path().join("other");
+        fs::create_dir(&other)?;
+        fs::write(
+            process.join("environ"),
+            format!("WINEPREFIX={}\0DISPLAY=:7\0", other.display()),
+        )?;
+        assert_eq!(
+            session(temporary.path(), "123", &prefix)
+                .unwrap_err()
+                .to_string(),
+            "Wrong game prefix"
+        );
+        Ok(())
+    }
     #[test]
     fn session_uses_actual_executable_and_refuses_deleted_fsync() -> Result<()> {
         let temporary = tempfile::tempdir()?;
@@ -485,6 +809,7 @@ mod tests {
         fs::create_dir(&prefix)?;
         let process = temporary.path().join("123");
         fs::create_dir_all(process.join("fd"))?;
+        write_stat(&process, 42)?;
         fs::write(
             process.join("environ"),
             format!("WINEPREFIX={}\0", prefix.display()),

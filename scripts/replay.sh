@@ -2,7 +2,7 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 lab=$root/local/replay
-usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles] [--battlegrounds-tabs] [--diagnostics] [--canonical-events] [--desktop-input] [--reference-views]'; }
+usage() { echo 'Usage: hdt-replay prepare --proton DIR --runtime DIR [--reuse] | run [--inject-failure] [--with-plugin] [--plaque-level 0..5] [--without-particles] [--battlegrounds-tabs] [--diagnostics] [--canonical-events] [--desktop-input] [--reference-views] [--libxi-library ABSOLUTE_FILE]'; }
 fail() {
     echo "HDT replay: $*" >&2
     exit 1
@@ -97,6 +97,7 @@ diagnostics=false
 canonical_events=false
 desktop_input=false
 reference_views=false
+libxi_library=''
 while (($#)); do
     case "$1" in
         --inject-failure) expected=true ;;
@@ -107,6 +108,11 @@ while (($#)); do
         --desktop-input) desktop_input=true ;;
         --reference-views) reference_views=true ;;
         --without-particles) particles=false ;;
+        --libxi-library)
+            (($# >= 2)) || fail 'Missing libXi runtime library.'
+            libxi_library=$2
+            shift
+            ;;
         --plaque-level)
             (($# >= 2)) && [[ "$2" =~ ^[0-5]$ ]] || fail 'Plaque level must be 0..5.'
             level=$2
@@ -138,6 +144,9 @@ mkdir "$run/source"
 cp -R "$root/src" "$root/tests" "$root/scripts" "$run/source/"
 host=${HDT_HOST_BINARY:-${CARGO_TARGET_DIR:-$root/target}/debug/hdt-host}
 [[ -x "$host" ]] || fail 'Build the native host before replay.'
+if [[ -n "$libxi_library" ]]; then
+    libxi_library=$("$host" libxi-check "$libxi_library")
+fi
 cp "$host" "$run/source/hdt-host"
 (
     cd "$run/source"
@@ -165,12 +174,12 @@ timeout --kill-after=5s 120 bwrap --die-with-parent --unshare-net --unshare-pid 
     --setenv PATH "$PATH" --setenv HDT_REPLAY_TOOLS_PATH "$PATH" \
     --setenv HOME "$run/home" --setenv USER steamuser --setenv LANG C.UTF-8 \
     --setenv PRESSURE_VESSEL_VARIABLE_DIR "$run/pv-var" \
-    steam-run "$lab/runtime/run" -- bash "$run/source/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" "$battlegrounds_tabs" "$diagnostics" "$canonical_events" "$desktop_input" "$reference_views" \
+    steam-run "$lab/runtime/run" -- bash "$run/source/scripts/replay-inside.sh" "$root" "$run" "$proton" "$expected" "$plugin" "$level" "$particles" "$battlegrounds_tabs" "$diagnostics" "$canonical_events" "$desktop_input" "$reference_views" "$libxi_library" \
     >"$run/supervisor.log" 2>&1
 status=$?
 set -e
 jq -n --argjson status "$status" --argjson negative "$expected" --arg run "$run" \
-    --arg revision "$revision" --arg snapshot "$snapshot_hash" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" --argjson bgs "$battlegrounds_tabs" --argjson diagnostics "$diagnostics" --argjson canonical "$canonical_events" --argjson desktop "$desktop_input" --argjson reference "$reference_views" \
-    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,battlegroundsTabs:$bgs,diagnostics:$diagnostics,canonicalEvents:$canonical,desktopInput:$desktop,referenceViews:$reference,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty,sourceManifestSHA256:$snapshot}' >"$run/result.json"
+    --arg revision "$revision" --arg snapshot "$snapshot_hash" --argjson dirty "$source_dirty" --argjson plugin "$plugin" --arg level "$level" --argjson particles "$particles" --argjson bgs "$battlegrounds_tabs" --argjson diagnostics "$diagnostics" --argjson canonical "$canonical_events" --argjson desktop "$desktop_input" --argjson reference "$reference_views" --arg libxi "$libxi_library" \
+    '{exitStatus:$status,negativeAssertionTest:$negative,compatibilityPlugin:$plugin,plaqueLevel:$level,particles:$particles,battlegroundsTabs:$bgs,diagnostics:$diagnostics,canonicalEvents:$canonical,desktopInput:$desktop,referenceViews:$reference,libxiLibrary:$libxi,evidence:$run,sourceRevision:$revision,sourceDirtyAtStart:$dirty,sourceManifestSHA256:$snapshot}' >"$run/result.json"
 echo "Replay exit status: $status. Evidence: $run"
 exit "$status"
