@@ -93,6 +93,15 @@ sealed class ReplayHost
             if (bool.Parse(args[1]))
             {
                 var assembly = Assembly.LoadFrom("ProtonCompatibility.dll");
+                var export = assembly.GetType("NativeClientExport", true);
+                var lazyIdentity = export.GetField("cardIdentity", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+                var readIdentity = (Delegate)Get(lazyIdentity, "Value");
+                var cardType = hdt.GetType("Hearthstone_Deck_Tracker.Hearthstone.Card", true);
+                var identityFixture = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(cardType);
+                Set(identityFixture, "Id", "HDT_REPLAY_IDENTITY");
+                if ((string)readIdentity.DynamicInvoke(identityFixture) != "HDT_REPLAY_IDENTITY")
+                    throw new InvalidDataException("Plugin card identity getter changed the original ID.");
+                File.AppendAllText(output, "PASS actual Framework card identity getter retains original ID" + Environment.NewLine);
                 compatibilityPlugin = Activator.CreateInstance(assembly.GetType("ProtonCompatibility", true));
                 compatibilityPlugin.GetType().GetMethod("OnLoad").Invoke(compatibilityPlugin, null);
             }

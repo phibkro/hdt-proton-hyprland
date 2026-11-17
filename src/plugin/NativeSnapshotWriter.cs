@@ -1,5 +1,6 @@
 #if NET10_0_OR_GREATER
-#nullable disable
+// C# 5 represents an empty pending slot and temporary path with null.
+#pragma warning disable 8600, 8618, 8625
 #endif
 // Original bounded latest-only publisher, shared with native acceptance tests.
 using System;

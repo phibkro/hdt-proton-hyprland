@@ -12,6 +12,10 @@ using Entity = Hearthstone_Deck_Tracker.Hearthstone.Entities.Entity;
 
 internal sealed class NativeClientExport : IDisposable
 {
+    // Legacy csc cannot import the init-only setter, but the getter is ordinary.
+    // Bind once on first capture; preserve startup/capture failure handling.
+    static readonly Lazy<Func<Card, string>> cardIdentity = new Lazy<Func<Card, string>>(() =>
+        (Func<Card, string>)Delegate.CreateDelegate(typeof(Func<Card, string>), typeof(Card).GetProperty("Id").GetGetMethod()));
     readonly string session = Guid.NewGuid().ToString();
     readonly List<object> completed = new List<object>();
     readonly NativeSnapshotWriter writer;
@@ -26,7 +30,7 @@ internal sealed class NativeClientExport : IDisposable
         arenaEvents = new NativeArenaEventBridge(Hearthstone_Deck_Tracker.Hearthstone.Watchers.ArenaStateWatcher, id =>
         {
             var card = Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(id);
-            return card == null ? null : new NativeArenaEventBridge.Metadata(card.Id, card.LocalizedName,
+            return card == null ? null : new NativeArenaEventBridge.Metadata(cardIdentity.Value(card), card.LocalizedName,
                 card.Type == null ? null : card.Type.ToUpperInvariant(), card.Cost);
         });
         try
@@ -160,12 +164,12 @@ internal sealed class NativeClientExport : IDisposable
         if (value.Length > maximum) throw new InvalidDataException();
         return value;
     }
-    static object ArenaCard(Card card) { if (card == null) throw new InvalidDataException(); return new { id = Text(card.Id, 128), name = Text(card.LocalizedName, 512), mana = Nonnegative(card.Cost) }; }
+    static object ArenaCard(Card card) { if (card == null) throw new InvalidDataException(); return new { id = Text(cardIdentity.Value(card), 128), name = Text(card.LocalizedName, 512), mana = Nonnegative(card.Cost) }; }
     static object[] Cards(IEnumerable<Card> cards)
     {
         var result = cards.Take(501).Select(card => (object)new
         {
-            id = Text(card.Id, 128),
+            id = Text(cardIdentity.Value(card), 128),
             dbfId = card.DbfId,
             name = Text(card.LocalizedName, 512),
             mana = Nonnegative(card.Cost),
