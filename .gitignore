@@ -120,6 +120,10 @@
 !/scripts/check-fuzz.sh
 !/scripts/check-rust-x11.sh
 !/scripts/check-xinput.sh
+!/scripts/check-xinput-watch.sh
+!/scripts/capture-native-error.sh
+!/scripts/check-native-capture.sh
+!/scripts/native-target-identity.sh
 !/scripts/check.sh
 !/scripts/ci-scope.sh
 !/scripts/desktop.sh
@@ -142,6 +146,8 @@
 !/src/diagnostics/
 /src/diagnostics/*
 !/src/diagnostics/window-probe.cs
+!/src/diagnostics/xlib-fatal.gdb
+!/src/diagnostics/xlib-identity.gdb
 !/src/host/
 /src/host/*
 !/src/host/config.rs
@@ -155,6 +161,7 @@
 !/src/host/status.rs
 !/src/host/trace.rs
 !/src/host/x11.rs
+!/src/host/xinput_watch.rs
 !/src/hyprland/
 /src/hyprland/*
 !/src/hyprland/overlay-rules.lua
@@ -177,6 +184,7 @@
 !/tests/cli/autostart.test.ts
 !/tests/cli/ci-scope.test.ts
 !/tests/cli/desktop.test.ts
+!/tests/cli/native-error.test.ts
 !/tests/cli/replay-cli.test.ts
 !/tests/cli/steam-launch.test.ts
 !/tests/host/
@@ -193,6 +201,7 @@
 !/tests/native/reference/x-surface-probe.c
 !/tests/native/surface-arguments.ts
 !/tests/native/xinput-race.c
+!/tests/native/native-capture-target.c
 !/tests/native/xinput-race.ts
 !/tests/replay/
 /tests/replay/*

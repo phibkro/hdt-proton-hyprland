@@ -84,6 +84,18 @@ jobs:
         run: nix develop --command cargo fetch --locked
       - name: Check native Rust host
         run: nix develop --command bun scripts/quality.ts check rust
+      - name: Build lifecycle observer executable
+        run: nix develop --command cargo build --locked --bin hdt-host
+      - name: Permit the pinned fixture sandbox on the hosted runner
+        # Ubuntu requires an explicit userns profile for Nix-store executables.
+        # Keep tests rootless and leave global namespace restrictions unchanged.
+        run: |
+          bwrap_path=$(nix develop --command sh -c 'command -v bwrap')
+          case "$bwrap_path" in /nix/store/*/bin/bwrap) ;; *) exit 1 ;; esac
+          printf 'abi <abi/4.0>,\ninclude <tunables/global>\nprofile hdt-xinput-ci %s flags=(unconfined) {\n  userns,\n}\n' "$bwrap_path" > "$RUNNER_TEMP/hdt-xinput-ci.profile"
+          sudo apparmor_parser --replace "$RUNNER_TEMP/hdt-xinput-ci.profile"
+      - name: Verify independent XInput lifecycle capture
+        run: nix develop --command bash scripts/check-xinput.sh
       - name: Bounded coverage-guided fuzz smoke
         run: nix develop --command bash scripts/check-fuzz.sh
       - name: Compile and smoke-test parser benchmarks

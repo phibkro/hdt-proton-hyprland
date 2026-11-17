@@ -1,6 +1,23 @@
 # Fatal XInput mapping errors
 
-Two observed HDT exits on Proton Experimental ended with `XI_BadDevice`,
+## Capture result contract
+
+The wrapper succeeds only when GDB exits zero and records the fatal completion
+marker after detaching. A deadline without a complete capture returns 124;
+partial captures, unexpected stops and debugger failures return nonzero. Raw
+evidence remains private on every outcome. The private regression must exercise
+the actual wrapper, including an owned target that remains alive and untraced
+after the deadline. Protocol failure controls do not establish Wine behavior.
+
+The wrapper snapshots Linux PID/start time, executable path/device/inode and
+process name, then compares them again while the attached inferior is stopped,
+before sourcing breakpoint commands or continuing. A mismatch detaches and
+fails loudly. Numeric-PID GDB attachment cannot exclude a brief attach to a
+reused PID before this check; this is a documented residual attach/detach race,
+not a race-free process handle. No live acceptance gate is replaced by the
+owned synthetic lifetime fixture.
+
+Repeated observed HDT exits on Proton Experimental ended with `XI_BadDevice`,
 request `X_GetDeviceButtonMapping`, and process status 1. The in-process recorder
 stopped without a managed exception. These exits are distinct from UI freezes.
 
@@ -23,8 +40,9 @@ fixture. The actual pointer ID is 10, while the error reports another value.
 The desktop's reported `0x158` therefore does not establish which device failed.
 
 The fixture demonstrates a possible failure mechanism. It does not establish
-that device removal triggered the observed desktop crashes. Those crashes have
-no native call stack or device-lifecycle trace.
+that device removal triggered the observed desktop crashes. Later desktop
+captures identify the Wine caller, as described below; they do not establish
+device removal as the cause.
 
 ## The installed driver has an unguarded query
 
@@ -71,3 +89,71 @@ license. Any future Wine source patch must retain Wine's LGPL provenance.
 REA's ELF provider was unavailable during this investigation. Installed LLVM
 tools supplied the symbol and disassembly evidence. No REA result is claimed
 for the native call sequence.
+
+## Further desktop incidents and independent capture
+
+Two additional native error records on 16 November 2026, at 18:24:16 and
+18:26:40 Europe/Oslo, report the same error and mapping request. Neither adds a
+native stack or establishes a click-triggered device race. Original records
+and recorder sessions are retained privately, outside the source tree.
+
+The independent Rust `xinput-watch` command uses the existing x11rb dependency
+to subscribe only to hierarchy/device-change events. It cannot catch another
+process's Xlib error or change Wine's mapping behavior. The private acceptance
+journey adds/removes devices through the existing project-owned C fixture,
+then lets that separate client exit through Xlib's default fatal handler. The
+observer must remain alive, retain the device events and end normally.
+See [capture instructions](../guides/freeze-capture.md#native-xinput-exits).
+
+## Observed Wine caller stack
+
+The 16 November 2026 19:04:44 Europe/Oslo exit has a native caller stack,
+captured before Xlib terminated HDT. The recorded path is:
+
+```text
+X11DRV_GenericEvent
+  → update_device_mapping
+  → XGetDeviceButtonMapping
+  → _XReply / _XError
+  → Wine error_handler
+  → _XDefaultError
+```
+
+This directly identifies the failing Wine function, rather than inferring it
+from the standalone fixture. The loaded `winex11.so` hash matches the inspected
+ELF above. Installed version metadata reads
+`experimental-11.0-20261112-x86_64`. Matching that build to a source revision
+remains separate work.
+
+Independent observation near the failure recorded `DeviceChanged` source
+switches between two device IDs. No nearby hierarchy-removal event was observed
+by that capture. The recorder's clock is userspace receipt time, and the native
+error journal is written after debugger handling: adjacency alone does not prove
+which event caused the request. Device removal is therefore still a possible
+fixture mechanism, not the established live cause.
+
+After saving the stack, GDB 17.2 itself aborted while printing shared libraries,
+with `find_debug_base_for_solib: solib->objfile != nullptr`. The stack and GDB
+core are preserved privately. This debugger assertion is separate from the
+already intercepted Wine/Xlib error; no complete-capture marker was reached.
+The capture now avoids `info sharedlibrary` and saves `/proc` mappings outside
+the debugger. A matching-driver private reproducer and a scoped Wine fix are
+still unverified.
+
+
+## Complete capture and repeated exit
+
+At 19:17:03 Europe/Oslo on 16 November 2026, the revised capture recorded the
+same Wine caller stack, reached its completion marker, and detached normally
+with debugger status zero. GDB did not crash in this capture. The last mapping
+query recorded device ID 18 on the failing thread/display, following repeated
+queries for IDs 6 and 7. The separate observer's initial inventory contained
+neither device 18 nor a subsequent recorded hierarchy addition for that ID.
+This discrepancy is a diagnostic lead, not proof of device removal, memory
+corruption, or the exact triggering event.
+
+A replacement HDT process exited at 19:18:18 with the same mapping-request error.
+It was not attached to the debugger, so this repeat adds an error record but no
+native caller stack. The original complete capture and both error records are
+preserved privately. The installed driver remains unchanged; capture does not
+prevent the fatal Xlib handler from terminating HDT.

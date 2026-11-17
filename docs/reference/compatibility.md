@@ -33,7 +33,7 @@ Experimental for Steam.
 | Plugins and other main-window interaction | A Plugins click was followed by an unresponsive tracker. Captures also found UI stalls on native input and rendering paths | Intermittent freezes remain unresolved. Working Settings transitions do not establish that every submenu is reliable |
 | Isolated Settings comparison | Ten cycles completed with every open and close acknowledged | The same ten-cycle fixture also completed. Neither run reproduced the desktop slowdown |
 | Arena recording after the return to Experimental | Not the comparison used for these later records | One complete Arena match was saved with no dispatcher stall during the measured match interval. A later result was saved after tracker restarts, with incomplete match continuity |
-| Fatal X11 mapping errors | These two later exits were not observed in the Stable session | Two later HDT exits reported `XI_BadDevice` on `X_GetDeviceButtonMapping`, with exit status 1 |
+| Fatal X11 mapping errors | This signature was not observed in the tested Stable session | Repeated HDT exits reported `XI_BadDevice` on `X_GetDeviceButtonMapping`, with exit status 1 |
 
 The observations suggest a version-dependent difference in submenu performance
 on this machine. They do not establish a general Proton 11.0-2 regression or

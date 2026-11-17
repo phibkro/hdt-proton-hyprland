@@ -14,6 +14,7 @@ with pkgs;
   rustfmt
   clippy
   rust-analyzer
+  gdb
   cargo-nextest
   cargo-fuzz
   cargo-deny
@@ -23,6 +24,8 @@ with pkgs;
   pkg-config
   libx11
   libxi
+  bubblewrap
+  xorg-server
   libxcomposite
   libxrender
   stylua
