@@ -24,4 +24,5 @@ env -u AVALONIA_TOOLS_LICENSE_KEY bash avalonia/dev.sh mcp >"$run/license-refusa
 [[ $status == 2 ]] && rg -q 'requires a paid Avalonia tools license' "$run/license-refusal.log"
 dotnet watch --project avalonia/Hdt.Development/Hdt.Development.csproj --list >"$run/watch-files.txt"
 rg -q '/Hdt.Views/ArenaChoices.fs$' "$run/watch-files.txt"
-echo "Development host build, ordinary dependency exclusion, Release refusal, license guard and F# watch discovery passed. Evidence: $run"
+rg -q '/Hdt.Views/SettingsView.axaml$' "$run/watch-files.txt"
+echo "Development host build, ordinary dependency exclusion, Release refusal, license guard and F#/AXAML watch discovery passed. Evidence: $run"

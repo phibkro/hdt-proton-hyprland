@@ -41,10 +41,37 @@ or chat message. This workspace does not create an account, start a trial or buy
 a license.
 
 The [hot-reload guide](https://docs.avaloniaui.net/tools/hot-reload/) documents
-licensed XAML/C# support. These F# code-only views use a full restart loop; no
+licensed XAML/C# support. The development loop still fully restarts the app; no
 paid hot-reload package is installed and F# live patching is not claimed.
 Parcel and XAML preview extensions are not installed: Nix currently packages the
-application, and this slice has no AXAML files to preview.
+application. Options now has a declarative AXAML layout; its editor preview has
+not been verified.
+
+## Separating layout from behavior
+
+Prefer independently authored `.axaml` for view trees, layout, styles and static
+labels when practical. Keep typed presentation state and UI-only event handling
+in F# or C# code-behind; keep acquisition, file IO and subprocess ownership in
+the existing controllers and backend. Port one user journey at a time and retain
+its rendered pointer and persistence acceptance checks.
+
+`Hdt.Views/SettingsView.axaml` is the first slice. Its three categories and section
+layout are declared in XAML. The parameterless F# `SettingsLayout` loads that
+layout with `AvaloniaXamlLoader`; `SettingsView` receives explicit path data and
+the existing Arena/overlay controls, wires category navigation and changes
+visibility. Path bindings declare `SettingsPaths` through `x:DataType`, enable
+compiled bindings and use `OneTime` mode because the supplied paths are immutable.
+No account, storage or game behavior moves into XAML or code-behind.
+
+This reuses the [official F# template pattern](https://github.com/AvaloniaUI/Avalonia.Templates/blob/main/templates/fsharp/app/MainWindow.axaml.fs)
+and the pinned framework's [automatic AXAML build items](https://github.com/AvaloniaUI/Avalonia/blob/12.1.6/packages/Avalonia/AvaloniaBuildTasks.props).
+The [XAML compiler](https://github.com/AvaloniaUI/Avalonia/blob/12.1.6/src/Avalonia.Build.Tasks/XamlCompilerTaskExecutor.cs)
+replaces the loader call with compiled initialization. No extra view assembly,
+runtime XML loader package or copied upstream HDT markup is needed. The F#
+project explicitly includes AXAML in `dotnet watch` inputs, and the development
+check verifies this discovery alongside F# sources. See
+[Avalonia's compiled-binding guidance](https://docs.avaloniaui.net/docs/xaml/compilation)
+when adding data templates.
 
 ## Editor and MCP setup
 

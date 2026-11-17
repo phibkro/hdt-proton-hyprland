@@ -234,7 +234,8 @@ try
     Check(!Result(new SettingsStore(Path.Combine(blocker, "settings.json")).LoadAsync()).ShowArenasmithScore, "recovered preference write is durable at real IO boundary");
     window.Close();
 
-    window = CreateWindow(new(fixture, Path.Combine(evidence, "private-" + new string('p', 140), "client-settings.json"), ClientData: Path.Combine(evidence, $"library-{Guid.NewGuid():N}.json")));
+    var clientDataPath = Path.Combine(evidence, $"library-{Guid.NewGuid():N}.json");
+    window = CreateWindow(new(fixture, Path.Combine(evidence, "private-" + new string('p', 140), "client-settings.json"), ClientData: clientDataPath));
     window.Show(); Wait(window.Initialization);
     var clientTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
     Click((TabItem)clientTabs.Items[0]!);
@@ -349,13 +350,22 @@ try
         Click(window.SettingsPanel.StorageCategory);
         Fits(window.SettingsPanel.DetailPanel, $"{size.Width}: local paths remain confined to settings content");
         var pathLabel = window.SettingsPanel.DetailPanel.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text?.Contains(new string('p', 140)) == true);
-        Check(pathLabel.Bounds.Width <= window.SettingsPanel.DetailPanel.Bounds.Width, $"{size.Width}: long configured path wraps within its section");
+        Check(pathLabel.IsEffectivelyVisible && pathLabel.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap
+            && pathLabel.Bounds.Width <= window.SettingsPanel.DetailPanel.Bounds.Width, $"{size.Width}: compiled XAML path binding wraps the exact configured path within its visible section");
+        var pathLabels = window.SettingsPanel.DetailPanel.GetVisualDescendants().OfType<TextBlock>().Where(text => text.Name is "PreferencesPath" or "LibraryPath" or "ObservationsPath").ToArray();
+        Check(pathLabels.Length == 3 && pathLabels.All(text => text.IsEffectivelyVisible && !string.IsNullOrEmpty(text.Text))
+            && pathLabels.Single(text => text.Name == "LibraryPath").Text == clientDataPath,
+            $"{size.Width}: local files exposes all three supplied paths through compiled XAML bindings");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-local-files-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         Click(window.SettingsPanel.ArenaCategory);
         Click(window.SettingsPanel.OverlayCategory);
-        Check(window.SettingsPanel.DetailPanel.GetVisualDescendants().Contains(window.NativeOverlay),
+        Check(window.NativeOverlay.IsEffectivelyVisible && !window.ScoresToggle.IsEffectivelyVisible
+            && window.SettingsPanel.DetailPanel.GetVisualDescendants().Contains(window.NativeOverlay),
             $"{size.Width}: F# settings navigation retains the real native overlay controls");
         Click(window.SettingsPanel.ArenaCategory);
+        Check(window.ScoresToggle.IsEffectivelyVisible && window.SynergiesToggle.IsEffectivelyVisible
+            && !window.NativeOverlay.IsEffectivelyVisible && pathLabels.All(text => !text.IsEffectivelyVisible),
+            $"{size.Width}: Arena category restores its injected controls and hides other XAML panes");
         Click((TabItem)clientTabs.Items[1]!);
         var arenaColumns = (Grid)((TabItem)clientTabs.Items[1]!).Content!;
         foreach (var pane in arenaColumns.Children) Fits(pane, $"{size.Width}: Arena offers and picked-deck columns remain visible");
