@@ -579,6 +579,13 @@ them. The Rust transaction layer validates tag and address limits. The website
 is plain saved text; original HDT's web update and browser commands are not
 implemented. Archived decks retain metadata and become editable after restore.
 
+Saved decks also offer **Duplicate saved deck** with an explicit new name. The
+copy uses saved content and starts without game history. It leaves unsaved source
+edits and tracking selection intact. **Open duplicate** reveals the active result
+even when search or archived browsing would hide it. See the
+[duplication contract](../docs/specs/native-deck-duplicate.md) for its ownership,
+failure behavior and distinction from version history.
+
 Old schema1 libraries without metadata read as empty tags/no website without an
 eager rewrite. Ordinary card saves preserve metadata because only the explicit
 metadata operation can replace it. Validation and stale-revision failures leave

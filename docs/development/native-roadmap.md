@@ -9,6 +9,9 @@ to define its acceptance. Keep the existing Proton patch usable during migration
 1. Complete account-free library gaps under `deck-metadata` and `deck-versions`.
    Give each operation its own save, cancel, restart, and association tests. Inspect
    original menu and selected-deck behavior before choosing the native layout.
+   Independent [saved-deck duplication](../specs/native-deck-duplicate.md) is a
+   separate journey. Version history still needs a parent/snapshot identity and
+   match-association contract; copying a deck does not complete it.
 2. Strengthen the acquisition boundary under `match-detection` and `arena-phases`.
    Keep raw event receipt, published observations, rating generation, and rendered
    state separately observable. Add independent acquisition before claiming an

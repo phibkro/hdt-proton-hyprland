@@ -6,6 +6,7 @@
     <Compile Include="NativeGameView.fs" />
     <Compile Include="SettingsView.fs" />
     <Compile Include="DeckMetadataView.fs" />
+    <Compile Include="DeckDuplicateView.fs" />
     <Compile Include="DeckLibraryView.fs" />
     <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
   </ItemGroup>
