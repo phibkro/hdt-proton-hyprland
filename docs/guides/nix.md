@@ -60,10 +60,14 @@ path and ELF header; the loader and runtime checks establish dynamic compatibili
 The isolated library regression reproduces the defect, but does not prove that
 every HDT crash is prevented.
 
-For automatic startup, declare the same absolute `HDT_LIBXI_LIBRARY` path in the
-existing HDT service environment through your desktop configuration. Keep that
-configuration as its source of truth. To roll back, remove that selection and
-restart only HDT; do not replace a shared Steam library.
+For automatic startup, derive `HDT_LIBXI_LIBRARY` in your desktop Nix configuration
+from `inputs.hdt-proton.packages.${pkgs.stdenv.hostPlatform.system}.libxi-steam-runtime`,
+appending `/lib/libXi.so.6`, and declare it in the existing HDT service environment.
+A reference from the configuration generation retains the library across garbage
+collection. The manual `--no-link` build above creates no persistent GC root, so
+pasting its literal store path into a service is insufficient for durable startup.
+Keep the desktop configuration as the source of truth. To roll back, remove that
+selection and restart only HDT; do not replace a shared Steam library.
 
 ## Configure Home Manager
 
