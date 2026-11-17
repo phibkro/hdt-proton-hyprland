@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/plugin/NativeSnapshotWriter.cs" Link="NativeSnapshotWriter.cs" />
+    <ProjectReference Include="../Hdt.Avalonia/Hdt.Avalonia.csproj" />
+    <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(WatcherAcceptance)' == 'true'">
+    <DefineConstants>$(DefineConstants);WATCHER_ACCEPTANCE</DefineConstants>
+    <IntermediateOutputPath>obj/watcher/$(Configuration)/$(TargetFramework)/</IntermediateOutputPath>
+    <OutputPath>bin/watcher/$(Configuration)/$(TargetFramework)/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(WatcherAcceptance)' == 'true'">
+    <Compile Include="../../src/plugin/NativeArenaEventBridge.cs" Link="NativeArenaEventBridge.cs" />
+    <Compile Include="../../tests/native/NativeWatcherChecks.cs" Link="NativeWatcherChecks.cs" />
+    <Reference Include="HearthWatcher"><HintPath>$(HdtAppDir)/HearthWatcher.dll</HintPath></Reference>
+    <Reference Include="HearthMirror"><HintPath>$(HdtAppDir)/HearthMirror.dll</HintPath></Reference>
+  </ItemGroup>
+  <Target Name="RequireWatcherAcceptanceAssemblies" BeforeTargets="ResolveReferences" Condition="'$(WatcherAcceptance)' == 'true'">
+    <Error Condition="!Exists('$(HdtAppDir)/HearthWatcher.dll') Or !Exists('$(HdtAppDir)/HearthMirror.dll')" Text="Watcher acceptance requires explicit original local HdtAppDir assemblies; no substitute interfaces are used." />
+  </Target>
+</Project>

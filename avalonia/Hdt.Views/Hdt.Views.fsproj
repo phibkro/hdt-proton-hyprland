@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="TrackerLayout.fs" />
+    <Compile Include="ArenaChoices.fs" />
+    <Compile Include="NativeGameView.fs" />
+    <Compile Include="SettingsView.fs" />
+    <Compile Include="DeckLibraryView.fs" />
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+</Project>

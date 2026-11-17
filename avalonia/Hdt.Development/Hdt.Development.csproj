@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Hdt.Avalonia/Hdt.Avalonia.csproj" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+  </ItemGroup>
+  <Target Name="RequireDebugDevelopmentHost" BeforeTargets="PrepareForBuild" Condition="'$(Configuration)' != 'Debug'">
+    <Error Text="Hdt.Development is a Debug-only diagnostics host. Ship Hdt.Avalonia instead." />
+  </Target>
+</Project>

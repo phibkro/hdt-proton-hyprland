@@ -205,6 +205,52 @@ fn controller_session_at(proc_root: &Path, prefix: &Path, args: &[OsString]) -> 
     selected.display()?;
     Ok(selected)
 }
+
+/// Optional native bridge output is explicit and private; inherited Steam values
+/// cannot silently enable a new tracker export. No prefix/game file is changed.
+pub fn native_observation_environment(
+    inherited: &mut Environment,
+    output: Option<&std::ffi::OsStr>,
+) -> Result<()> {
+    inherited.remove(std::ffi::OsStr::new("HDT_NATIVE_CLIENT_FILE"));
+    let Some(output) = output else {
+        return Ok(());
+    };
+    let path = Path::new(output);
+    ensure!(
+        path.is_absolute(),
+        "HDT_NATIVE_CLIENT_FILE must be an absolute host path"
+    );
+    let parent = path
+        .parent()
+        .context("Native observation output requires a parent directory")?;
+    let name = path
+        .file_name()
+        .context("Native observation output requires a filename")?;
+    let parent =
+        fs::canonicalize(parent).context("Create a private native observation directory first")?;
+    let metadata = fs::metadata(&parent)?;
+    ensure!(
+        metadata.is_dir()
+            && metadata.uid() == nix::unistd::getuid().as_raw()
+            && metadata.mode() & 0o077 == 0,
+        "Native observation directory must belong to this user and grant no group/other access"
+    );
+    let path = parent.join(name);
+    path.to_str()
+        .context("Native observation path must be UTF-8 for Wine")?;
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) => ensure!(
+            metadata.is_file() && metadata.uid() == nix::unistd::getuid().as_raw(),
+            "Native observation target must be an owned regular file"
+        ),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    inherited.insert("HDT_NATIVE_CLIENT_FILE".into(), win(&path).into());
+    Ok(())
+}
+
 fn session(proc_root: &Path, pid: &str, prefix: &Path) -> Result<Session> {
     use std::os::unix::ffi::OsStringExt;
     let before = start_time(proc_root, pid)?;
@@ -449,6 +495,7 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
                 "/r:System.Drawing.dll".into(),
                 "/r:System.Xaml.dll".into(),
                 format!("/r:{}", win(&cfg.app_directory.join("HearthMirror.dll"))).into(),
+                format!("/r:{}", win(&cfg.app_directory.join("HearthWatcher.dll"))).into(),
                 "/r:System.Web.Extensions.dll".into(),
                 format!("/r:{}", win(&cfg.app_directory.join("MahApps.Metro.dll"))).into(),
             ];
@@ -545,6 +592,11 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<i32> {
             let selected = libxi_environment(&mut environment, Path::new(&library))?;
             println!("HDT-only libXi selected: {}", selected.display());
         }
+
+        native_observation_environment(
+            &mut environment,
+            std::env::var_os("HDT_NATIVE_CLIENT_FILE").as_deref(),
+        )?;
         let result = if enabled("HDT_DIRECT") {
             execute(
                 wine,

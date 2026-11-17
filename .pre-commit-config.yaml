@@ -9,3 +9,11 @@ repos:
         pass_filenames: true
         require_serial: true
         stages: [pre-commit]
+      - id: hdt-fsharp-format
+        name: F# formatting (versioned source and tests)
+        entry: nix-shell avalonia/shell.nix --run "bash scripts/check-fsharp.sh"
+        language: system
+        files: '(\.(fs|fsi|fsx|fsproj)$|^avalonia/dotnet-tools\.json$|^\.editorconfig$|^scripts/check-fsharp\.sh$)'
+        pass_filenames: false
+        require_serial: true
+        stages: [pre-commit]
