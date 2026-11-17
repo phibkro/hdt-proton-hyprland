@@ -8,7 +8,7 @@ indent_style = space
 indent_size = 2
 trim_trailing_whitespace = true
 
-[*.{c,h,cs,lua}]
+[*.{c,h,cs,fs,fsi,fsx,lua}]
 indent_size = 4
 
 [*.cs]

@@ -50,6 +50,9 @@ const classify = (cwd: string, base: string, head = "HEAD") =>
 
 test.each([
   ["docs/nested/guide with spaces.md", "true"],
+  ["avalonia/README.md", "true"],
+  ["avalonia/THIRD_PARTY_NOTICES.md", "true"],
+  ["avalonia/Hdt.Avalonia/MainWindow.cs", "false"],
   ["docs/guide\nwith-newline.md", "true"],
   [".cursor/skills/verify-hdt-proton/features/launch.md", "true"],
   [".github/workflows/check.yml", "false"],

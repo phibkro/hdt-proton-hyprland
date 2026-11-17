@@ -1,0 +1,165 @@
+[
+  {
+    "Sequence": 1,
+    "Hero": "Mage",
+    "Underground": false,
+    "PickedDeck": [],
+    "Description": "Illustrative replay \u2022 first offer, scores unavailable",
+    "Offers": [
+      {
+        "Card": {
+          "Id": "DEMO_A",
+          "Name": "Illustrative spell",
+          "Mana": 2
+        },
+        "BaseRating": null,
+        "DynamicRating": null,
+        "Enabled": {
+          "Direct": [],
+          "Indirect": []
+        },
+        "EnhancedBy": {
+          "Direct": [],
+          "Indirect": []
+        }
+      },
+      {
+        "Card": {
+          "Id": "DEMO_B",
+          "Name": "Illustrative minion",
+          "Mana": 3
+        },
+        "BaseRating": {
+          "Score": "8.0",
+          "Plaque": 2
+        },
+        "DynamicRating": null,
+        "Enabled": {
+          "Direct": [],
+          "Indirect": []
+        },
+        "EnhancedBy": {
+          "Direct": [],
+          "Indirect": []
+        }
+      },
+      {
+        "Card": {
+          "Id": "DEMO_C",
+          "Name": "Illustrative discover",
+          "Mana": 4
+        },
+        "BaseRating": {
+          "Score": "9.4",
+          "Plaque": 3
+        },
+        "DynamicRating": null,
+        "Enabled": {
+          "Direct": [],
+          "Indirect": []
+        },
+        "EnhancedBy": {
+          "Direct": [],
+          "Indirect": []
+        }
+      }
+    ],
+    "SchemaVersion": 1,
+    "SessionId": "illustrative-session",
+    "ObservedAt": "2026-01-01T00:00:00Z",
+    "Mode": "Drafting",
+    "PickIndex": 0,
+    "SelectedCardId": null
+  },
+  {
+    "Sequence": 2,
+    "Hero": "Mage",
+    "Underground": false,
+    "PickedDeck": [
+      {
+        "Id": "DEMO_A",
+        "Name": "Illustrative spell",
+        "Mana": 2
+      }
+    ],
+    "Description": "Pick observed \u2022 refreshed offers and dynamic rating",
+    "Offers": [
+      {
+        "Card": {
+          "Id": "DEMO_D",
+          "Name": "Illustrative synergy",
+          "Mana": 5
+        },
+        "BaseRating": {
+          "Score": "7.0",
+          "Plaque": 1
+        },
+        "DynamicRating": {
+          "Score": "10.8",
+          "Plaque": 4
+        },
+        "Enabled": {
+          "Direct": [],
+          "Indirect": []
+        },
+        "EnhancedBy": {
+          "Direct": [
+            "DEMO_A"
+          ],
+          "Indirect": []
+        }
+      },
+      {
+        "Card": {
+          "Id": "DEMO_E",
+          "Name": "Illustrative defense",
+          "Mana": 1
+        },
+        "BaseRating": {
+          "Score": "6.5",
+          "Plaque": 1
+        },
+        "DynamicRating": null,
+        "Enabled": {
+          "Direct": [],
+          "Indirect": []
+        },
+        "EnhancedBy": {
+          "Direct": [],
+          "Indirect": []
+        }
+      }
+    ],
+    "SchemaVersion": 1,
+    "SessionId": "illustrative-session",
+    "ObservedAt": "2026-01-01T00:00:01Z",
+    "Mode": "Drafting",
+    "PickIndex": 1,
+    "SelectedCardId": "DEMO_A"
+  },
+  {
+    "Sequence": 3,
+    "Hero": "Mage",
+    "Underground": true,
+    "PickedDeck": [
+      {
+        "Id": "DEMO_A",
+        "Name": "Illustrative spell",
+        "Mana": 2
+      },
+      {
+        "Id": "DEMO_D",
+        "Name": "Illustrative synergy",
+        "Mana": 5
+      }
+    ],
+    "Description": "Underground state \u2022 no current offers",
+    "Offers": [],
+    "SchemaVersion": 1,
+    "SessionId": "illustrative-session",
+    "ObservedAt": "2026-01-01T00:00:02Z",
+    "Mode": "Inactive",
+    "PickIndex": 2,
+    "SelectedCardId": "DEMO_D"
+  }
+]

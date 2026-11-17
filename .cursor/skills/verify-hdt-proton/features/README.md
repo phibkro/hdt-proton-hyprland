@@ -1,12 +1,16 @@
 # HDT Proton verification map
 
 Read the parent skill first. The map covers the native integration, not every
-feature of upstream HDT. Source review and runtime evidence are separate columns
+feature of upstream HDT. The [original-application map](application/README.md)
+adds source-audited original journeys, including unmigrated features and draft
+verification routes. Its linked parity ledger guides native development.
+Source review and runtime evidence are separate columns
 in private run notes. A passed isolated path never upgrades an unavailable live
 path to passed.
 
 - [Launch and setup](launch-setup.md): configuration, packaging, same-session launch, plugin/settings installation, desktop/service entry points.
 - [Overlay and UI](overlay-ui.md): transient relationships, pixel sampling, isolated WPF transitions and live input/geometry.
+- [Native Avalonia preview](native-avalonia.md): bounded Rust IO, decks/history, dynamic observed views, preferences and isolated native X11 overlay; separate from installed HDT acceptance.
 - [Freeze evidence](freeze-evidence.md): independent byte capture, recorder continuity and trace export.
 
 Initialize a fresh evidence directory and doctor each CLI session. Only the
