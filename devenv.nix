@@ -3,7 +3,7 @@ let
   command = name: ''exec bash "$REA_PROJECT/scripts/hdt.sh" ${name} "$@"'';
 in
 {
-  packages = (with pkgs; [ bash shellcheck actionlint bun nodejs_24 protontricks winetricks steam-run util-linux procps ripgrep jq unzip git rsync gitleaks libnotify xorg.xwininfo xorg.xprop xorg.xorgserver xcompmgr openbox xdotool bubblewrap gcc pkg-config libx11 libxi libxcomposite libxrender ]) ++ import ./nix/tooling.nix { inherit pkgs; };
+  packages = (with pkgs; [ bash shellcheck actionlint bun nodejs_24 protontricks winetricks steam-run util-linux procps ripgrep jq unzip git rsync gitleaks libnotify xorg.xwininfo xorg.xprop xorg.xorgserver xcompmgr openbox xdotool weston wayland-utils bubblewrap gcc pkg-config libx11 libxi libxcomposite libxrender ]) ++ import ./nix/tooling.nix { inherit pkgs; };
   # Match the native C object producer to the shell's Rust linker toolchain.
   # alloca enables Clang LTO for an inherited literal CC=clang.
   env.CC = "${pkgs.stdenv.cc}/bin/cc";

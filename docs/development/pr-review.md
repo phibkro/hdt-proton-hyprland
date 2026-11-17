@@ -119,3 +119,6 @@ sockets, drive a window-only game fixture and the real HDT overlay, and observe
 both composed pixels and delivered input. Preserve failing frames and timing.
 Do not drive the operator's active game or treat Openbox/Xvfb as Hyprland proof.
 Until those journeys exist and pass, keep their manual gates explicit.
+The replay guide also documents the parent-registry probe. Its current Weston
+route fails the pinned backend's protocol requirements; passing its parser
+controls does not satisfy any compositor visual gate.

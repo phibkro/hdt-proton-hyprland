@@ -69,6 +69,9 @@ jobs:
       - name: Test screen-pixel classifier and negative controls
         if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: nix develop --command bash tests/replay/visual-triplet-checks.sh
+      - name: Test isolated compositor prerequisite validator
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: nix develop --command bash tests/replay/wayland-parent-checks.sh
 
   rust-quality:
     needs: scope

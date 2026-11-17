@@ -79,6 +79,53 @@ This journey covers the main-window fallback tooltip, not overlay hover polling,
 every popup, game-relative alignment, Hyprland stacking, Alt-Tab or live-game
 input. Those remain distinct gates.
 
+## Check the isolated compositor prerequisite
+
+The nested-Hyprland visual journey is not implemented yet. The bounded parent
+probe collects a private Weston registry and checks whether it can host the
+Aquamarine 0.15.1 Wayland backend. It does not start Hyprland, HDT or Hearthstone,
+capture overlay pixels, or drive the current desktop.
+
+After checking machine headroom, supply the exact unprivileged Hyprland binary
+and one render node explicitly:
+
+```sh
+devenv shell -- bash tests/replay/hyprland-probe.sh \
+  /nix/store/SELECTED-HYPRLAND/bin/Hyprland /dev/dri/renderD128
+```
+
+Replace the example binary path with the selected store executable. The probe
+requires its version report to identify Aquamarine 0.15.1; another backend needs
+its own source review. It runs Weston headless with a private home, runtime,
+display socket, network and process namespace. Only the selected render node is
+exposed; it still shares the host GPU driver. No physical input devices or host
+display sockets are exposed. The 30-second supervisor retains evidence on failure.
+
+Inspect `parent-capabilities.json`, `parent-registry.txt`, `weston.log`,
+`compositor-version.json`, `source-sha256.txt` and `result.json` in the printed
+private evidence directory. The two executed scripts are copied and mounted
+read-only for the run. A nonzero result is a failed prerequisite, not a skipped
+visual test. A zero result establishes registry compatibility only; allocation,
+child rendering, capture and input still need separate executable checks.
+
+The tested Weston 16.0.0 headless GL parent advertised seat 7, compositor 5,
+xdg-shell 5 and linux-dmabuf 3. The reviewed
+[Aquamarine backend](https://github.com/hyprwm/aquamarine/blob/v0.15.1/src/backend/Wayland.cpp)
+binds versions 9, 6, 6 and 4 respectively. This parent therefore fails before
+child startup. Do not lower the validator thresholds to bypass that mismatch.
+A compatible parent with working DMA-BUF feedback, or an isolated virtual GPU
+environment, remains necessary for the composed-frame journey.
+
+Run the registry parser controls without a compositor or GPU:
+
+```sh
+devenv shell -- bash tests/replay/wayland-parent-checks.sh
+```
+
+These run in CI and cover minimum versions, padded output, duplicate globals,
+old versions, missing globals, empty input and malformed records. They test the
+validator, not compositor compatibility or overlay rendering.
+
 ## Capture original views
 
 After preparing the private seed, run:

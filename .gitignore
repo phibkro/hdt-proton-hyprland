@@ -201,6 +201,9 @@
 !/tests/replay/portable-wpf.sh
 !/tests/replay/visual-triplet.sh
 !/tests/replay/visual-triplet-checks.sh
+!/tests/replay/hyprland-probe.sh
+!/tests/replay/wayland-parent-check.sh
+!/tests/replay/wayland-parent-checks.sh
 !/tooling/
 /tooling/*
 !/tooling/net/
