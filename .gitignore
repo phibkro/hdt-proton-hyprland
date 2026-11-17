@@ -90,6 +90,7 @@
 !/docs/specs/structured-setup.md
 !/docs/specs/ui-replay.md
 !/docs/specs/xinput-device-race.md
+!/docs/specs/steam-controller-namespace.md
 !/flake.nix
 !/fuzz/
 /fuzz/*
