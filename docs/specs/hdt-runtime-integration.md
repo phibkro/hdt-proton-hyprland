@@ -9,8 +9,9 @@ PR20 and scoped helper source from PR32. Native Avalonia remains separate.
 
 ## Invariants
 
-- Runtime library selection is explicit, HDT-only and reversible. Invalid or
-  conflicting libraries fail before launch; unrelated environment is preserved.
+- Runtime library selection is explicit, HDT-only and reversible. Invalid
+  path/header selections and conflicting preloads fail before launch; unrelated
+  environment is preserved. Header checks do not establish full loader/ABI validity.
 - The host controller keeps Hyprland IPC. Only X11 apply/restore helpers enter
   the selected matching-prefix Steam wineserver namespace, revalidating PID,
   Linux start identity and existing Proton/session guards before every call.

@@ -25,7 +25,10 @@ probe supplies a differential reference in the isolated acceptance test.
 
 ## Build and check
 
-Enter the pinned environment before using Cargo:
+Enter the pinned environment before using Cargo. The devenv shell explicitly
+selects its pinned C compiler and archiver, so inherited compiler settings cannot
+make the benchmark's native dependency emit Clang bitcode for a GCC linker:
+
 
 ```sh
 devenv shell -- cargo fetch --locked
