@@ -79,6 +79,99 @@ This journey covers the main-window fallback tooltip, not overlay hover polling,
 every popup, game-relative alignment, Hyprland stacking, Alt-Tab or live-game
 input. Those remain distinct gates.
 
+## Check the isolated compositor prerequisite
+
+The nested-Hyprland visual journey is not implemented yet. The bounded parent
+probe collects an explicitly selected private parent's registry and checks
+whether it can host the Aquamarine 0.15.1 Wayland backend. It does not start
+Hyprland, HDT or Hearthstone, capture overlay pixels, or drive the current desktop.
+
+After checking machine headroom, supply the exact unprivileged Hyprland binary
+and one render node explicitly:
+
+```sh
+devenv shell -- bash tests/replay/hyprland-probe.sh \
+  --parent weston /nix/store/SELECTED-HYPRLAND/bin/Hyprland /dev/dri/renderD128
+```
+
+Replace the example binary path with the selected store executable. The probe
+requires its version report to identify Aquamarine 0.15.1; another backend needs
+its own source review. It runs the selected parent headless with a private home,
+runtime, display socket, network and process namespace. Only the selected render node is
+exposed; it still shares the host GPU driver. No physical input devices or host
+display sockets are exposed. The 30-second supervisor retains evidence on failure.
+
+Inspect `parent-capabilities.json`, `parent-registry.txt`, `parent-stderr.log`,
+`compositor-version.json`, `parent-version.txt`, `source-sha256.txt` and
+`result.json` in the printed private evidence directory. Weston also writes
+`weston.log`. The two executed scripts are copied and mounted
+read-only for the run. A nonzero result is a failed prerequisite, not a skipped
+visual test. A zero result establishes registry compatibility only; allocation,
+child rendering, capture and input still need separate executable checks.
+
+The tested Weston 16.0.0 headless GL parent advertised seat 7, compositor 5,
+xdg-shell 5 and linux-dmabuf 3. The reviewed
+[Aquamarine backend](https://github.com/hyprwm/aquamarine/blob/v0.15.1/src/backend/Wayland.cpp)
+binds versions 9, 6, 6 and 4 respectively. This parent therefore fails before
+child startup. Do not lower the validator thresholds to bypass that mismatch.
+A compatible parent with working DMA-BUF feedback, or an isolated virtual GPU
+environment, remains necessary for the composed-frame journey.
+
+Run the registry parser controls without a compositor or GPU:
+
+```sh
+devenv shell -- bash tests/replay/wayland-parent-checks.sh
+```
+
+These run in CI and cover minimum versions, padded output, duplicate globals,
+old versions, missing globals, empty input and malformed records, including
+malformed records mixed with otherwise compatible globals. `malformedRecords`
+must be zero as well as every required version passing. They test the
+validator, not compositor compatibility or overlay rendering.
+
+### Next parent candidate
+
+The project-pinned labwc 0.20.2 and wlroots 0.20.2 are a source-compatible
+candidate, not a tested replacement for Weston. Labwc declares
+[xdg-shell 6](https://github.com/labwc/labwc/blob/0.20.2/src/xdg.c) and
+[compositor 6 and DMA-BUF 4](https://github.com/labwc/labwc/blob/0.20.2/src/server.c);
+the corresponding
+[wlroots seat implementation](https://gitlab.freedesktop.org/wlroots/wlroots/-/blob/0.20.2/types/seat/wlr_seat.c)
+declares seat 9. DMA-BUF advertisement still depends on the actual renderer.
+Sway 1.12 and Cage 0.2.1 were also examined: their
+[Sway](https://github.com/swaywm/sway/blob/1.12/sway/server.c) and
+[Cage](https://github.com/cage-kiosk/cage/blob/v0.2.1/cage.c) shell initialization
+uses version 5, so those versions do not meet this backend's shell requirement.
+
+Select the alternative parent explicitly with `--parent labwc`. The probe
+requires the reviewed labwc/wlroots version pair, retains the existing private
+namespace and selected render node, and collects its registry without starting
+any child compositor. The pinned
+[wlroots environment contract](https://gitlab.freedesktop.org/wlroots/wlroots/-/blob/0.20.2/docs/env_vars.md)
+supports `WLR_BACKENDS=headless`, `WLR_HEADLESS_OUTPUTS=1` and an explicit
+`WLR_RENDER_DRM_DEVICE`. The probe uses an owned empty config directory and
+session scripts, suppresses activation environment updates with
+`LABWC_UPDATE_ACTIVATION_ENV=0`, and keeps all host display, bus and input
+resources absent. The
+[labwc command contract](https://github.com/labwc/labwc/blob/0.20.2/docs/labwc.1.scd)
+provides the config-directory option. The existing timeout, exact-child cleanup
+and private evidence manifest apply to both parents.
+
+The executed labwc probe on the selected NVIDIA render node advertised seat 9,
+compositor 6, xdg-shell 6 and SHM 2, but no DMA-BUF global. EGL reported an
+incompatible GBM backend; Vulkan found only a CPU renderer and could not match
+the DRM device. Labwc fell back to Pixman and SHM allocation. The validator
+correctly failed with one missing requirement. This establishes a renderer
+prerequisite failure in this restricted environment, rather than a remaining
+protocol-version mismatch. Its cause has not been isolated further.
+
+Accept only actual registry success and a hardware renderer with usable DMA-BUF
+feedback. Exposing additional devices or forcing software rendering is not an
+approved fallback. A failure ends the experiment before Hyprland, WPF or input
+starts. Those child stages remain unexecuted, and this investigation adds no
+support claim for labwc as an operator desktop. A separately provisioned
+compatible virtual GPU remains an alternative requiring its own bounded setup.
+
 ## Capture original views
 
 After preparing the private seed, run:
