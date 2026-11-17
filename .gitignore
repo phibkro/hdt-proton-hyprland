@@ -261,6 +261,7 @@
 !/avalonia/Hdt.Views/TrackerLayout.fs
 !/avalonia/Hdt.Views/ArenaChoices.fs
 !/avalonia/Hdt.Views/SettingsView.fs
+!/avalonia/Hdt.Views/*.axaml
 !/avalonia/Hdt.Views/packages.lock.json
 !/avalonia/dotnet-tools.json
 !/avalonia/dev.sh

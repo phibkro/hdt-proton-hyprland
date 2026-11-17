@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Hdt.Avalonia"
+             x:Class="Hdt.Avalonia.SettingsLayout"
+             x:DataType="local:SettingsPaths"
+             x:CompileBindings="True">
+  <UserControl.Styles>
+    <Style Selector="TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Button.category">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="{x:Static local:TrackerLayout.Surface}" />
+    </Style>
+    <Style Selector="Border.section">
+      <Setter Property="Background" Value="{x:Static local:TrackerLayout.Surface}" />
+      <Setter Property="BorderBrush" Value="{x:Static local:TrackerLayout.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.heading">
+      <Setter Property="Background" Value="{x:Static local:TrackerLayout.Accent}" />
+      <Setter Property="Padding" Value="10,6" />
+    </Style>
+  </UserControl.Styles>
+  <Grid ColumnDefinitions="170,*" ColumnSpacing="12" Margin="12">
+    <Border x:Name="CategoryPanel" Classes="section" Padding="8">
+      <StackPanel Spacing="6">
+        <TextBlock Text="OVERLAY" FontSize="12" />
+        <Button x:Name="ArenaCategory" Classes="category" Content="Arena draft" />
+        <Button x:Name="OverlayCategory" Classes="category" Content="Native overlay" />
+        <Border Height="12" />
+        <TextBlock Text="TRACKER" FontSize="12" />
+        <Button x:Name="StorageCategory" Classes="category" Content="Local files" />
+      </StackPanel>
+    </Border>
+    <ContentControl x:Name="DetailPanel" Grid.Column="1">
+      <Grid>
+        <Border x:Name="ArenaPane" Classes="section">
+          <DockPanel>
+            <Border Classes="heading" DockPanel.Dock="Top">
+              <TextBlock Text="OVERLAY / ARENA DRAFT" />
+            </Border>
+            <Border Padding="10">
+              <ScrollViewer>
+                <ContentControl x:Name="ArenaSlot" />
+              </ScrollViewer>
+            </Border>
+          </DockPanel>
+        </Border>
+        <Border x:Name="OverlayPane" Classes="section" IsVisible="False">
+          <DockPanel>
+            <Border Classes="heading" DockPanel.Dock="Top">
+              <TextBlock Text="OVERLAY / NATIVE TRACKING" />
+            </Border>
+            <Border Padding="10">
+              <ScrollViewer>
+                <ContentControl x:Name="OverlaySlot" />
+              </ScrollViewer>
+            </Border>
+          </DockPanel>
+        </Border>
+        <Border x:Name="StoragePane" Classes="section" IsVisible="False">
+          <DockPanel>
+            <Border Classes="heading" DockPanel.Dock="Top">
+              <TextBlock Text="TRACKER / LOCAL FILES" />
+            </Border>
+            <Border Padding="10">
+              <ScrollViewer>
+                <StackPanel Spacing="12">
+                  <TextBlock Text="These files belong to this native client. Their paths are supplied when it starts; no Windows HDT database is imported." />
+                  <TextBlock Text="Preferences" />
+                  <TextBlock x:Name="PreferencesPath" Text="{Binding Preferences, Mode=OneTime}" />
+                  <TextBlock Text="Deck library and supplied match history" />
+                  <TextBlock x:Name="LibraryPath" Text="{Binding Library, Mode=OneTime}" />
+                  <TextBlock Text="Read-only game observations" />
+                  <TextBlock x:Name="ObservationsPath" Text="{Binding Observations, Mode=OneTime}" />
+                </StackPanel>
+              </ScrollViewer>
+            </Border>
+          </DockPanel>
+        </Border>
+      </Grid>
+    </ContentControl>
+  </Grid>
+</UserControl>
