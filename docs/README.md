@@ -20,3 +20,7 @@ should start with the [development guide](development/README.md) and
 
 The [HDT view trees](reference/wpf-view-map.md) map the original windows,
 settings categories and migration process boundaries to reference capture.
+The [feature parity ledger](reference/hdt-feature-parity.md) maps original user
+journeys to the native implementation and evidence. Use the
+[native development sequence](development/native-roadmap.md) to select the next
+bounded migration task.

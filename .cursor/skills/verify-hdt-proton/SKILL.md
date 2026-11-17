@@ -9,6 +9,10 @@ Use the [feature map](features/README.md) as the coverage index. The primary
 surface is a Windows desktop app with Linux launch/diagnostic commands. Prefer
 this repository's real CLI, private X11 acceptance, and WPF replay. A successful
 build or synthetic draft does not establish live game tracking.
+The [original application map](features/application/README.md) adds migration
+journeys beyond the currently implemented preview. Its linked parity ledger
+guides native work. Newly inventoried journeys remain draft until driven;
+expanding the inventory is not a completed full maintenance pass.
 
 Workflow derived from pstack's [creation](https://github.com/cursor/plugins/blob/bf0c7cd80abdbf7fe47b634978a7d1b4071f71a7/pstack/skills/create-verification-skill/SKILL.md)
 and [maintenance](https://github.com/cursor/plugins/blob/bf0c7cd80abdbf7fe47b634978a7d1b4071f71a7/pstack/skills/maintain-verification-skill/SKILL.md)
@@ -62,7 +66,7 @@ from `hdt-status`, not just a healthy CLI. Re-do doctor or reset after any failu
 
 ## Drive
 
-Follow all three indexed feature files. The coordinator owns all runtime actions;
+Follow all indexed feature files. The coordinator owns all runtime actions;
 source-review agents may read only. Run each mapped entry point or record its
 attempt and concrete missing prerequisite. Never replace a live path with a
 mock and label it passed. Mutation tests use a new owned data directory; preserve
