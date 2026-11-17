@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Hdt.Avalonia.DeckDuplicateView">
+  <UserControl.Styles>
+    <Style Selector="TextBlock">
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </UserControl.Styles>
+  <StackPanel Spacing="8">
+    <Button x:Name="OpenDuplicate" Content="Duplicate saved deck" />
+    <Border x:Name="DuplicateEditor" IsVisible="False">
+      <StackPanel Spacing="8">
+        <TextBlock Text="Duplicates the saved deck. Unsaved edits and game history are not copied." />
+        <TextBlock Text="Name for the duplicate" />
+        <TextBox x:Name="DuplicateName" MaxLength="256" TextWrapping="Wrap" />
+        <WrapPanel>
+          <Button x:Name="SaveDuplicate" Content="Duplicate saved deck" Margin="0,0,6,6" />
+          <Button x:Name="CancelDuplicate" Content="Cancel" Margin="0,0,0,6" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+    <TextBlock x:Name="DuplicateResult" IsVisible="False" MaxLines="3" TextTrimming="CharacterEllipsis" />
+    <Button x:Name="OpenDuplicateResult" Content="Open duplicate" IsVisible="False" />
+  </StackPanel>
+</UserControl>

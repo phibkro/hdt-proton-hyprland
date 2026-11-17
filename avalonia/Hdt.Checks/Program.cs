@@ -992,6 +992,176 @@ try
     window.Close(); metadataPublisher.Dispose(); Wait(metadataPublisher.Completion);
     Check(metadataFailures == 0 && metadataPublisher.Completion.IsCompletedSuccessfully,
         "metadata observation journey reaps its actual publisher without failure");
+
+    // Duplicate persisted content independently of editor drafts and captured match identity.
+    var duplicateFile = Path.Combine(evidence, "duplicate-library.json");
+    var duplicateSeed = new ClientLibrary(duplicateFile);
+    Wait(duplicateSeed.ReloadAsync());
+    Wait(duplicateSeed.ImportAsync("Original saved deck", "AAECAf0EAU0BZAAA"));
+    var originalId = duplicateSeed.State.SelectedDeckId!;
+    var savedContent = duplicateSeed.State.Decks.Single().Content with { Sideboards = [new(77, 400, 1)] };
+    Wait(duplicateSeed.SaveAsync(originalId, "Original saved deck", "Mage", savedContent, "Saved notes to duplicate"));
+    Wait(duplicateSeed.SetMetadataAsync(originalId, new(["Arena", "arena", "日本語"], "https://example.test/日本語")));
+    var originalHistory = new MatchRecord(Guid.NewGuid().ToString(), originalId, DateTimeOffset.UtcNow.ToString("o"), "Prior supplied game", "Win", "Mage", "Warrior", 8, null, "");
+    Wait(duplicateSeed.RecordAsync(originalHistory));
+    var originalSaved = System.Text.Json.JsonSerializer.Serialize(duplicateSeed.State.Decks.Single());
+    nativeSession = Guid.NewGuid().ToString(); observedMatch = Guid.NewGuid().ToString();
+    var duplicateSource = Path.Combine(evidence, "duplicate-observation.json");
+    var duplicateFailures = 0;
+    using var duplicatePublisher = new NativeSnapshotWriter(duplicateSource,
+        snapshot => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(snapshot, ReplaySource.JsonOptions),
+        () => Interlocked.Increment(ref duplicateFailures));
+    ownedWriters.Add(duplicatePublisher);
+    duplicatePublisher.Offer(NativeFrame("Constructed", 1));
+    PumpUntil(() => File.Exists(duplicateSource), "duplicate journey publishes a real in-progress observation");
+    var duplicateSettings = Path.Combine(evidence, "duplicate-settings.json");
+    window = CreateWindow(new(null, duplicateSettings, ClientData: duplicateFile, NativeState: duplicateSource));
+    window.Show(); Wait(window.Initialization);
+    Click((TabItem)window.GetVisualDescendants().OfType<TabControl>().Single().Items[0]!);
+    editor = window.DeckLibrary;
+    var duplicateView = editor.Duplicate;
+    Click(editor.EditButton); Fill(editor.NotesBox, "Unsaved notes must survive duplication");
+    Fill(editor.CardsBox, "77 2\n100 1");
+    Click(editor.OverviewButton); Click(editor.Metadata.OpenButton);
+    Fill(editor.Metadata.TagsBox, "Unsaved tag");
+    Fill(editor.Metadata.WebsiteBox, "https://example.test/unsaved");
+    var beforeDuplicate = File.ReadAllBytes(duplicateFile);
+    Click(duplicateView.OpenButton); Fill(duplicateView.NameBox, "Discarded name");
+    Click(duplicateView.OpenButton);
+    Check(duplicateView.NameBox.Text == "Discarded name" && !duplicateView.OpenButton.IsEnabled,
+        "duplicate form activation is idempotent and retains the explicit name");
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height;
+        Fill(duplicateView.NameBox, "Long explicit duplicate name " + new string('W', 120));
+        duplicateView.CancelButton.BringIntoView(); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
+        Check(InsideScrollViewport(duplicateView.NameBox) && InsideScrollViewport(duplicateView.SaveButton)
+            && InsideScrollViewport(duplicateView.CancelButton),
+            $"{size.Width}: long duplicate name and Save/Cancel share the actual form viewport");
+        FitsWindowBounds(duplicateView.NameBox, $"{size.Width}: duplicate name field fits the window");
+        FitsWindowBounds(duplicateView.SaveButton, $"{size.Width}: duplicate save action fits the window");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"duplicate-form-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+    Click(duplicateView.CancelButton); Click(duplicateView.OpenButton);
+    Check(duplicateView.NameBox.Text == "" && File.ReadAllBytes(duplicateFile).SequenceEqual(beforeDuplicate),
+        "duplicate cancel/reopen clears temporary name without any persisted mutation");
+    Fill(duplicateView.NameBox, "   "); Click(duplicateView.SaveButton); Wait(editor.PendingAction);
+    Check(!window.Library.Ready && duplicateView.Editor.IsEffectivelyVisible && duplicateView.NameBox.Text == "   "
+        && File.ReadAllBytes(duplicateFile).SequenceEqual(beforeDuplicate) && editor.Status.Contains("name", StringComparison.OrdinalIgnoreCase),
+        "invalid duplicate name retains its input and reports failure without rewriting saved state");
+    FitsWindowBounds(editor.StatusText, "800: duplicate validation error remains visible in the browser status");
+    Click(duplicateView.NameBox);
+    Check(InsideScrollViewport(duplicateView.NameBox) && InsideScrollViewport(duplicateView.CancelButton),
+        "800: rejected duplicate input and Cancel remain reachable beside the validation error");
+    window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "duplicate-error-800.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    Click(editor.ReloadButton); Wait(editor.PendingAction);
+    Check(window.Library.Ready && duplicateView.Editor.IsEffectivelyVisible && duplicateView.NameBox.Text == "   "
+        && editor.NotesBox.Text == "Unsaved notes must survive duplication" && editor.Metadata.TagsBox.Text == "Unsaved tag",
+        "reload recovers duplicate availability while retaining all rejected and unrelated drafts");
+    var copiedName = "Independent duplicate — " + new string('D', 120);
+    Fill(duplicateView.NameBox, copiedName);
+    var duplicateMatch = originalHistory with { Id = Guid.NewGuid().ToString(), DeckId = null, Mode = "Earlier supplied result" };
+    duplicatePublisher.Offer(NativeFrame("Constructed", 2, matches: [duplicateMatch]));
+    PumpUntil(() => window.Library.State.Matches.Length == 2, "actual polling records an earlier supplied result while duplicate input is open");
+    Check(duplicateView.NameBox.Text == copiedName && duplicateView.Editor.IsEffectivelyVisible
+        && editor.Metadata.TagsBox.Text == "Unsaved tag" && editor.NotesBox.Text == "Unsaved notes must survive duplication"
+        && window.Library.State.Matches.Single(match => match.Id == duplicateMatch.Id).DeckId is null,
+        "background history preserves all drafts and does not guess a deck for an uncaptured game");
+    Fill(editor.SearchBox, "Original saved");
+    var beforeDuplicateRevision = window.Library.State.Revision;
+    Click(duplicateView.SaveButton); Wait(editor.PendingAction);
+    var copy = window.Library.State.Decks.Single(deck => deck.Id != originalId);
+    Check(window.Library.State.Revision == beforeDuplicateRevision + 1 && copy.Name == copiedName && !copy.Archived
+        && System.Text.Json.JsonSerializer.Serialize(window.Library.State.Decks.Single(deck => deck.Id == originalId)) == originalSaved
+        && System.Text.Json.JsonSerializer.Serialize(copy.Content) == System.Text.Json.JsonSerializer.Serialize(savedContent)
+        && copy.Notes == "Saved notes to duplicate" && copy.Metadata.Tags.SequenceEqual(new[] { "Arena", "arena", "日本語" })
+        && copy.Metadata.Website == "https://example.test/日本語" && window.Library.State.SelectedDeckId == originalId
+        && window.Library.State.Matches.Length == 2 && window.Library.State.Matches.Single(match => match.Id == originalHistory.Id) == originalHistory
+        && window.Library.State.Matches.Single(match => match.Id == duplicateMatch.Id) == duplicateMatch,
+        "duplicate adds only fresh independent saved content and preserves source/history/tracking identities");
+    Check(editor.NotesBox.Text == "Unsaved notes must survive duplication" && editor.CardsBox.Text == "77 2\n100 1"
+        && editor.Metadata.Editor.IsVisible && editor.Metadata.TagsBox.Text == "Unsaved tag"
+        && editor.Metadata.WebsiteBox.Text == "https://example.test/unsaved" && duplicateView.ResultText.Text!.Contains(copiedName),
+        "successful duplicate reports its result without saving or discarding source drafts");
+    var spanningMatch = originalHistory with { Id = observedMatch, DeckId = null, Mode = "Game spanning duplication" };
+    duplicatePublisher.Offer(NativeFrame("Menu", 3, matches: [duplicateMatch, spanningMatch]));
+    PumpUntil(() => window.Library.State.Matches.Length == 3, "game observed before duplication finishes after the copy is saved");
+    Check(window.Library.State.Matches.Single(match => match.Id == spanningMatch.Id).DeckId == originalId
+        && duplicateView.ResultText.Text!.Contains(copiedName) && editor.NotesBox.Text == "Unsaved notes must survive duplication",
+        "game spanning duplication keeps its original captured deck and background history preserves the result and drafts");
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height;
+        Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
+        duplicateView.OpenResultButton.BringIntoView(); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
+        Check(InsideScrollViewport(duplicateView.OpenResultButton) && InsideScrollViewport(duplicateView.ResultText),
+            $"{size.Width}: long duplicate result and explicit open action share the actual selected-deck viewport");
+        FitsWindowBounds(duplicateView.OpenResultButton, $"{size.Width}: duplicate open action fits the window");
+        FitsWindowBounds(duplicateView.ResultText, $"{size.Width}: bounded duplicate result fits the window");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"duplicate-result-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+    Click(duplicateView.OpenResultButton);
+    Check(editor.SearchBox.Text == "" && editor.ShowArchived.IsChecked != true && editor.NameBox.Text == copiedName
+        && window.Library.State.SelectedDeckId == originalId && editor.History.Matches.ItemCount == 0
+        && editor.Decks.SelectedItem is DeckEntry { Id: var displayedCopy } && displayedCopy == copy.Id,
+        "explicit open reveals a filtered-out duplicate with empty history without changing tracked deck");
+    Click(editor.EditButton); Click(editor.UseButton); Wait(editor.PendingAction);
+    observedMatch = Guid.NewGuid().ToString();
+    duplicatePublisher.Offer(NativeFrame("Constructed", 4));
+    PumpUntil(() => File.ReadAllText(duplicateSource).Contains(observedMatch), "publisher replaces the next match identity");
+    PumpUntil(() => window.GameView.ModeText.StartsWith("Constructed"), "native reader observes the next in-progress game before its completion");
+    var copyMatch = originalHistory with { Id = observedMatch, DeckId = null, Mode = "Explicit duplicate selection" };
+    duplicatePublisher.Offer(NativeFrame("Menu", 5, matches: [duplicateMatch, spanningMatch, copyMatch]));
+    PumpUntil(() => window.Library.State.Matches.Length == 4, "polling records the next match after explicit tracking selection");
+    Check(window.Library.State.Matches.Single(match => match.Id == copyMatch.Id).DeckId == copy.Id
+        && window.Library.State.Matches.Single(match => match.Id == spanningMatch.Id).DeckId == originalId
+        && window.Library.State.Matches.Single(match => match.Id == duplicateMatch.Id).DeckId is null
+        && window.Library.State.Matches.Single(match => match.Id == originalHistory.Id) == originalHistory,
+        "only explicit Use changes future history association; prior source games remain untouched");
+    window.Close();
+    window = CreateWindow(new(null, duplicateSettings, ClientData: duplicateFile, NativeState: duplicateSource));
+    window.Show(); Wait(window.Initialization);
+    Click((TabItem)window.GetVisualDescendants().OfType<TabControl>().Single().Items[0]!);
+    editor = window.DeckLibrary; duplicateView = editor.Duplicate;
+    Check(editor.NameBox.Text == copiedName && editor.History.Matches.ItemCount == 1
+        && ((TabItem)window.GetVisualDescendants().OfType<TabControl>().Single().Items[2]!).Content is HistoryView duplicateGlobal
+        && duplicateGlobal.Matches.ItemCount == 4 && window.Library.State.Decks.Length == 2,
+        "a reconstructed window reads the independent deck and exact per-deck/global history from real storage");
+    Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single(item => item.DataContext is DeckEntry deck && deck.Id == originalId));
+    Click(editor.EditButton); Click(editor.ArchiveButton); Wait(editor.PendingAction);
+    Click(editor.ShowArchived);
+    Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single(item => item.DataContext is DeckEntry deck && deck.Id == originalId));
+    Click(editor.OverviewButton); Click(duplicateView.OpenButton); Fill(duplicateView.NameBox, "Active copy of archived source");
+    var archivedOriginal = System.Text.Json.JsonSerializer.Serialize(window.Library.State.Decks.Single(deck => deck.Id == originalId));
+    Click(duplicateView.SaveButton); Wait(editor.PendingAction);
+    Check(window.Library.State.Decks.Count(deck => !deck.Archived) == 2 && window.Library.State.Decks.Length == 3
+        && System.Text.Json.JsonSerializer.Serialize(window.Library.State.Decks.Single(deck => deck.Id == originalId)) == archivedOriginal
+        && window.Library.State.SelectedDeckId == copy.Id && window.Library.State.Matches.Length == 4,
+        "archived saved source can produce an active copy without restoring it or copying history");
+    Click(duplicateView.OpenResultButton);
+    Check(editor.ShowArchived.IsChecked != true && editor.NameBox.Text == "Active copy of archived source"
+        && window.Library.State.SelectedDeckId == copy.Id && editor.History.Matches.ItemCount == 0,
+        "explicit open clears archived browsing to reveal the active copy while preserving tracking selection");
+    Click(duplicateView.OpenButton); Fill(duplicateView.NameBox, "Archived after creation");
+    Click(duplicateView.SaveButton); Wait(editor.PendingAction);
+    var archivedResultId = duplicateView.ResultId!;
+    var anotherWriter = new ClientLibrary(duplicateFile); Wait(anotherWriter.ReloadAsync());
+    Wait(anotherWriter.SetArchivedAsync(archivedResultId, true));
+    Click(editor.ReloadButton); Wait(editor.PendingAction);
+    Check(duplicateView.ResultId == archivedResultId && duplicateView.OpenResultButton.IsEffectivelyVisible,
+        "reloading a copy archived by another writer retains the exact result identity");
+    Click(duplicateView.OpenResultButton);
+    Check(editor.ShowArchived.IsChecked == true && editor.NameBox.Text == "Archived after creation"
+        && editor.Decks.SelectedItem is DeckEntry { Id: var archivedDisplayedId, Archived: true } && archivedDisplayedId == archivedResultId
+        && window.Library.State.SelectedDeckId == copy.Id,
+        "open follows a result archived after creation rather than silently falling back to the tracked deck");
+    Click(duplicateView.OpenButton); Fill(duplicateView.NameBox, "Unsaved duplicate form");
+    Click(editor.NewButton);
+    Check(!duplicateView.Editor.IsVisible && !duplicateView.IsVisible && editor.NameBox.Text == "",
+        "New clears duplicate UI and cannot duplicate an unsaved deck");
+    window.Close(); duplicatePublisher.Dispose(); Wait(duplicatePublisher.Completion);
+    Check(duplicateFailures == 0 && duplicatePublisher.Completion.IsCompletedSuccessfully,
+        "duplicate observation journey reaps its real publisher without failures");
     var failedOutput = Path.Combine(evidence, $"publisher-block-{Guid.NewGuid():N}", "state.json");
     var publicationFailed = 0;
     using var failedPublisher = new NativeSnapshotWriter(failedOutput, _ => [123, 125], () => Interlocked.Increment(ref publicationFailed));

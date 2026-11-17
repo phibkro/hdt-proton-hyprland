@@ -35,6 +35,20 @@ public sealed class ClientLibrary(string path, CancellationToken cancellation = 
     }
     public Task ImportAsync(string? name, string code)
         => ExecuteAsync(new { operation = "importDeck", expectedRevision = State.Revision, name, code });
+    public async Task<DeckEntry> DuplicateAsync(string sourceId, string name)
+    {
+        var before = State.Decks.Select(deck => deck.Id).ToHashSet(StringComparer.Ordinal);
+        await ExecuteAsync(new { operation = "duplicateDeck", expectedRevision = State.Revision, sourceId, name });
+        var created = State.Decks.Where(deck => !before.Contains(deck.Id)).ToArray();
+        if (created.Length != 1 || State.Decks.Length != before.Count + 1)
+        {
+            Ready = false;
+            Status = "Duplicate response did not identify exactly one new deck. Reload to inspect saved state.";
+            Changed?.Invoke();
+            throw new InvalidDataException(Status);
+        }
+        return created[0];
+    }
     public Task SelectAsync(string id) => ExecuteAsync(new { operation = "selectDeck", expectedRevision = State.Revision, id });
     public Task SetArchivedAsync(string id, bool archived) => ExecuteAsync(new { operation = "setArchived", expectedRevision = State.Revision, id, archived });
     public Task RecordAsync(MatchRecord record) => ExecuteAsync(new { operation = "recordMatch", expectedRevision = State.Revision, record });

@@ -11,13 +11,43 @@ public sealed class LibraryView : DeckLibrarySurface
     private bool _working, _creating, _updatingDeckList;
     private ulong _shownRevision = ulong.MaxValue;
     public DeckMetadataView Metadata => (DeckMetadataView)MetadataControl;
+    public DeckDuplicateView Duplicate => (DeckDuplicateView)DuplicateControl;
     public HistoryView History => (HistoryView)HistoryControl;
     public CardCatalogView Catalog => (CardCatalogView)CatalogControl;
     public Task PendingAction { get; private set; } = Task.CompletedTask;
     public string Status => StatusText.Text ?? "";
-    public LibraryView(ClientLibrary library, CancellationToken lifetime = default) : base(new CardCatalogView(lifetime), new HistoryView(library, new HistoryScope.Deck(null)), new DeckMetadataView())
+    public LibraryView(ClientLibrary library, CancellationToken lifetime = default) : base(new CardCatalogView(lifetime), new HistoryView(library, new HistoryScope.Deck(null)), new DeckMetadataView(), new DeckDuplicateView())
     {
         _library = library;
+        Duplicate.OpenButton.Click += (_, _) =>
+        {
+            if (_editing is not null && _library.Ready && !_working && !_library.Busy)
+                Duplicate.Open();
+        };
+        Duplicate.CancelButton.Click += (_, _) => Duplicate.Close();
+        Duplicate.SaveButton.Click += (_, _) =>
+        {
+            if (_editing is null) { StatusText.Text = "Select a saved deck before duplicating."; return; }
+            var sourceId = _editing;
+            var name = Duplicate.NameBox.Text ?? "";
+            Start(async () =>
+            {
+                var result = await _library.DuplicateAsync(sourceId, name);
+                Duplicate.ShowResult(new DeckDuplicateDisplay(result.Id, result.Name));
+            });
+        };
+        Duplicate.OpenResultButton.Click += (_, _) =>
+        {
+            if (_working || _library.Busy || !_library.Ready) return;
+            var result = _library.State.Decks.FirstOrDefault(deck => deck.Id == Duplicate.ResultId);
+            if (result is null) { StatusText.Text = "Duplicate is unavailable. Reload to inspect saved decks."; return; }
+            _updatingDeckList = true;
+            try { ShowArchived.IsChecked = result.Archived; SearchBox.Text = ""; }
+            finally { _updatingDeckList = false; }
+            Edit(result);
+            _shownRevision = ulong.MaxValue;
+            Refresh();
+        };
         Metadata.OpenButton.Click += (_, _) =>
         {
             if (_editing is not null && _library.State.Decks.FirstOrDefault(deck => deck.Id == _editing) is { Archived: false } deck)
@@ -89,13 +119,13 @@ public sealed class LibraryView : DeckLibrarySurface
                 Start(async () => { await _library.SetArchivedAsync(id, !archived); ClearEditor(); });
             }
         };
-        ShowArchived.IsCheckedChanged += (_, _) => { _shownRevision = ulong.MaxValue; ClearEditor(); Refresh(); };
+        ShowArchived.IsCheckedChanged += (_, _) => { if (!_updatingDeckList) { _shownRevision = ulong.MaxValue; ClearEditor(); Refresh(); } };
         ReloadButton.Click += (_, _) => Start(_library.ReloadAsync);
         Decks.SelectionChanged += (_, _) => { if (!_updatingDeckList && Decks.SelectedItem is DeckEntry deck) Edit(deck); };
         _library.Changed += Refresh;
         Decks.ItemTemplate = new FuncDataTemplate<DeckEntry>((entry, _) => entry is null ? null :
             DeckRow(entry.Name, entry.HeroClass, entry.Content.Cards.Sum(card => (long)card.Count)));
-        SearchBox.TextChanged += (_, _) => { _shownRevision = ulong.MaxValue; Refresh(); };
+        SearchBox.TextChanged += (_, _) => { if (!_updatingDeckList) { _shownRevision = ulong.MaxValue; Refresh(); } };
         EditButton.Click += (_, _) => EditSelected();
         Refresh();
     }
@@ -114,7 +144,7 @@ public sealed class LibraryView : DeckLibrarySurface
     }
     private void ClearEditor()
     {
-        _creating = true; _editing = null; ClearInputs(); Metadata.Close();
+        _creating = true; _editing = null; ClearInputs(); Metadata.Close(); Duplicate.Close();
         RefreshButtons(); RefreshSelected();
     }
     public void FocusImport() => OpenEditor(CodeBox);
@@ -126,7 +156,7 @@ public sealed class LibraryView : DeckLibrarySurface
     }
     private void Edit(DeckEntry deck)
     {
-        if (_editing != deck.Id) Metadata.Close();
+        if (_editing != deck.Id) { Metadata.Close(); Duplicate.Close(); }
         LoadEditor(Project(deck), _editing != deck.Id);
         _creating = false; _editing = deck.Id;
         RefreshButtons(); RefreshSelected();
@@ -170,6 +200,7 @@ public sealed class LibraryView : DeckLibrarySurface
     {
         var deck = _library.State.Decks.FirstOrDefault(entry => entry.Id == _editing);
         Metadata.IsVisible = deck is not null;
+        Duplicate.IsVisible = deck is not null;
         if (deck is not null) Metadata.ShowSaved(ProjectMetadata(deck.Metadata));
         History.Select(new HistoryScope.Deck(deck?.Id));
         ShowSelected(deck is null ? LibrarySelection.Empty : LibrarySelection.NewSaved(Project(deck)));
@@ -186,6 +217,7 @@ public sealed class LibraryView : DeckLibrarySurface
         var selection = deck is null ? LibraryEditorSelection.NoneSelected : deck.Archived ? LibraryEditorSelection.Archived : LibraryEditorSelection.Active;
         ApplyAvailability(_working, _library.Busy, _library.Ready, ShowArchived.IsChecked == true, selection);
         Metadata.ApplyAvailability(_library.Ready && selection == LibraryEditorSelection.Active, _working || _library.Busy);
+        Duplicate.ApplyAvailability(_library.Ready && selection != LibraryEditorSelection.NoneSelected, _working || _library.Busy);
     }
 }
 

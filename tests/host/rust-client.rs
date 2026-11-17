@@ -337,3 +337,197 @@ fn metadata_defaults_explicit_updates_and_old_upserts_preserve_library_identity(
         "invalid stored metadata must fail, never repair or truncate silently"
     );
 }
+
+fn duplicate_source_fixture(path: &std::path::Path) -> Value {
+    let content = json!({"heroDbfId":637,"format":2,"cards":[{"dbfId":77,"count":1},{"dbfId":100,"count":2}],"sideboards":[{"ownerDbfId":77,"dbfId":200,"count":2}]});
+    let created = ok(
+        path,
+        json!({"operation":"upsertDeck","expectedRevision":0,"deck":{"id":null,"name":"Source deck","heroClass":"Mage","content":content,"notes":"Saved source notes"}}),
+    );
+    let source_id = created["decks"][0]["id"].clone();
+    ok(
+        path,
+        json!({"operation":"setDeckMetadata","expectedRevision":1,"id":source_id,"metadata":{"tags":["Arena","arena","日本語"],"website":{"action":"set","value":"https://例え.テスト/CaSe?a=1#notes"}}}),
+    );
+    ok(
+        path,
+        json!({"operation":"upsertDeck","expectedRevision":2,"deck":{"id":null,"name":"Other deck","heroClass":"Mage","content":content,"notes":"Other saved notes"}}),
+    );
+    for (revision, id, deck_id) in [
+        (3, "9c685e68-1fa0-43a3-aedb-b3d913a02b14", source_id),
+        (4, "715a21bb-0917-4d37-97b8-859f5b20b082", Value::Null),
+    ] {
+        ok(
+            path,
+            json!({"operation":"recordMatch","expectedRevision":revision,"record":{"id":id,"deckId":deck_id,"observedAt":"2026-01-01T00:00:00Z","mode":"Owned duplicate fixture","result":"Win","playerHero":"Mage","opponentHero":"Warrior","turns":8,"placement":null,"notes":"Preserve history"}}),
+        );
+    }
+    let mut stored = ok(path, json!({"operation":"list"}));
+    for deck in stored["decks"].as_array_mut().unwrap() {
+        deck["createdAt"] = json!("2000-01-01T00:00:00Z");
+        deck["updatedAt"] = json!("2000-01-01T00:00:00Z");
+    }
+    fs::write(path, serde_json::to_vec_pretty(&stored).unwrap()).unwrap();
+    stored
+}
+
+#[test]
+fn saved_duplicate_copies_content_and_metadata_without_history_or_tracking_changes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("library.json");
+    let baseline = duplicate_source_fixture(&path);
+    for (archived, no_selection) in [(false, false), (true, false), (false, true)] {
+        let mut before = baseline.clone();
+        before["decks"][0]["archived"] = json!(archived);
+        if no_selection {
+            before["selectedDeckId"] = Value::Null;
+        }
+        fs::write(&path, serde_json::to_vec_pretty(&before).unwrap()).unwrap();
+        let source = &before["decks"][0];
+        let duplicated = ok(
+            &path,
+            json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source["id"],"name":"Source deck"}),
+        );
+        let decks = duplicated["decks"].as_array().unwrap();
+        assert_eq!(decks.len(), 3);
+        assert_eq!(&decks[..2], before["decks"].as_array().unwrap().as_slice());
+        assert_eq!(duplicated["revision"], 6);
+        assert_eq!(duplicated["selectedDeckId"], before["selectedDeckId"]);
+        assert_eq!(duplicated["matches"], before["matches"]);
+        let duplicate = &decks[2];
+        uuid::Uuid::parse_str(duplicate["id"].as_str().unwrap()).unwrap();
+        assert!(
+            before["decks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|deck| deck["id"] != duplicate["id"])
+        );
+        for field in ["name", "heroClass", "content", "notes", "metadata"] {
+            assert_eq!(
+                duplicate[field], source[field],
+                "saved {field} must be copied"
+            );
+        }
+        assert_eq!(duplicate["archived"], false);
+        assert_eq!(duplicate["createdAt"], duplicate["updatedAt"]);
+        assert_ne!(duplicate["createdAt"], source["createdAt"]);
+        assert_eq!(ok(&path, json!({"operation":"list"})), duplicated);
+        let edited = ok(
+            &path,
+            json!({"operation":"upsertDeck","expectedRevision":6,"deck":{"id":duplicate["id"],"name":"Independent edit","heroClass":"Mage","content":duplicate["content"],"notes":"Only the duplicate changed"}}),
+        );
+        assert_eq!(
+            &edited["decks"].as_array().unwrap()[..2],
+            before["decks"].as_array().unwrap().as_slice()
+        );
+        assert_eq!(edited["decks"][2]["metadata"], duplicate["metadata"]);
+        assert_eq!(edited["selectedDeckId"], before["selectedDeckId"]);
+        assert_eq!(edited["matches"], before["matches"]);
+    }
+    let mut legacy = baseline;
+    legacy["decks"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("metadata");
+    let old_bytes = serde_json::to_vec_pretty(&legacy).unwrap();
+    fs::write(&path, &old_bytes).unwrap();
+    let normalized = ok(&path, json!({"operation":"list"}));
+    assert_eq!(fs::read(&path).unwrap(), old_bytes);
+    let duplicated = ok(
+        &path,
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":normalized["decks"][0]["id"],"name":"Explicit duplicate name"}),
+    );
+    assert_eq!(duplicated["decks"][2]["name"], "Explicit duplicate name");
+    assert_eq!(
+        duplicated["decks"][2]["metadata"],
+        json!({"tags":[],"website":null})
+    );
+    assert_eq!(
+        &duplicated["decks"].as_array().unwrap()[..2],
+        normalized["decks"].as_array().unwrap().as_slice()
+    );
+    assert_eq!(duplicated["selectedDeckId"], normalized["selectedDeckId"]);
+    assert_eq!(duplicated["matches"], normalized["matches"]);
+    assert_eq!(ok(&path, json!({"operation":"list"})), duplicated);
+}
+
+#[test]
+fn duplicate_rejections_and_capacity_limits_leave_exact_saved_bytes_unchanged() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("library.json");
+    let baseline = duplicate_source_fixture(&path);
+    let source_id = baseline["decks"][0]["id"].clone();
+    let before = fs::read(&path).unwrap();
+    for body in [
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":"f7d368ae-b616-4baa-9593-c78092747bf2","name":"Unknown source"}),
+        json!({"operation":"duplicateDeck","expectedRevision":4,"sourceId":source_id,"name":"Stale"}),
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id,"name":"","copyHistory":true}),
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id,"name":"Valid name","copyHistory":false}),
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id}),
+        json!({"operation":"duplicateDeck","expectedRevision":5,"name":"Missing source"}),
+        json!({"operation":"duplicateDeck","sourceId":source_id,"name":"Missing revision"}),
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id,"name":""}),
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id,"name":"   "}),
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id,"name":"n".repeat(257)}),
+    ] {
+        let rejected = request(&path, body);
+        assert!(
+            !rejected.status.success(),
+            "invalid duplicate request accepted"
+        );
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+    let mut capacity = baseline.clone();
+    while capacity["decks"].as_array().unwrap().len() < 500 {
+        let mut filler = baseline["decks"][0].clone();
+        filler["id"] = json!(
+            uuid::Uuid::from_u128(capacity["decks"].as_array().unwrap().len() as u128 + 1)
+                .to_string()
+        );
+        capacity["decks"].as_array_mut().unwrap().push(filler);
+    }
+    let capacity_bytes = serde_json::to_vec_pretty(&capacity).unwrap();
+    assert!(capacity_bytes.len() < 2 * 1024 * 1024);
+    fs::write(&path, &capacity_bytes).unwrap();
+    assert_eq!(
+        ok(&path, json!({"operation":"list"}))["decks"]
+            .as_array()
+            .unwrap()
+            .len(),
+        500
+    );
+    let rejected = request(
+        &path,
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id,"name":"Over capacity"}),
+    );
+    assert!(!rejected.status.success());
+    assert_eq!(fs::read(&path).unwrap(), capacity_bytes);
+
+    let limit = 2 * 1024 * 1024;
+    let mut byte_capacity = baseline;
+    byte_capacity["decks"][0]["notes"] = json!("n".repeat(8192));
+    loop {
+        let mut filler = byte_capacity["decks"][0].clone();
+        filler["id"] = json!(
+            uuid::Uuid::from_u128(byte_capacity["decks"].as_array().unwrap().len() as u128 + 1)
+                .to_string()
+        );
+        byte_capacity["decks"].as_array_mut().unwrap().push(filler);
+        if serde_json::to_vec_pretty(&byte_capacity).unwrap().len() > limit {
+            byte_capacity["decks"].as_array_mut().unwrap().pop();
+            break;
+        }
+    }
+    assert!(byte_capacity["decks"].as_array().unwrap().len() < 500);
+    let full_bytes = serde_json::to_vec_pretty(&byte_capacity).unwrap();
+    fs::write(&path, &full_bytes).unwrap();
+    assert_eq!(ok(&path, json!({"operation":"list"})), byte_capacity);
+    let rejected = request(
+        &path,
+        json!({"operation":"duplicateDeck","expectedRevision":5,"sourceId":source_id,"name":"Source deck"}),
+    );
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("client store exceeds 2 MiB"));
+    assert_eq!(fs::read(&path).unwrap(), full_bytes);
+}

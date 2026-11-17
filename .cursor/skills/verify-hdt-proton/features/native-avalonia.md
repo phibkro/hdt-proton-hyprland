@@ -106,6 +106,35 @@ new file mode 0600. No card catalog, legality certification, automatic Windows
 history import or write into Hearthstone is implied by these routes.
 
 
+## Duplicate a saved deck
+
+Feature ID: `deck-duplicate`. Build the current host and run the ordinary rendered
+driver plus `rust-client` tests through the pinned Rust suite. Use fresh private
+files: an older host cannot serve `duplicateDeck`. The [contract](../../../../docs/specs/native-deck-duplicate.md)
+distinguishes duplication from version history.
+
+Require pointer open/cancel/reopen, invalid-name refusal with exact unchanged
+saved bytes, reload/retry and successful save. Keep card notes, card counts and
+metadata unsaved while a real supplied-observation writer completes a game.
+The form and those drafts must survive. Copy only saved content, retaining all
+source fields, prior match records and tracked deck selection.
+
+Inspect `duplicate-result-1120.png` and `duplicate-result-800.png`. The result and
+its explicit open action must share the actual selected-deck scroll viewport.
+Open a copy excluded by search, then duplicate an archived source and open its
+active result. The action must reveal the result without a tracking-selection
+write. Archive a newly created result through a second real writer, reload, then
+open that exact result in archived browsing. Require no fallback to another deck.
+Reconstruct the UI from storage and compare per-deck and global history.
+Only explicit **Use for game history** may associate a later supplied game with
+the copy; the already captured game must retain its original association.
+
+CLI checks must additionally reject omitted/unknown fields, stale revisions,
+unknown sources, invalid names and count/byte capacity failures with saved bytes
+unchanged. Legacy metadata defaults must copy without rewriting the source on
+read. Ordinary independent edits must not mutate the sibling deck. Keep the
+runner's cleanup and failure evidence; these tests do not prove live acquisition.
+
 ## Local deck metadata
 
 Feature ID: `deck-metadata`. Use the freshly built host from this checkout;

@@ -244,6 +244,11 @@ pub enum Request {
         expected_revision: u64,
         deck: DeckDraft,
     },
+    DuplicateDeck {
+        expected_revision: u64,
+        source_id: String,
+        name: String,
+    },
     ImportDeck {
         expected_revision: u64,
         name: Option<String>,
@@ -353,6 +358,9 @@ pub fn execute(path: &Path, request: Request) -> Result<serde_json::Value> {
         Request::UpsertDeck {
             expected_revision, ..
         }
+        | Request::DuplicateDeck {
+            expected_revision, ..
+        }
         | Request::ImportDeck {
             expected_revision, ..
         }
@@ -377,6 +385,23 @@ pub fn execute(path: &Path, request: Request) -> Result<serde_json::Value> {
     );
     match request {
         Request::UpsertDeck { deck, .. } => upsert(&mut state, deck)?,
+        Request::DuplicateDeck {
+            source_id, name, ..
+        } => {
+            let mut duplicate = state
+                .decks
+                .iter()
+                .find(|deck| deck.id == source_id)
+                .cloned()
+                .context("source deck does not exist")?;
+            let now = Timestamp::now().rfc3339();
+            duplicate.id = uuid::Uuid::new_v4().to_string();
+            duplicate.name = name;
+            duplicate.archived = false;
+            duplicate.created_at = now.clone();
+            duplicate.updated_at = now;
+            state.decks.push(duplicate);
+        }
         Request::ImportDeck { name, code, .. } => upsert(
             &mut state,
             DeckDraft {

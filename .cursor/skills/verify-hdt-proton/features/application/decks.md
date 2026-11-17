@@ -8,7 +8,8 @@ cards and deck metadata.
 - `deck-browser`: browse, search, filter, and select saved decks.
 - `deck-editor`: create a deck, edit cards and sideboards, and save or cancel.
 - `deck-metadata`: rename a deck and edit notes, tags, and its web address.
-- `deck-versions`: inspect versions and clone a deck or version.
+- `deck-duplicate`: duplicate a saved deck independently, without game history.
+- `deck-versions`: inspect and select versions under the same deck identity.
 - `deck-archive`: archive, restore, and delete an entry with distinct effects.
 - `deck-selection`: choose tracked or no-deck mode and change deck category.
 - `deck-missing`: inspect missing cards against the available collection.
@@ -41,6 +42,11 @@ checks additionally require an observed collection, not an invented empty one.
 - Those remaining original actions need dedicated owned-instance journeys.
   For version and deletion checks, retain old identities and history associations
   before and after the action. No executable acceptance currently covers them.
+- Run the [saved-deck duplication workflow](../native-avalonia.md#duplicate-a-saved-deck).
+  Give the copy an explicit name, preserve unsaved source edits, and open the
+  result through its action even when filters exclude it. Require unchanged
+  tracked selection, old match associations and source content. This journey
+  does not establish original history-copying or deck-version behavior.
 
 ## Gotchas
 
