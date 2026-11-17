@@ -42,6 +42,7 @@ if [[ ${1:-} != --inside ]]; then
         --tmpfs /run/user --tmpfs /tmp --tmpfs "$HOME" --clearenv \
         --setenv PATH "$PATH" --setenv HOME "$run/home" \
         --setenv XDG_RUNTIME_DIR /tmp/hdt-runtime --setenv LANG C.UTF-8 \
+        --setenv LP_NUM_THREADS 2 \
         --setenv HYPRLAND_NO_SD_VARS 1 --setenv HYPRLAND_NO_SD_NOTIFY 1 \
         bash "$run/source/hyprland-probe.sh" --inside "$run" \
         >"$run/supervisor.log" 2>&1 || status=$?
