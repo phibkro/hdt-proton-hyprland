@@ -321,3 +321,5 @@
 !tests/cli/plugin-compiler.test.ts
 
 !/docs/specs/native-deck-menu-selection.md
+
+!/docs/specs/native-selected-sideboards.md

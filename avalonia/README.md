@@ -84,7 +84,9 @@ export/copy, native tracking selection, archiving and explicit restore.
 The editor supports numeric DBF IDs and optional card-name search from a local
 catalog you supply; no catalog or artwork is bundled. A decoded
 code is structurally checked, not certified legal for a Hearthstone format.
-Sideboards are preserved. Archiving retains the deck and notes in the library;
+Sideboards are preserved and shown beneath the selected saved deck, grouped by
+their supplied owner DBF ID with exact card IDs and copy counts. Unsaved changes
+stay in the editor until saved. Archiving retains the deck and notes in the library;
 **Show archived decks** opens preserved entries; **Restore** retains their stable
 identity and historical associations without silently changing tracking selection.
 Archived entries cannot be saved or selected for tracking. Tracking selection affects
