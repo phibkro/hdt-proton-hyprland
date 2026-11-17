@@ -1,7 +1,10 @@
 # HDT Proton verification map
 
 Read the parent skill first. The map covers the native integration, not every
-feature of upstream HDT. Source review and runtime evidence are separate columns
+feature of upstream HDT. The [original-application map](application/README.md)
+adds source-audited original journeys, including unmigrated features and draft
+verification routes. Its linked parity ledger guides native development.
+Source review and runtime evidence are separate columns
 in private run notes. A passed isolated path never upgrades an unavailable live
 path to passed.
 

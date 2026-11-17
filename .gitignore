@@ -16,6 +16,17 @@
 !/.cursor/skills/verify-hdt-proton/features/freeze-evidence.md
 !/.cursor/skills/verify-hdt-proton/features/launch-setup.md
 !/.cursor/skills/verify-hdt-proton/features/overlay-ui.md
+!/.cursor/skills/verify-hdt-proton/features/application/
+/.cursor/skills/verify-hdt-proton/features/application/*
+!/.cursor/skills/verify-hdt-proton/features/application/README.md
+!/.cursor/skills/verify-hdt-proton/features/application/decks.md
+!/.cursor/skills/verify-hdt-proton/features/application/sharing.md
+!/.cursor/skills/verify-hdt-proton/features/application/matches.md
+!/.cursor/skills/verify-hdt-proton/features/application/arena.md
+!/.cursor/skills/verify-hdt-proton/features/application/battlegrounds.md
+!/.cursor/skills/verify-hdt-proton/features/application/windows.md
+!/.cursor/skills/verify-hdt-proton/features/application/preferences.md
+!/.cursor/skills/verify-hdt-proton/features/application/services.md
 !/.editorconfig
 !/.envrc
 !/.githooks/
@@ -72,6 +83,8 @@
 !/docs/reference/compatibility.md
 !/docs/reference/components.md
 !/docs/reference/wpf-view-map.md
+!/docs/reference/hdt-feature-parity.md
+!/docs/development/native-roadmap.md
 !/docs/specs/
 /docs/specs/*
 !/docs/specs/arena-freeze-investigation.md

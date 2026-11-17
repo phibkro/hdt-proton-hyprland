@@ -2,6 +2,8 @@
 
 Use a view tree within each window. Shared tracking state supplies the windows;
 individual controls do not form a second application-wide message graph.
+The [feature parity ledger](hdt-feature-parity.md) tracks implementation and test
+coverage for the user journeys within this containment tree.
 
 This is a reference inventory, not a claim of complete migration or capture.
 The source reference is HDT commit
