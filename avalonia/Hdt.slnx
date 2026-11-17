@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Hdt.Avalonia/Hdt.Avalonia.csproj" />
+  <Project Path="Hdt.Checks/Hdt.Checks.csproj" />
+  <Project Path="Hdt.Development/Hdt.Development.csproj" />
+  <Project Path="Hdt.Views/Hdt.Views.fsproj" />
+</Solution>

@@ -131,7 +131,7 @@ fn isolated_x11_relationship_and_argb_pixels() {
                 "1",
                 "-screen",
                 "0",
-                "128x128x24",
+                "1280x900x24",
                 "-nolisten",
                 "tcp",
                 "-ac",
@@ -415,6 +415,8 @@ fn isolated_x11_relationship_and_argb_pixels() {
     conn.free_colormap(colormap).unwrap().check().unwrap();
     conn.destroy_window(game).unwrap().check().unwrap();
     portable_bridge_acceptance(&conn, &display, root.root, pid_atom);
+    native_overlay_acceptance(&conn, &display, root.root, pid_atom);
+    native_overlay_desktop_acceptance(&conn, &display, root.root, pid_atom);
     conn.flush().unwrap();
 }
 
@@ -803,4 +805,790 @@ fn portable_controller_faults(conn: &RustConnection, display: &str, windows: &[u
     assert!(owner.0.wait().unwrap().success());
     wait_ack(&|v| v["nativeReady"] == false);
     assert_eq!(property(conn, overlay), None);
+}
+
+fn native_overlay_acceptance(conn: &RustConnection, display: &str, root: u32, pid_atom: u32) {
+    use base64::Engine;
+    use serde_json::json;
+    use x11rb::protocol::xproto::{ConfigureWindowAux, ImageFormat, MapState};
+    let screen = &conn.setup().roots[0];
+    let game = conn.generate_id().unwrap();
+    conn.create_window(
+        screen.root_depth,
+        game,
+        root,
+        100,
+        100,
+        640,
+        680,
+        0,
+        WindowClass::INPUT_OUTPUT,
+        screen.root_visual,
+        &CreateWindowAux::new().background_pixel(0x334455),
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    identity(conn, game, pid_atom, std::process::id(), b"Hearthstone");
+    conn.map_window(game).unwrap().check().unwrap();
+    let active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    let set_active = |id| {
+        conn.change_property32(PropMode::REPLACE, root, active, AtomEnum::WINDOW, &[id])
+            .unwrap()
+            .check()
+            .unwrap();
+        conn.flush().unwrap();
+    };
+    set_active(game);
+    let mut owner = Server(
+        Command::new(std::env::var_os("HDT_TEST_HOST_BINARY").unwrap())
+            .args([
+                "native-overlay",
+                "run",
+                &game.to_string(),
+                &std::process::id().to_string(),
+                "hdt-fixture",
+            ])
+            .env("DISPLAY", display)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    let stdout = owner.0.stdout.take().unwrap();
+    let (sender, receiver) = mpsc::sync_channel(16);
+    let reader = std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        loop {
+            let mut line = Vec::new();
+            let count = std::io::Read::take(&mut reader, 8193)
+                .read_until(b'\n', &mut line)
+                .unwrap();
+            if count == 0 {
+                break;
+            }
+            assert!(count <= 8192 && line.last() == Some(&b'\n'));
+            if sender
+                .send(serde_json::from_slice::<serde_json::Value>(&line).unwrap())
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+    let ready = receiver.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!(ready["kind"], "ready");
+    assert_eq!(ready["inputRectangles"], 0);
+    assert_eq!(ready["pid"], owner.0.id());
+    let overlay = u32::try_from(ready["window"].as_u64().unwrap()).unwrap();
+    let width = u16::try_from(ready["width"].as_u64().unwrap()).unwrap();
+    let height = u16::try_from(ready["height"].as_u64().unwrap()).unwrap();
+    assert_eq!(property(conn, overlay), Some(game));
+    assert_eq!(
+        conn.get_window_attributes(overlay)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .map_state,
+        MapState::UNMAPPED
+    );
+    let wait = |mapped: bool| {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            assert!(
+                conn.shape_get_rectangles(overlay, SK::INPUT)
+                    .unwrap()
+                    .reply()
+                    .unwrap()
+                    .rectangles
+                    .is_empty()
+            );
+            let is_mapped = conn
+                .get_window_attributes(overlay)
+                .unwrap()
+                .reply()
+                .unwrap()
+                .map_state
+                == MapState::VIEWABLE;
+            if is_mapped == mapped {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "native overlay map state did not become {mapped}"
+            );
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    };
+    let mut frame = if let Some(path) = std::env::var_os("HDT_TEST_AVALONIA_FRAME") {
+        let bytes = std::fs::read(path).unwrap();
+        assert!(bytes.len() <= 2 * 1024 * 1024);
+        eprintln!("native overlay: exercising actual Avalonia-rendered raster");
+        serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+    } else {
+        eprintln!("native overlay: protocol-only solid raster (no managed renderer supplied)");
+        let pixels = [0x31_u8, 0x62, 0x93, 255].repeat(usize::from(width) * usize::from(height));
+        json!({"kind":"frame","schemaVersion":1,"sourceSession":"4d68a13f-4045-4a5d-b401-d107e8d15c84","sequence":1,"width":width,"height":height,
+            "pixelFormat":"bgra8888Opaque","pixels":base64::engine::general_purpose::STANDARD.encode(pixels)})
+    };
+    assert_eq!(frame["width"], width);
+    assert_eq!(frame["height"], height);
+    let pixels = base64::engine::general_purpose::STANDARD
+        .decode(frame["pixels"].as_str().unwrap())
+        .unwrap();
+    let mut stdin = owner.0.stdin.take().unwrap();
+    let send = |stdin: &mut std::process::ChildStdin, value: &serde_json::Value| {
+        serde_json::to_writer(&mut *stdin, value).unwrap();
+        stdin.write_all(b"\n").unwrap();
+        stdin.flush().unwrap();
+    };
+    let now = || chrono::Utc::now().timestamp_millis();
+    frame["observedMs"] = json!(now());
+    frame["sequence"] = json!(100);
+    send(&mut stdin, &frame);
+    wait(true);
+    let actual = conn
+        .get_image(
+            ImageFormat::Z_PIXMAP,
+            overlay,
+            0,
+            0,
+            width,
+            height,
+            u32::MAX,
+        )
+        .unwrap()
+        .reply()
+        .unwrap();
+    assert_eq!(actual.data.len(), pixels.len());
+    for (observed, expected) in actual
+        .data
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(pixels.as_chunks::<4>().0)
+    {
+        assert_eq!(
+            &observed[..3],
+            &expected[..3],
+            "real X11 raster pixel differs from source"
+        );
+    }
+    let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
+    for pixel in actual.data.as_chunks::<4>().0 {
+        ppm.extend([pixel[2], pixel[1], pixel[0]]);
+    }
+    std::fs::write("native-overlay.ppm", ppm).unwrap();
+    conn.configure_window(
+        game,
+        &ConfigureWindowAux::new()
+            .x(140)
+            .y(120)
+            .width(700)
+            .height(700),
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let bounds = conn.get_geometry(overlay).unwrap().reply().unwrap();
+        if bounds.x == 140 + 700 - i16::try_from(width).unwrap() && bounds.y == 120 {
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    set_active(root);
+    wait(false);
+    set_active(game);
+    wait(true);
+    frame["sequence"] = json!(101);
+    frame["observedMs"] = json!(now() - 6000);
+    send(&mut stdin, &frame);
+    wait(false);
+    frame["observedMs"] = json!(now());
+    send(&mut stdin, &frame);
+    wait(true);
+    send(&mut stdin, &json!({"kind":"hide"}));
+    wait(false);
+    frame["sequence"] = json!(99);
+    send(&mut stdin, &frame);
+    std::thread::sleep(Duration::from_millis(150));
+    wait(false);
+    frame["sequence"] = json!(102);
+    frame["observedMs"] = json!(now());
+    send(&mut stdin, &frame);
+    wait(true);
+    std::thread::sleep(Duration::from_millis(5100));
+    wait(false);
+    frame["sequence"] = json!(103);
+    frame["observedMs"] = json!(now());
+    send(&mut stdin, &frame);
+    wait(true);
+    drop(stdin);
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        if let Some(status) = owner.0.try_wait().unwrap() {
+            assert!(status.success());
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    drop(receiver);
+    reader.join().unwrap();
+    assert!(
+        conn.get_window_attributes(overlay)
+            .unwrap()
+            .reply()
+            .is_err(),
+        "owned raster window survived child exit"
+    );
+    let game_bounds = conn.get_geometry(game).unwrap().reply().unwrap();
+    assert_eq!(
+        (
+            game_bounds.x,
+            game_bounds.y,
+            game_bounds.width,
+            game_bounds.height
+        ),
+        (140, 120, 700, 700)
+    );
+    assert_eq!(
+        conn.shape_get_rectangles(game, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1
+    );
+    conn.destroy_window(game).unwrap().check().unwrap();
+    eprintln!(
+        "native overlay: input-empty before map, actual pixels, geometry follow, focus hide, stale/backward rejection, recovery and owned-child cleanup passed"
+    );
+}
+
+fn native_overlay_desktop_acceptance(
+    conn: &RustConnection,
+    display: &str,
+    root: u32,
+    pid_atom: u32,
+) {
+    use serde_json::{Value, json};
+    use x11rb::protocol::xproto::{ImageFormat, MapState};
+    let Some(dll) = std::env::var_os("HDT_TEST_NATIVE_UI_DLL") else {
+        return;
+    };
+    let screen = &conn.setup().roots[0];
+    let game = conn.generate_id().unwrap();
+    conn.create_window(
+        screen.root_depth,
+        game,
+        root,
+        600,
+        100,
+        640,
+        680,
+        0,
+        WindowClass::INPUT_OUTPUT,
+        screen.root_visual,
+        &CreateWindowAux::new().background_pixel(0x223344),
+    )
+    .unwrap()
+    .check()
+    .unwrap();
+    identity(conn, game, pid_atom, std::process::id(), b"Hearthstone");
+    conn.map_window(game).unwrap().check().unwrap();
+    let active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    let clients = conn
+        .intern_atom(false, b"_NET_CLIENT_LIST")
+        .unwrap()
+        .reply()
+        .unwrap()
+        .atom;
+    conn.change_property32(PropMode::REPLACE, root, clients, AtomEnum::WINDOW, &[game])
+        .unwrap()
+        .check()
+        .unwrap();
+    let activate = |window| {
+        conn.change_property32(PropMode::REPLACE, root, active, AtomEnum::WINDOW, &[window])
+            .unwrap()
+            .check()
+            .unwrap();
+        conn.flush().unwrap();
+    };
+    activate(game);
+    std::fs::create_dir("desktop-ui").unwrap();
+    let mut observation: Value =
+        serde_json::from_slice(&std::fs::read("ui-observation.json").unwrap()).unwrap();
+    let mut sequence = 100;
+    let mut publish = || {
+        sequence += 1;
+        let now = chrono::Utc::now().to_rfc3339();
+        observation["sequence"] = json!(sequence);
+        observation["observedAt"] = json!(now);
+        observation["arena"]["sequence"] = json!(sequence);
+        observation["arena"]["observedAt"] = json!(now);
+        std::fs::write(
+            "desktop-ui/observation.next",
+            serde_json::to_vec(&observation).unwrap(),
+        )
+        .unwrap();
+        std::fs::rename("desktop-ui/observation.next", "desktop-ui/observation.json").unwrap();
+    };
+    publish();
+    let stderr = std::fs::File::create("desktop-ui/stderr.txt").unwrap();
+    let mut app = Server(
+        Command::new(std::env::var_os("HDT_TEST_UI_DOTNET").unwrap())
+            .arg(dll)
+            .args(["--desktop-overlay-ui", "/capture/desktop-ui"])
+            .env("DISPLAY", display)
+            .env("HDT_HOST_BINARY", "/capture/hdt-host")
+            .env("DOTNET_PROCESSOR_COUNT", "2")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(stderr)
+            .spawn()
+            .unwrap(),
+    );
+    let app_pid = app.0.id();
+    let stdout = app.0.stdout.take().unwrap();
+    let (tx, rx) = mpsc::sync_channel(16);
+    let reader = std::thread::spawn(move || {
+        let mut input = BufReader::new(stdout);
+        loop {
+            let mut line = Vec::new();
+            let count = std::io::Read::take(&mut input, 8193)
+                .read_until(b'\n', &mut line)
+                .unwrap();
+            if count == 0 {
+                break;
+            }
+            assert!(count <= 8192 && line.last() == Some(&b'\n'));
+            let value = serde_json::from_slice::<Value>(&line).unwrap();
+            if tx.send(value).is_err() {
+                break;
+            }
+        }
+    });
+    let ready = rx
+        .recv_timeout(Duration::from_secs(8))
+        .expect("real desktop app ready; inspect desktop-ui/stderr.txt on failure");
+    assert_eq!(ready["kind"], "ready");
+    assert_eq!(ready["pid"], app_pid);
+    let mut stdin = app.0.stdin.take().unwrap();
+    let mut transcript = std::fs::File::create("desktop-ui/actions.jsonl").unwrap();
+    let mut request = |value: Value| {
+        serde_json::to_writer(&mut stdin, &value).unwrap();
+        stdin.write_all(b"\n").unwrap();
+        stdin.flush().unwrap();
+        let reply = rx
+            .recv_timeout(Duration::from_secs(4))
+            .expect("real desktop control reply");
+        writeln!(transcript, "{}", json!({"request":value,"reply":reply})).unwrap();
+        reply
+    };
+    let click = |point: Value| {
+        assert_eq!(point["kind"], "point");
+        let x = point["x"].as_i64().unwrap();
+        let y = point["y"].as_i64().unwrap();
+        assert!(
+            (0..600).contains(&x) && (0..900).contains(&y),
+            "pointer must stay in the app's own area, outside the fake game"
+        );
+        let status = Command::new(std::env::var_os("HDT_TEST_UI_XDOTOOL").unwrap())
+            .args([
+                "mousemove",
+                "--sync",
+                &x.to_string(),
+                &y.to_string(),
+                "click",
+                "1",
+            ])
+            .env("DISPLAY", display)
+            .status()
+            .unwrap();
+        assert!(status.success());
+    };
+    click(request(json!({"action":"point","target":"options"})));
+    assert_eq!(
+        request(json!({"action":"inspect"}))["page"],
+        3,
+        "actual X11 pointer opens Options"
+    );
+    click(request(
+        json!({"action":"point","target":"overlay-settings"}),
+    ));
+    click(request(json!({"action":"point","target":"enabled"})));
+    let state = request(json!({"action":"inspect"}));
+    assert!(
+        !state["enabled"].as_bool().unwrap()
+            && state["status"]
+                .as_str()
+                .unwrap()
+                .contains("choose a Hearthstone window"),
+        "invalid missing selection must fail visibly and roll back: {state}"
+    );
+    request(json!({"action":"capture"}));
+    std::fs::copy("desktop-ui/options.png", "desktop-ui/invalid-selection.png").unwrap();
+    publish();
+    click(request(json!({"action":"point","target":"find"})));
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["idle"] == true && state["choices"] == 1 {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "real game discovery did not complete: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    publish();
+    click(request(json!({"action":"point","target":"enabled"})));
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["idle"] == true && state["enabled"] == true {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "real Options enable failed: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let find_overlay = || {
+        conn.query_tree(root)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .children
+            .into_iter()
+            .find(|window| {
+                conn.get_property(false, *window, AtomEnum::WM_NAME, AtomEnum::STRING, 0, 128)
+                    .unwrap()
+                    .reply()
+                    .is_ok_and(|reply| reply.value == b"HDT native tracking overlay")
+            })
+    };
+    let overlay = find_overlay().expect("Options must create the real Rust-owned window");
+    let pid_reply = conn
+        .get_property(false, overlay, pid_atom, AtomEnum::CARDINAL, 0, 1)
+        .unwrap()
+        .reply()
+        .unwrap();
+    let owner_pid = pid_reply.value32().unwrap().next().unwrap();
+    assert_eq!(property(conn, overlay), Some(game));
+    let wait_map = |mapped: bool| {
+        let deadline = Instant::now() + Duration::from_secs(4);
+        loop {
+            assert!(
+                conn.shape_get_rectangles(overlay, SK::INPUT)
+                    .unwrap()
+                    .reply()
+                    .unwrap()
+                    .rectangles
+                    .is_empty()
+            );
+            if (conn
+                .get_window_attributes(overlay)
+                .unwrap()
+                .reply()
+                .unwrap()
+                .map_state
+                == MapState::VIEWABLE)
+                == mapped
+            {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "desktop overlay visibility did not become {mapped}"
+            );
+            std::thread::sleep(Duration::from_millis(30));
+        }
+    };
+    publish();
+    request(json!({"action":"expected"}));
+    let expected = std::fs::read("desktop-ui/expected.bgra").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let pixels = loop {
+        wait_map(true);
+        let actual = conn
+            .get_image(ImageFormat::Z_PIXMAP, overlay, 0, 0, 320, 640, u32::MAX)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .data;
+        if actual.len() == expected.len()
+            && actual
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(expected.as_chunks::<4>().0)
+                .all(|(left, right)| left[..3] == right[..3])
+        {
+            break actual;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "real Options -> actor -> Rust X11 pixels differ from actual renderer"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let mut ppm = b"P6\n320 640\n255\n".to_vec();
+    for pixel in pixels.as_chunks::<4>().0 {
+        ppm.extend([pixel[2], pixel[1], pixel[0]]);
+    }
+    std::fs::write("desktop-ui/overlay.ppm", ppm).unwrap();
+    request(json!({"action":"capture"}));
+    let desktop = conn
+        .get_image(
+            ImageFormat::Z_PIXMAP,
+            root,
+            0,
+            0,
+            screen.width_in_pixels,
+            screen.height_in_pixels,
+            u32::MAX,
+        )
+        .unwrap()
+        .reply()
+        .unwrap();
+    let mut desktop_ppm = format!(
+        "P6\n{} {}\n255\n",
+        screen.width_in_pixels, screen.height_in_pixels
+    )
+    .into_bytes();
+    for pixel in desktop.data.as_chunks::<4>().0 {
+        desktop_ppm.extend([pixel[2], pixel[1], pixel[0]]);
+    }
+    std::fs::write("desktop-ui/desktop.ppm", desktop_ppm).unwrap();
+    if std::env::var_os("HDT_TEST_WATCHER_ACCEPTANCE").is_some() {
+        // One file writer at a time: the normal fixture publisher is idle until
+        // the real-watcher fixture explicitly stops and joins its atomic writer.
+        click(request(json!({"action":"point","target":"arena"})));
+        {
+            let mut capture_watcher = |command: &str, phase: &str| {
+                request(json!({"action":"watcher","command":command}));
+                let deadline = Instant::now() + Duration::from_secs(5);
+                loop {
+                    let state = request(json!({"action":"inspect"}));
+                    if state["offers"] == 3 && state["arena"].as_str().unwrap().contains(phase) {
+                        break;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "real watcher phase never reached native controls: {state}"
+                    );
+                    std::thread::sleep(Duration::from_millis(30));
+                }
+                request(json!({"action":"watcher","command":"pause"}));
+                request(json!({"action":"expected"}));
+                let expected = std::fs::read("desktop-ui/expected.bgra").unwrap();
+                let deadline = Instant::now() + Duration::from_secs(3);
+                let actual = loop {
+                    wait_map(true);
+                    let actual = conn
+                        .get_image(ImageFormat::Z_PIXMAP, overlay, 0, 0, 320, 640, u32::MAX)
+                        .unwrap()
+                        .reply()
+                        .unwrap()
+                        .data;
+                    if actual.len() == expected.len()
+                        && actual
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .zip(expected.as_chunks::<4>().0)
+                            .all(|(a, b)| a[..3] == b[..3])
+                    {
+                        break actual;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "real watcher -> adapter -> file -> Rust -> overlay pixels differ for {command}"
+                    );
+                    std::thread::sleep(Duration::from_millis(30));
+                };
+                assert!(
+                    conn.shape_get_rectangles(overlay, SK::INPUT)
+                        .unwrap()
+                        .reply()
+                        .unwrap()
+                        .rectangles
+                        .is_empty()
+                );
+                let mut ppm = b"P6\n320 640\n255\n".to_vec();
+                for pixel in actual.as_chunks::<4>().0 {
+                    ppm.extend([pixel[2], pixel[1], pixel[0]]);
+                }
+                std::fs::write(format!("desktop-ui/watcher-{command}-overlay.ppm"), ppm).unwrap();
+                request(json!({"action":"capture"}));
+                std::fs::copy(
+                    "desktop-ui/options.png",
+                    format!("desktop-ui/watcher-{command}-main.png"),
+                )
+                .unwrap();
+                std::fs::copy(
+                    "desktop-ui/observation.json",
+                    format!("desktop-ui/watcher-{command}.json"),
+                )
+                .unwrap();
+                request(json!({"action":"watcher","command":"resume"}));
+            };
+            capture_watcher("heroes", "Choose a hero");
+            capture_watcher("cards", "Card draft");
+            capture_watcher("replacement", "Card draft");
+        }
+        request(json!({"action":"watcher","command":"menu"}));
+        wait_map(false);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            let state = request(json!({"action":"inspect"}));
+            if state["offers"] == 0 && state["source"].as_str().unwrap().starts_with("Menu") {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "watcher menu must clear prior choices: {state}"
+            );
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        request(json!({"action":"capture"}));
+        std::fs::copy("desktop-ui/options.png", "desktop-ui/watcher-menu-main.png").unwrap();
+        request(json!({"action":"watcher","command":"heroes"}));
+        wait_map(true);
+        request(json!({"action":"watcher","command":"pause"}));
+        request(json!({"action":"watcher","command":"cards"}));
+        std::thread::sleep(Duration::from_millis(5200));
+        wait_map(false);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let state = request(json!({"action":"inspect"}));
+            if state["source"].as_str().unwrap().contains("unavailable") && state["offers"] == 0 {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "paused source delivery must become unavailable by the next one-second UI refresh even though provider Update completed: {state}"
+            );
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        click(request(json!({"action":"point","target":"options"})));
+        assert_eq!(request(json!({"action":"inspect"}))["page"], 3);
+        request(json!({"action":"capture"}));
+        std::fs::copy(
+            "desktop-ui/options.png",
+            "desktop-ui/watcher-dispatcher-stopped.png",
+        )
+        .unwrap();
+        request(json!({"action":"watcher","command":"resume"}));
+        wait_map(true);
+        request(json!({"action":"watcher","command":"stop"}));
+        eprintln!(
+            "actual installed watcher/scripted provider -> copied events -> atomic file -> Rust -> pointer-driven Main and input-empty X11 overlay: hero/card/replacement/menu/dispatcher stop/recovery passed"
+        );
+    }
+    publish();
+    activate(root);
+    wait_map(false);
+    activate(game);
+    wait_map(true);
+    std::thread::sleep(Duration::from_millis(5200));
+    wait_map(false);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["source"].as_str().unwrap().contains("unavailable") && state["cards"] == 0 {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "stale observations must clear real game cards by the next one-second UI timer tick: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    request(json!({"action":"capture"}));
+    std::fs::copy("desktop-ui/options.png", "desktop-ui/stale.png").unwrap();
+    publish();
+    wait_map(true);
+    let owner_alive = std::path::PathBuf::from(format!("/proc/{owner_pid}"));
+    assert!(owner_alive.exists());
+    click(request(json!({"action":"point","target":"enabled"})));
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        let state = request(json!({"action":"inspect"}));
+        if state["enabled"] == false
+            && state["idle"] == true
+            && state["ownerCompleted"] == true
+            && state["status"].as_str().unwrap().contains("stopped")
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "disable must await the owned child: {state}"
+        );
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    assert!(
+        !owner_alive.exists(),
+        "Options disable must reap its exact Rust child"
+    );
+    assert!(
+        conn.get_window_attributes(overlay)
+            .unwrap()
+            .reply()
+            .is_err()
+    );
+    request(json!({"action":"capture"}));
+    std::fs::copy("desktop-ui/options.png", "desktop-ui/disabled.png").unwrap();
+    std::fs::write("desktop-ui/identity.json",json!({"appPid":app_pid,"gameWindow":game,"gamePid":std::process::id(),"overlayWindow":overlay,"overlayPid":owner_pid,"inputRectangles":0,"reaped":true}).to_string()).unwrap();
+    request(json!({"action":"close"}));
+    drop(stdin);
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        if let Some(status) = app.0.try_wait().unwrap() {
+            assert!(status.success());
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    drop(rx);
+    reader.join().unwrap();
+    let bounds = conn.get_geometry(game).unwrap().reply().unwrap();
+    assert_eq!(
+        (bounds.x, bounds.y, bounds.width, bounds.height),
+        (600, 100, 640, 680)
+    );
+    assert_eq!(
+        conn.shape_get_rectangles(game, SK::INPUT)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .rectangles
+            .len(),
+        1
+    );
+    conn.destroy_window(game).unwrap().check().unwrap();
+    eprintln!(
+        "native desktop Options: actual X11 pointer navigation, visible invalid selection, discovery/enable, real Rust pixels/input-empty, focus/stale/recovery, disable/exact-child reap passed"
+    );
 }

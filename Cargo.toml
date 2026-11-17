@@ -23,11 +23,11 @@ signal-hook = "0.3"
 uuid = { version = "1", features = ["v4"] }
 x11rb = { version = "0.13", features = ["composite", "render", "xinput", "shape", "randr"] }
 quick-xml = "0.42"
+tempfile = "3"
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
 proptest = { version = "1.12.0", default-features = false, features = ["std"] }
-tempfile = "3"
 
 [lints.rust]
 unsafe_code = "forbid"
@@ -61,5 +61,17 @@ name = "rust-x11-isolated"
 path = "tests/host/rust-x11-isolated.rs"
 
 [[test]]
+name = "rust-native-session-isolated"
+path = "tests/host/rust-native-session-isolated.rs"
+
+[[test]]
 name = "rust-x11"
 path = "tests/host/rust-x11.rs"
+
+[[test]]
+name = "rust-client"
+path = "tests/host/rust-client.rs"
+
+[[test]]
+name = "rust-snapshot"
+path = "tests/host/rust-snapshot.rs"
