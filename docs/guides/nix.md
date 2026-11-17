@@ -41,6 +41,30 @@ ln -s "$HOME/.nix-profile/share/applications/io.github.phibkro.hdt-proton.deskto
 
 Create the link only if that desktop entry does not already exist. Home Manager creates the entry directly, so that workflow does not need the link.
 
+## Select the optional corrected libXi
+
+Use the updated package from this checkout. Start Battle.net through its existing
+Steam shortcut first and set `HDT_PROJECT_DIR` to your existing HDT data directory,
+as described above. When HDT is already running, close only HDT before this manual
+launch; keep Hearthstone and Battle.net running.
+
+```sh
+hdt_runtime=$(nix build .#libxi-steam-runtime --no-link --print-out-paths)
+nix run .#default -- libxi-check "$hdt_runtime/lib/libXi.so.6"
+HDT_LIBXI_LIBRARY="$hdt_runtime/lib/libXi.so.6" nix run .#default -- raw-launch
+```
+
+The library is selected only for this HDT launch and its descendants. The game
+prefix and shared Steam libraries are unchanged. `libxi-check` validates the
+path and ELF header; the loader and runtime checks establish dynamic compatibility.
+The isolated library regression reproduces the defect, but does not prove that
+every HDT crash is prevented.
+
+For automatic startup, declare the same absolute `HDT_LIBXI_LIBRARY` path in the
+existing HDT service environment through your desktop configuration. Keep that
+configuration as its source of truth. To roll back, remove that selection and
+restart only HDT; do not replace a shared Steam library.
+
 ## Configure Home Manager
 
 Use the module to install the package, register its desktop entry, and declare the watcher service.
