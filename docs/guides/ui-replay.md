@@ -54,9 +54,30 @@ devenv shell -- bash tests/replay/visual-triplet-checks.sh
 
 Those controls reject a never-visible popup, retained popup pixels and a white
 surface after closing. They validate the classifier, not WPF rendering. The
-replay establishes the actual WPF path separately. This first visual test does
-not cover HDT's real card-preview control, every popup, game-relative alignment,
-Hyprland stacking, Alt-Tab or live-game input. Those remain distinct gates.
+replay establishes the actual WPF path separately.
+
+## Check the original card preview
+
+The normal sequence also mounts the installed HDT `Controls.Card` with its
+original Fireball model in the main window. Private X11 pointer movement drives
+the original hover and leave handlers. The passing path never sets tooltip
+visibility or calls its show/hide methods. Require exactly one original
+`Controls.Tooltips.CardTooltip` for `CS2_029`, then none after leaving.
+
+Screen captures taken before the first hover, during the preview and after
+leaving are cropped to that preview's observed bounds. Require
+`card-preview-visual/result.json` to pass. The real shown frame substituted as
+the cleared frame must fail in `card-preview-retained-negative/result.json`.
+`card-preview-shown.json` records the control identity, model, bounds and
+`assetLoaded`; `card-preview-after.json` retains the empty preview observation.
+
+The account-free network-isolated seed may show HDT's bundled loading-card
+artwork (`assetLoaded: false`). That still exercises the original preview's
+rendering and clearing; it does not establish successful artwork download.
+The card is mounted by the fixture rather than selected from a saved deck.
+This journey covers the main-window fallback tooltip, not overlay hover polling,
+every popup, game-relative alignment, Hyprland stacking, Alt-Tab or live-game
+input. Those remain distinct gates.
 
 ## Capture original views
 
@@ -124,7 +145,7 @@ The host uses the installed HDT assembly, WPF resources, main window, overlay, A
 
 The run owns a separate PID namespace, network namespace, home directory, prefix, and Xvfb display. It mounts selected system paths and this project, leaving unrelated host volumes outside the test environment. The live prefix and desktop sockets are masked. A timeout bounds execution, and namespace exit terminates the test descendants. Commands reject simultaneous access to the lab.
 
-A passing replay establishes that the exercised WPF path works under the isolated X11 configuration. It does not establish a fix for the live Arena failure. HearthMirror polling, watcher dispatch, ArenaSmith requests, real picks, and Hyprland composition are outside this fixture's coverage. The compatibility plugin runs only with `--with-plugin`; its updates run on the fixture's UI timer rather than HDT's plugin scheduler. The generic popup is not HDT's card-preview implementation.
+A passing replay establishes that the exercised WPF path works under the isolated X11 configuration. It does not establish a fix for the live Arena failure. HearthMirror polling, watcher dispatch, ArenaSmith requests, real picks, and Hyprland composition are outside this fixture's coverage. The compatibility plugin runs only with `--with-plugin`; its updates run on the fixture's UI timer rather than HDT's plugin scheduler. The generic popup and original card-preview journeys are checked separately.
 
 See [freeze diagnostics](diagnostics.md) for the local flight recorder, `hdt-proton trace-export`, and the replay `--diagnostics` option.
 

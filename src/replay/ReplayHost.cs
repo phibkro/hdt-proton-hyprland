@@ -34,6 +34,7 @@ sealed class ReplayHost
     static Button desktopControl;
     static int desktopClicks;
     static bool referenceSettings;
+    static FrameworkElement previewCard;
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int WindowStyle(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool MoveFileEx(string source, string destination, int flags);
@@ -328,6 +329,27 @@ sealed class ReplayHost
                 };
                 popup.IsOpen = true; break;
             case "popup-hide": if (popup != null) popup.IsOpen = false; break;
+            case "preview-card":
+                if (previewCard != null) throw new InvalidOperationException("Preview fixture already mounted");
+                var cardModel = hdt.GetType("Hearthstone_Deck_Tracker.Hearthstone.Database", true)
+                    .GetMethod("GetCardFromId", new[] { typeof(string) }).Invoke(null, new object[] { "CS2_029" });
+                if (cardModel == null) throw new InvalidOperationException("Original Fireball card model unavailable");
+                previewCard = (FrameworkElement)Activator.CreateInstance(hdt.GetType("Hearthstone_Deck_Tracker.Controls.Card", true));
+                previewCard.DataContext = cardModel;
+                previewCard.Width = 217; previewCard.Height = 34;
+                previewCard.HorizontalAlignment = HorizontalAlignment.Left;
+                previewCard.VerticalAlignment = VerticalAlignment.Top;
+                previewCard.Margin = new Thickness(100, 200, 0, 0);
+                var mainPanel = main.Content as Panel;
+                if (mainPanel == null) throw new InvalidOperationException("Original main content is not a panel");
+                Grid.SetRowSpan(previewCard, Int32.MaxValue);
+                Panel.SetZIndex(previewCard, Int32.MaxValue);
+                mainPanel.Children.Add(previewCard);
+                break;
+            case "preview-card-remove":
+                if (previewCard != null) ((Panel)main.Content).Children.Remove(previewCard);
+                previewCard = null;
+                break;
             case "new":
                 var menu = main.FindName("MainWindowMenu") as FrameworkElement;
                 var newDeckCommand = Get(menu.DataContext, "NewDeckCommand") as System.Windows.Input.ICommand;
@@ -399,6 +421,25 @@ sealed class ReplayHost
             desktopBounds = new { x = (int)point.X, y = (int)point.Y };
         }
         var bgsContent = (FrameworkElement)((UserControl)overlay.FindName("GuidesTabs")).FindName("TabsContent");
+        object previewTarget = null;
+        var previews = new List<object>();
+        if (previewCard != null)
+        {
+            var point = previewCard.PointToScreen(new Point(previewCard.ActualWidth / 2, previewCard.ActualHeight / 2));
+            previewTarget = new { x = (int)point.X, y = (int)point.Y, cardId = Get(previewCard.DataContext, "Id") };
+            foreach (PresentationSource source in PresentationSource.CurrentSources)
+            {
+                if (source.RootVisual == null) continue;
+                foreach (var element in Children<FrameworkElement>(source.RootVisual).Where(e => e.IsVisible && e.GetType().FullName == "Hearthstone_Deck_Tracker.Controls.Tooltips.CardTooltip"))
+                {
+                    var origin = element.PointToScreen(new Point(0, 0));
+                    var model = Get(element, "ViewModel");
+                    var card = Get(model, "Card");
+                    var asset = Get(model, "AssetViewModel");
+                    previews.Add(new { type = element.GetType().FullName, cardId = card == null ? null : Get(card, "Id"), assetLoaded = asset != null && (bool)Get(asset, "IsLoaded"), x = (int)Math.Floor(origin.X), y = (int)Math.Floor(origin.Y), width = (int)Math.Ceiling(element.ActualWidth), height = (int)Math.Ceiling(element.ActualHeight) });
+                }
+            }
+        }
         var data = new
         {
             observedUTC = DateTime.UtcNow.ToString("o"),
@@ -434,6 +475,8 @@ sealed class ReplayHost
             renderingTier = RenderCapability.Tier,
             visibleEmitters = Children<FrameworkElement>(overlay).Count(e => e.IsVisible && e.GetType().Name == "ParticleEmitter"),
             popupOpen = popup != null && popup.IsOpen,
+            previewTarget,
+            cardPreviews = previews,
             visibleDialogTypes = Children<FrameworkElement>(main).Where(e => e.IsVisible && e.GetType().Name.EndsWith("Dialog", StringComparison.Ordinal)).Select(e => e.GetType().FullName).Distinct().ToArray(),
             visibleScores = Children<FrameworkElement>(overlay).Where(t => t.IsVisible && t.GetType().Name == "HearthstoneTextBlock")
                 .Select(t => (string)Get(t, "Text")).Where(t => expectedScores.Contains(t)).Distinct().OrderBy(t => t).ToArray()

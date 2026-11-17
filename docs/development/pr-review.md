@@ -108,7 +108,8 @@ A green classifier job does not substitute for that journey.
 | Visual behavior | Current automated evidence | Remaining boundary |
 | --- | --- | --- |
 | Settings appears and clears | Native opening input, WPF state, before/shown/after screen crops | Progressive animation quality and real compositor |
-| Transparent popup clears | Actual screen-pixel return to baseline | Real card previews and other popup classes |
+| Transparent popup clears | Actual screen-pixel return to baseline | Other popup classes |
+| Original main-window card preview clears | Native hover/leave, original control/model, composed-pixel return to baseline and retained-frame negative control | Overlay hover polling and downloaded artwork |
 | Empty space clicks through; control receives input | Separate private X11 input journey and actual click counters | Hyprland-specific control gating |
 | Overlay follows game movement/resizing | Human desktop acceptance | Automate against a window-only fixture under nested Hyprland |
 | Overlay survives Alt-Tab and game clicks | Human desktop acceptance | Composed-frame assertions under nested Hyprland |
