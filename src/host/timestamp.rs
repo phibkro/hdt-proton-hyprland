@@ -67,7 +67,22 @@ impl Timestamp {
 
     /// Signed elapsed milliseconds, truncating submilliseconds toward zero.
     pub fn elapsed_millis_since(self, earlier: Self) -> i128 {
-        (self.unix_nanos() - earlier.unix_nanos()) / 1_000_000
+        // Legacy durations count an endpoint leap when the UTC time-of-day
+        // crosses its base second, even when the endpoints lie on different dates.
+        // This is deliberately distinct from subtraction of Unix timestamps.
+        // Behavior reference: Chrono 0.4.45 NaiveTime::signed_duration_since
+        // (MIT OR Apache-2.0), src/naive/time/mod.rs.
+        let ordering = self
+            .value
+            .unix_timestamp()
+            .rem_euclid(86_400)
+            .cmp(&earlier.value.unix_timestamp().rem_euclid(86_400));
+        let endpoint_correction = match ordering {
+            std::cmp::Ordering::Greater if earlier.leap_second => 1_000_000_000,
+            std::cmp::Ordering::Less if self.leap_second => -1_000_000_000,
+            _ => 0,
+        };
+        (self.unix_nanos() - earlier.unix_nanos() + endpoint_correction) / 1_000_000
     }
 
     pub fn utc_millis(self) -> String {
@@ -237,6 +252,40 @@ mod tests {
                 .utc_millis(),
             "-0001-12-31T22:30:00.000Z"
         );
+    }
+
+    #[test]
+    fn leap_elapsed_counts_endpoint_crossings_in_utc_in_both_directions() {
+        // Fixed legacy results, including the review counterexample. Epoch
+        // subtraction alone produces zero rather than 1000 for the first pair.
+        for (later, earlier, millis) in [
+            ("2016-12-31T12:01:00Z", "2016-12-31T12:00:60Z", 1000),
+            (
+                "2016-12-31T12:01:00.001Z",
+                "2016-12-31T12:00:60.9999999Z",
+                1,
+            ),
+            ("2017-01-01T12:01:00Z", "2016-12-31T12:00:60Z", 86401000),
+            ("2017-01-01T00:00:00Z", "2016-12-31T23:59:60Z", 0),
+            ("2016-12-31T12:01:60Z", "2016-12-31T12:00:60Z", 61000),
+            ("2017-01-01T12:01:60Z", "2016-12-31T12:00:60Z", 86461000),
+            ("2016-12-31T12:00:60.9Z", "2016-12-31T12:00:60.1Z", 800),
+            (
+                "2016-12-31T13:01:00+01:00",
+                "2016-12-31T07:00:60-05:00",
+                1000,
+            ),
+            (
+                "2017-01-01T13:01:00+01:00",
+                "2016-12-31T07:00:60-05:00",
+                86401000,
+            ),
+        ] {
+            let later = Timestamp::parse_rfc3339(later).unwrap();
+            let earlier = Timestamp::parse_rfc3339(earlier).unwrap();
+            assert_eq!(later.elapsed_millis_since(earlier), millis);
+            assert_eq!(earlier.elapsed_millis_since(later), -millis);
+        }
     }
 
     #[test]

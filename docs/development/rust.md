@@ -136,7 +136,11 @@ explicit inclusive or exclusive thresholds.
 
 The adapter has fixed legacy-input and boundary tests checked against the former
 Chrono 0.4.45 behavior. Journal integration tests also inspect the actual serialized
-rows. These checks cover timestamp compatibility; they do not establish overlay
+rows. Leap-endpoint duration behavior follows the explicitly retained
+[Chrono 0.4.45 rule](https://github.com/chronotope/chrono/blob/v0.4.45/src/naive/time/mod.rs#L741)
+(MIT OR Apache-2.0): crossing an endpoint's UTC base second adds or subtracts
+a second independently of the date difference. Tests distinguish this from
+Unix epoch subtraction. These checks cover timestamp compatibility; they do not establish overlay
 or live game behavior. Jiff was considered, but its default
 [Temporal parser](https://docs.rs/jiff/latest/jiff/fmt/temporal/) accepts a broader
 input language than this RFC3339 boundary needs.
