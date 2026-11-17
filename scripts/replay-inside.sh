@@ -383,6 +383,36 @@ jq -e '.popupOpen==false' "$run/state.json" >/dev/null
 sleep 0.7
 capture_main_crop "${mains[0]}" popup "$run/popup-after.png"
 bash "$snapshot/tests/replay/visual-triplet.sh" "$run/popup-before.png" "$run/popup-shown.png" "$run/popup-after.png" "$run/popup-visual"
+send preview-card
+xdotool windowactivate --sync "${mains[0]}"
+read -r cx cy < <(jq -er '[.previewTarget.x,.previewTarget.y]|@tsv' "$run/state.json")
+xdotool mousemove --sync "$((cx - 80))" "$((cy - 100))"
+sleep 0.7
+jq -e '.cardPreviews==[] and .previewTarget.cardId=="CS2_029"' "$run/state.json" >/dev/null
+magick import -window root "$run/card-preview-before-root.png"
+xdotool mousemove --sync "$cx" "$cy"
+for ((attempt = 0; attempt < 40; attempt++)); do
+    jq -e '.cardPreviews|length==1' "$run/state.json" >/dev/null && break
+    sleep 0.1
+done
+cp "$run/state.json" "$run/card-preview-shown.json"
+jq -e '.cardPreviews|length==1 and .[0].cardId=="CS2_029" and .[0].width>0 and .[0].height>0 and .[0].x>=0 and .[0].y>=0 and (.[0].x+.[0].width)<=2560 and (.[0].y+.[0].height)<=1440' "$run/card-preview-shown.json" >/dev/null
+sleep 0.7
+magick import -window root "$run/card-preview-shown-root.png"
+xdotool mousemove --sync "$((cx - 80))" "$((cy - 100))"
+for ((attempt = 0; attempt < 40; attempt++)); do
+    jq -e '.cardPreviews==[]' "$run/state.json" >/dev/null && break
+    sleep 0.1
+done
+jq -e '.cardPreviews==[]' "$run/state.json" >/dev/null
+sleep 0.7
+magick import -window root "$run/card-preview-after-root.png"
+geometry=$(jq -er '.cardPreviews[0]|"\(.width)x\(.height)+\(.x)+\(.y)"' "$run/card-preview-shown.json")
+for phase in before shown after; do
+    magick "$run/card-preview-$phase-root.png" -crop "$geometry" +repage "$run/card-preview-$phase.png"
+done
+bash "$snapshot/tests/replay/visual-triplet.sh" "$run/card-preview-before.png" "$run/card-preview-shown.png" "$run/card-preview-after.png" "$run/card-preview-visual"
+send preview-card-remove
 send new
 sleep 1
 cp "$run/state.json" "$run/new.json"
