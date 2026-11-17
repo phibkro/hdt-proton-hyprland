@@ -1030,6 +1030,18 @@ try
     Click(duplicateView.OpenButton);
     Check(duplicateView.NameBox.Text == "Discarded name" && !duplicateView.OpenButton.IsEnabled,
         "duplicate form activation is idempotent and retains the explicit name");
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height;
+        Fill(duplicateView.NameBox, "Long explicit duplicate name " + new string('W', 120));
+        duplicateView.CancelButton.BringIntoView(); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
+        Check(InsideScrollViewport(duplicateView.NameBox) && InsideScrollViewport(duplicateView.SaveButton)
+            && InsideScrollViewport(duplicateView.CancelButton),
+            $"{size.Width}: long duplicate name and Save/Cancel share the actual form viewport");
+        FitsWindowBounds(duplicateView.NameBox, $"{size.Width}: duplicate name field fits the window");
+        FitsWindowBounds(duplicateView.SaveButton, $"{size.Width}: duplicate save action fits the window");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"duplicate-form-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
     Click(duplicateView.CancelButton); Click(duplicateView.OpenButton);
     Check(duplicateView.NameBox.Text == "" && File.ReadAllBytes(duplicateFile).SequenceEqual(beforeDuplicate),
         "duplicate cancel/reopen clears temporary name without any persisted mutation");
@@ -1037,6 +1049,11 @@ try
     Check(!window.Library.Ready && duplicateView.Editor.IsEffectivelyVisible && duplicateView.NameBox.Text == "   "
         && File.ReadAllBytes(duplicateFile).SequenceEqual(beforeDuplicate) && editor.Status.Contains("name", StringComparison.OrdinalIgnoreCase),
         "invalid duplicate name retains its input and reports failure without rewriting saved state");
+    FitsWindowBounds(editor.StatusText, "800: duplicate validation error remains visible in the browser status");
+    Click(duplicateView.NameBox);
+    Check(InsideScrollViewport(duplicateView.NameBox) && InsideScrollViewport(duplicateView.CancelButton),
+        "800: rejected duplicate input and Cancel remain reachable beside the validation error");
+    window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "duplicate-error-800.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     Click(editor.ReloadButton); Wait(editor.PendingAction);
     Check(window.Library.Ready && duplicateView.Editor.IsEffectivelyVisible && duplicateView.NameBox.Text == "   "
         && editor.NotesBox.Text == "Unsaved notes must survive duplication" && editor.Metadata.TagsBox.Text == "Unsaved tag",
