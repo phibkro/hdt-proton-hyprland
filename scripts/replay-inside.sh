@@ -131,6 +131,18 @@ settings() {
     cp "$run/state.json" "$run/settings-$id.json"
     send settings-close
 }
+capture_main_crop() {
+    local x y width height
+    read -r x y width height < <(xdotool getwindowgeometry --shell "$1" | awk -F= '/^X=/{x=$2} /^Y=/{y=$2} /^WIDTH=/{w=$2} /^HEIGHT=/{h=$2} END{print x,y,w,h}')
+    if [[ "$2" == popup ]]; then
+        x=$((x + width / 2 - 160))
+        y=$((y + height / 2 - 90))
+    else
+        x=$((x + 40))
+        y=$((y + 120))
+    fi
+    magick import -window root -crop "320x180+$x+$y" +repage "$3"
+}
 if [[ "$canonical_events" == true ]]; then
     # The native journal is independently owned by this supervisor. Its sources
     # are the synthetic fixture and actual HDT publishers, not interpreted markers.
@@ -347,12 +359,30 @@ xdotool windowsize "${mains[0]}" 1280 720
 sleep 0.5
 jq -e '.mainWidth>=1250 and .mainHeight>=700' "$run/state.json" >/dev/null
 settings
+# Native Settings input plus actual screen-pixel appearance and clearing.
+# State acknowledgements alone cannot detect a white or stale rendered surface.
+sleep 0.7
+capture_main_crop "${mains[0]}" settings "$run/settings-before.png"
+read -r x y < <(jq -r '[.settingsButton.x,.settingsButton.y]|@tsv' "$run/state.json")
+xdotool mousemove --sync "$x" "$y" click 1
+sleep 0.7
+jq -e '.settingsOpen' "$run/state.json" >/dev/null
+capture_main_crop "${mains[0]}" settings "$run/settings-shown.png"
+send settings-close
+sleep 0.7
+capture_main_crop "${mains[0]}" settings "$run/settings-after.png"
+bash "$snapshot/tests/replay/visual-triplet.sh" "$run/settings-before.png" "$run/settings-shown.png" "$run/settings-after.png" "$run/settings-visual"
+capture_main_crop "${mains[0]}" popup "$run/popup-before.png"
 send popup-show
-sleep 0.3
+sleep 0.7
 jq -e '.popupOpen' "$run/state.json" >/dev/null
 magick import -window root "$run/popup.png"
+capture_main_crop "${mains[0]}" popup "$run/popup-shown.png"
 send popup-hide
 jq -e '.popupOpen==false' "$run/state.json" >/dev/null
+sleep 0.7
+capture_main_crop "${mains[0]}" popup "$run/popup-after.png"
+bash "$snapshot/tests/replay/visual-triplet.sh" "$run/popup-before.png" "$run/popup-shown.png" "$run/popup-after.png" "$run/popup-visual"
 send new
 sleep 1
 cp "$run/state.json" "$run/new.json"

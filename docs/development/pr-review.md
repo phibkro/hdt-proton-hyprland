@@ -96,3 +96,25 @@ remote `main` and confirm the PR is merged. Apply the repository's branch cleanu
 policy only after preserving evidence and proving integration. Do not reset dirty
 operator checkouts, delete investigation branches or activate a new desktop
 service as part of PR cleanup.
+
+## Automate visual acceptance
+
+Use the real WPF replay for screen-pixel assertions, not a heartbeat as a proxy
+for rendering. The [replay guide](../guides/ui-replay.md) documents the executable
+Settings/popup comparisons and their negative controls. The classifier runs in
+CI without HDT; the real rendering journey requires the private HDT/CLR seed.
+A green classifier job does not substitute for that journey.
+
+| Visual behavior | Current automated evidence | Remaining boundary |
+| --- | --- | --- |
+| Settings appears and clears | Native opening input, WPF state, before/shown/after screen crops | Progressive animation quality and real compositor |
+| Transparent popup clears | Actual screen-pixel return to baseline | Real card previews and other popup classes |
+| Empty space clicks through; control receives input | Separate private X11 input journey and actual click counters | Hyprland-specific control gating |
+| Overlay follows game movement/resizing | Human desktop acceptance | Automate against a window-only fixture under nested Hyprland |
+| Overlay survives Alt-Tab and game clicks | Human desktop acceptance | Composed-frame assertions under nested Hyprland |
+
+For the compositor journeys, own a nested compositor and its display/input
+sockets, drive a window-only game fixture and the real HDT overlay, and observe
+both composed pixels and delivered input. Preserve failing frames and timing.
+Do not drive the operator's active game or treat Openbox/Xvfb as Hyprland proof.
+Until those journeys exist and pass, keep their manual gates explicit.
