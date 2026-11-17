@@ -106,6 +106,42 @@ new file mode 0600. No card catalog, legality certification, automatic Windows
 history import or write into Hearthstone is implied by these routes.
 
 
+## Local deck metadata
+
+Feature ID: `deck-metadata`. Use the freshly built host from this checkout;
+older hosts do not provide the metadata contract. Run the ordinary rendered
+journey and the real CLI storage tests above. Inspect `metadata-saved-1120.png`
+and `metadata-saved-800.png`.
+
+The rendered journey must open the saved deck's **Edit tags and website** action,
+enter tags and a website, and repeat the edit activation without resetting input.
+**Cancel** and reopen must restore saved values without changing revision.
+An invalid website save must show a backend error, retain input and leave exact
+stored bytes unchanged. Drive **Reload library**, correct the address and save;
+reconstruct the main window and require the same persisted values.
+
+At default and minimum widths, long saved tags and website text must wrap into
+bounded summaries with ellipsis. Both summaries and the edit action must fit in
+the same viewport; the editor retains complete values and inputs remain reachable
+by real pointer/scroll input. Keep card notes and metadata unsaved, publish a completed-match observation
+through the actual optional writer/file/Rust/timer route, and require both edits
+to survive the background history transaction. Metadata-only save must preserve
+unsaved card notes. Ordinary card save must preserve metadata. Switching decks
+must close and clear the previous draft. Explicitly clear both fields and verify
+a second storage read preserves deck identity, notes, selection and match links.
+
+The CLI journey additionally supplies an old schema1 record without metadata:
+reading returns empty defaults without rewriting its bytes. Existing upsert
+requests cannot replace metadata. The dedicated metadata operation requires tags
+and a tagged website `set` or `clear`; missing/null or contradictory update shapes,
+invalid tags/URLs, unknown decks, archived edits and stale revisions must reject
+without changing persisted bytes. Archive/restore keeps metadata and match links.
+Stored metadata is validated by the same Rust type as updates.
+
+This journey stores metadata locally. It does not establish original global tag
+management, importing/updating a deck from its URL or opening a browser. Those
+original user actions remain absent from the native preview.
+
 ## Optional native observation bridge
 
 The default rendered journey links the same `NativeSnapshotWriter` as the

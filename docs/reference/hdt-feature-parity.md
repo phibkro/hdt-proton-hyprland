@@ -59,7 +59,7 @@ Native implementation: [library controller](../../avalonia/Hdt.Avalonia/LibraryV
 |---|---|---|
 | `deck-browser` | Subset | Rendered search, class filtering, selection, and selected-deck layout. Original sort, tags, and grouping are incomplete. |
 | `deck-editor` | Subset | Rendered and File IO create/edit/save, notes, explicit hero/format, card counts, and sideboards. No legality or collection checks. |
-| `deck-metadata` | Partial | Name and notes exist. Tags and linked website operations are absent. |
+| `deck-metadata` | Partial | Name and notes plus Rendered/File IO save, cancel, reopen and clear of local case-sensitive tags and an optional HTTP(S) website. Background history preserves unsaved metadata and notes; ordinary card saves preserve metadata. Original global tag management, URL-triggered web update and browser opening are absent. |
 | `deck-versions` | Absent | No native version history or clone-version journey. |
 | `deck-archive` | Partial | Rendered archive and restore preserve identity and notes. Original permanent-delete workflow is absent. |
 | `deck-selection` | Partial | Native selection labels future observed history. No original automatic deck selection, game selection, or remaining-deck reconstruction. |

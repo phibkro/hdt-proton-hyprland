@@ -257,7 +257,7 @@ try
         Check(!editor.EditorPane.IsExpanded && editor.SelectedPanel.IsEffectivelyVisible
             && editor.Status == "Select a saved deck before editing." && window.Library.State.Revision == emptyRevision
             && window.Library.State.Decks.Length == 0, $"{size.Width}: top Deck requires a saved selection without opening or creating a deck");
-        Fits(editor.StatusText, $"{size.Width}: missing-selection instruction is visible");
+        FitsWindowBounds(editor.StatusText, $"{size.Width}: missing-selection instruction is visible");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"deck-action-empty-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     }
     window.Width = 1120; window.Height = 760;
@@ -271,9 +271,9 @@ try
         Dispatcher.UIThread.RunJobs();
     }
     Click(window.GetVisualDescendants().OfType<Menu>().Single().Items.Cast<MenuItem>().Single(item => item.Header?.ToString() == "Import"));
-    Fits(editor.CodeBox, "top Import action exposes code before input helper scrolling");
+    FitsWindowBounds(editor.CodeBox, "top Import action exposes code before input helper scrolling");
     Click(editor.NewButton);
-    Fits(editor.NameBox, "New action exposes the name field before input helper scrolling");
+    FitsWindowBounds(editor.NameBox, "New action exposes the name field before input helper scrolling");
     Fill(editor.NameBox, "Native fixture deck");
     Click(deckAction);
     Check(editor.EditorPane.IsExpanded && editor.NameBox.Text == "Native fixture deck"
@@ -289,12 +289,12 @@ try
         && editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "2 × DBF 100"),
         "F# selected facts render saved identities and multiplicity rather than unsaved input");
     Click(editor.ExportButton); Wait(editor.PendingAction);
-    Fits(editor.CodeBox, "Export action exposes code before input helper scrolling");
+    FitsWindowBounds(editor.CodeBox, "Export action exposes code before input helper scrolling");
     Check(editor.CodeBox.Text?.Contains("AAECAf0EAU0BZAAA") == true, "native export produces independently specified Hearthstone deckstring");
     Click(editor.CopyButton); Wait(editor.PendingAction);
     Check(window.Clipboard is not null && Result(window.Clipboard.TryGetTextAsync()) == editor.CodeBox.Text && editor.Status.Contains("copied"), "native copy button publishes the actual exported deckstring to the isolated clipboard");
     Fill(editor.CodeBox, "### " + new string('z', 300) + "\n" + editor.CodeBox.Text);
-    Fits(editor.CodeBox, "long commented deck export stays confined to its code field");
+    FitsWindowBounds(editor.CodeBox, "long commented deck export stays confined to its code field");
     Fill(editor.NameBox, "Imported native fixture");
     Click(editor.ImportButton); Wait(editor.PendingAction);
     Check(window.Library.State.Decks.Length == 2 && editor.NameBox.Text == "Imported native fixture", "native import creates and selects a second persisted deck");
@@ -315,12 +315,19 @@ try
     Click(editor.SaveButton); Wait(editor.PendingAction);
     Click(editor.OverviewButton);
     Check(!editor.EditorPane.IsExpanded && !editor.NameBox.IsEffectivelyVisible, "default deck overview hides raw editor fields behind an explicit action");
-    void Fits(Control control, string reason)
+    void FitsWindowBounds(Control control, string reason)
     {
         var point = control.TranslatePoint(default, window) ?? throw new InvalidOperationException("Missing layout position");
         Check(control.IsEffectivelyVisible && control.Bounds.Width > 0 && control.Bounds.Height > 0
             && point.X >= 0 && point.Y >= 0 && point.X + control.Bounds.Width <= window.Bounds.Width + 1
             && point.Y + control.Bounds.Height <= window.Bounds.Height + 1, reason);
+    }
+    bool InsideScrollViewport(Control control)
+    {
+        var viewport = control.GetVisualAncestors().OfType<ScrollViewer>().First();
+        var origin = control.TranslatePoint(default, viewport)!.Value;
+        return origin.X >= 0 && origin.Y >= 0 && origin.X + control.Bounds.Width <= viewport.Viewport.Width + 1
+            && origin.Y + control.Bounds.Height <= viewport.Viewport.Height + 1;
     }
     void Ordered(Control first, Control second, string reason)
     {
@@ -332,23 +339,23 @@ try
     {
         window.Width = size.Width; window.Height = size.Height;
         Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
-        Fits(editor.BrowserPanel, $"{size.Width}: deck browser remains inside viewport");
-        Fits(editor.GamesPanel, $"{size.Width}: actual My Games panel remains inside viewport");
-        Fits(editor.SelectedPanel, $"{size.Width}: long selected deck facts remain inside viewport");
+        FitsWindowBounds(editor.BrowserPanel, $"{size.Width}: deck browser remains inside viewport");
+        FitsWindowBounds(editor.GamesPanel, $"{size.Width}: actual My Games panel remains inside viewport");
+        FitsWindowBounds(editor.SelectedPanel, $"{size.Width}: long selected deck facts remain inside viewport");
         Ordered(editor.BrowserPanel, editor.GamesPanel, $"{size.Width}: browser and games do not overlap");
         Ordered(editor.GamesPanel, editor.SelectedPanel, $"{size.Width}: games and selected deck do not overlap");
         var savedNotesLabel = editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == longSavedNotes);
         Check(savedNotesLabel.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap && savedNotesLabel.Bounds.Width <= editor.SelectedPanel.Bounds.Width,
             $"{size.Width}: long saved F# notes wrap within selected-deck facts");
-        foreach (var tab in clientTabs.Items.Cast<TabItem>()) Fits(tab, $"{size.Width}: navigation {tab.Header} remains visible");
+        foreach (var tab in clientTabs.Items.Cast<TabItem>()) FitsWindowBounds(tab, $"{size.Width}: navigation {tab.Header} remains visible");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-library-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         Click((TabItem)clientTabs.Items[3]!);
-        Fits(window.SettingsPanel.CategoryPanel, $"{size.Width}: settings sidebar remains visible");
-        Fits(window.SettingsPanel.DetailPanel, $"{size.Width}: settings content remains visible");
+        FitsWindowBounds(window.SettingsPanel.CategoryPanel, $"{size.Width}: settings sidebar remains visible");
+        FitsWindowBounds(window.SettingsPanel.DetailPanel, $"{size.Width}: settings content remains visible");
         Ordered(window.SettingsPanel.CategoryPanel, window.SettingsPanel.DetailPanel, $"{size.Width}: settings categories and content do not overlap");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-settings-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         Click(window.SettingsPanel.StorageCategory);
-        Fits(window.SettingsPanel.DetailPanel, $"{size.Width}: local paths remain confined to settings content");
+        FitsWindowBounds(window.SettingsPanel.DetailPanel, $"{size.Width}: local paths remain confined to settings content");
         var pathLabel = window.SettingsPanel.DetailPanel.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text?.Contains(new string('p', 140)) == true);
         Check(pathLabel.IsEffectivelyVisible && pathLabel.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap
             && pathLabel.Bounds.Width <= window.SettingsPanel.DetailPanel.Bounds.Width, $"{size.Width}: compiled XAML path binding wraps the exact configured path within its visible section");
@@ -368,7 +375,7 @@ try
             $"{size.Width}: Arena category restores its injected controls and hides other XAML panes");
         Click((TabItem)clientTabs.Items[1]!);
         var arenaColumns = (Grid)((TabItem)clientTabs.Items[1]!).Content!;
-        foreach (var pane in arenaColumns.Children) Fits(pane, $"{size.Width}: Arena offers and picked-deck columns remain visible");
+        foreach (var pane in arenaColumns.Children) FitsWindowBounds(pane, $"{size.Width}: Arena offers and picked-deck columns remain visible");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-arena-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         Click((TabItem)clientTabs.Items[0]!);
     }
@@ -377,18 +384,18 @@ try
     Fill(editor.SearchBox, "");
     Check(editor.Decks.ItemCount == 2, "clearing search restores saved decks without rewriting the library");
     Click(deckAction);
-    Fits(editor.NameBox, "minimum width top Deck action exposes selected name before helper scrolling");
+    FitsWindowBounds(editor.NameBox, "minimum width top Deck action exposes selected name before helper scrolling");
     Click(editor.OverviewButton);
     Check(!editor.EditorPane.IsExpanded && editor.SelectedPanel.IsEffectivelyVisible,
         "minimum width pointer overview restores the selected-deck edit control");
     Click(editor.EditButton);
-    Fits(editor.NameBox, "minimum width Edit selected deck action exposes name before helper scrolling");
+    FitsWindowBounds(editor.NameBox, "minimum width Edit selected deck action exposes name before helper scrolling");
     Fill(editor.NotesBox, "Edited persistent notes");
     Click(editor.SaveButton); Wait(editor.PendingAction);
-    Fits(editor.SaveButton, "minimum width save remains visible after pointer activation");
+    FitsWindowBounds(editor.SaveButton, "minimum width save remains visible after pointer activation");
     Click(editor.ExportButton); Wait(editor.PendingAction);
     Click(editor.CopyButton); Wait(editor.PendingAction);
-    Fits(editor.CopyButton, "minimum width export and copy actions stay inside secondary editor");
+    FitsWindowBounds(editor.CopyButton, "minimum width export and copy actions stay inside secondary editor");
     Check(editor.CodeBox.Text?.Contains("AAECAf0EAU0BZAAA") == true, "minimum width pointer save/export preserves actual deck code");
     window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "layout-editor-800.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     window.Width = 1120; window.Height = 760;
@@ -409,7 +416,7 @@ try
     Fill(editor.SearchBox, "filter that must not hide the new deck");
     Click(editor.NewButton);
     Check(editor.SearchBox.Text == "", "New clears an active browser search so a newly saved deck cannot remain hidden");
-    Fits(editor.NameBox, "New from archived browsing exposes name in one action before helper scrolling");
+    FitsWindowBounds(editor.NameBox, "New from archived browsing exposes name in one action before helper scrolling");
     Check(editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "No deck selected")
         && !editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "2 × DBF 100"),
         "F# New transition clears previous selected cards even while the overview is hidden");
@@ -431,12 +438,12 @@ try
     var catalog = editor.Catalog;
     Click((Expander)catalog.Content!);
     Fill(catalog.PathBox, catalogPath); Fill(catalog.QueryBox, "catalog mage");
-    Fits(catalog.PathBox, "minimum-width catalog confines a long local path to its input");
+    FitsWindowBounds(catalog.PathBox, "minimum-width catalog confines a long local path to its input");
     Click(catalog.SearchButton); Wait(catalog.PendingSearch);
     Click(catalog.Results.GetVisualDescendants().OfType<ListBoxItem>().Single());
     Click(catalog.AddButton); Click(catalog.AddButton);
     Click(catalog.RemoveButton);
-    Fits(catalog.RemoveButton, "minimum-width catalog card actions wrap within the editor");
+    FitsWindowBounds(catalog.RemoveButton, "minimum-width catalog card actions wrap within the editor");
     Check(editor.CardsBox.Text == "777 1", "catalog remove action decrements the selected card without changing its identity");
     Click(catalog.RemoveButton);
     Check(editor.CardsBox.Text == "", "removing the final catalog copy removes the card rather than persisting a zero count");
@@ -447,7 +454,7 @@ try
     Click(catalog.SearchButton); Wait(catalog.PendingSearch);
     Click(catalog.Results.GetVisualDescendants().OfType<ListBoxItem>().Single()); Click(catalog.HeroButton);
     Check(editor.HeroBox.Text == "637" && editor.ClassBox.Text == "MAGE", "explicit catalog hero choice sets exact hero identity without guessing a class mapping");
-    Fits(catalog.HeroButton, "minimum-width catalog hero action remains reachable");
+    FitsWindowBounds(catalog.HeroButton, "minimum-width catalog hero action remains reachable");
     Check(catalog.Results.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text?.Contains("? mana • Illustrative base hero") == true),
         "F# catalog row renders unavailable cost as unknown rather than zero");
     window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, "layout-catalog-800.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
@@ -497,9 +504,9 @@ try
                 Check(label.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap && label.Bounds.Width <= group.Bounds.Width,
                     $"{size.Width}: long sideboard identity and count labels wrap within their group");
         }
-        Fits(editor.BrowserPanel, $"{size.Width}: sideboard overview keeps deck browser visible");
-        Fits(editor.GamesPanel, $"{size.Width}: sideboard overview keeps games visible");
-        Fits(editor.SelectedPanel, $"{size.Width}: sideboard overview keeps selected column visible");
+        FitsWindowBounds(editor.BrowserPanel, $"{size.Width}: sideboard overview keeps deck browser visible");
+        FitsWindowBounds(editor.GamesPanel, $"{size.Width}: sideboard overview keeps games visible");
+        FitsWindowBounds(editor.SelectedPanel, $"{size.Width}: sideboard overview keeps selected column visible");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-sideboards-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     }
     Click(editor.EditButton); Fill(editor.SideboardsBox, "777 100 2"); Click(editor.OverviewButton);
@@ -522,10 +529,10 @@ try
         window.MouseMove(pointer); window.MouseWheel(pointer, new Vector(0, -100), RawInputModifiers.None); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
         Check(selectedScroll.Offset.Y > 0 && SideboardGroup(777).GetVisualDescendants().OfType<TextBlock>().Count() == 26,
             $"{size.Width}: actual wheel input scrolls all saved long-sideboard rows without losing entries");
-        Fits(SideboardGroup(777).GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == "1 × DBF 224"),
+        FitsWindowBounds(SideboardGroup(777).GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == "1 × DBF 224"),
             $"{size.Width}: final sideboard row is reachable through actual wheel input");
-        Fits(editor.BrowserPanel, $"{size.Width}: long sideboard cannot expand or overlap the deck browser");
-        Fits(editor.GamesPanel, $"{size.Width}: long sideboard cannot expand or overlap the games panel");
+        FitsWindowBounds(editor.BrowserPanel, $"{size.Width}: long sideboard cannot expand or overlap the deck browser");
+        FitsWindowBounds(editor.GamesPanel, $"{size.Width}: long sideboard cannot expand or overlap the games panel");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-sideboards-long-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     }
     window.Close();
@@ -558,7 +565,7 @@ try
         ChooseHistoryDeck(deckA);
         Check(ShownHistoryIds(editor.History).SequenceEqual(new[] { matchA.Id }) && editor.History.Summary == "1 supplied games • 1 wins / 0 losses",
             $"{size.Width}: actual deck-row pointer selection changes both history rows and derived counts");
-        Fits(editor.GamesPanel, $"{size.Width}: selected-deck games stay visible within library layout");
+        FitsWindowBounds(editor.GamesPanel, $"{size.Width}: selected-deck games stay visible within library layout");
         ChooseHistoryDeck(deckB);
         Check(ShownHistoryIds(editor.History).SequenceEqual(new[] { matchB.Id }) && window.Library.State.Revision == deckHistoryRevision,
             $"{size.Width}: browsing another deck neither shows stale history nor writes selection or stored associations");
@@ -660,8 +667,8 @@ try
         window.Width = size.Width; window.Height = size.Height;
         Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
         Check(window.Summary.Contains("Choose a hero") && window.OfferCount == 2 && HasText("Illustrative Mage") && !HasText("mana") && !HasText("Deck synergies:"), "hero phase renders identities without card mana, scores or synergy advice");
-        Fits(window.NextButton, $"{size.Width}: phase navigation is reachable without scrolling");
-        foreach (var pane in ((Grid)((TabItem)phaseTabs.Items[1]!).Content!).Children) Fits(pane, $"{size.Width}: hero and deck panels stay inside viewport");
+        FitsWindowBounds(window.NextButton, $"{size.Width}: phase navigation is reachable without scrolling");
+        foreach (var pane in ((Grid)((TabItem)phaseTabs.Items[1]!).Content!).Children) FitsWindowBounds(pane, $"{size.Width}: hero and deck panels stay inside viewport");
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"arena-hero-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         Click(window.NextButton);
         Check(window.Summary.Contains("Card draft") && window.OfferCount == 3 && !HasText("Illustrative Mage") && HasText("mana"), "pointer next replaces hero controls with card controls");
@@ -767,7 +774,7 @@ try
         window.Width = size.Width; window.Height = size.Height; Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
         var lists = window.GameView.GetVisualDescendants().OfType<ListBox>().ToArray();
         Check(lists.Length == 4 && DeckSectionVisible(), $"{size.Width}: constructed game exposes four supplied card lists");
-        foreach (var list in lists) Fits(list, $"{size.Width}: live-game list stays inside the window");
+        foreach (var list in lists) FitsWindowBounds(list, $"{size.Width}: live-game list stays inside the window");
         Ordered(lists[0], lists[1], $"{size.Width}: deck and player columns do not overlap");
         Ordered(lists[1], lists[3], $"{size.Width}: player and opponent columns do not overlap");
         var longName = window.GameView.GetVisualDescendants().OfType<TextBlock>()
@@ -857,6 +864,134 @@ try
     PumpUntil(() => window.Summary.Contains("Choose a hero") && window.OfferCount == 2, "controlled unsupported-shape failure recovers on a fresh complete source");
     window.Close(); nativePublisher.Dispose(); Wait(nativePublisher.Completion);
     Check(nativePublisher.Completion.IsCompletedSuccessfully, "owned optional publisher worker exits after native window closes");
+    var metadataFile = Path.Combine(evidence, "metadata-library.json");
+    var metadataSeed = new ClientLibrary(metadataFile);
+    Wait(metadataSeed.ReloadAsync());
+    Wait(metadataSeed.ImportAsync("Metadata deck A", "AAECAf0EAU0BZAAA"));
+    var metadataDeckA = metadataSeed.State.SelectedDeckId!;
+    Wait(metadataSeed.ImportAsync("Metadata deck B", "AAECAf0EAU0BZAAA"));
+    var metadataDeckB = metadataSeed.State.SelectedDeckId!;
+    Wait(metadataSeed.SelectAsync(metadataDeckA));
+    nativeSession = Guid.NewGuid().ToString(); observedMatch = Guid.NewGuid().ToString();
+    var metadataSource = Path.Combine(evidence, "metadata-observation.json");
+    var metadataFailures = 0;
+    using var metadataPublisher = new NativeSnapshotWriter(metadataSource,
+        snapshot => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(snapshot, ReplaySource.JsonOptions),
+        () => Interlocked.Increment(ref metadataFailures));
+    ownedWriters.Add(metadataPublisher);
+    metadataPublisher.Offer(NativeFrame("Constructed", 1));
+    PumpUntil(() => File.Exists(metadataSource), "metadata journey starts its actual observation publisher");
+    var metadataSettings = Path.Combine(evidence, "metadata-settings.json");
+    window = CreateWindow(new(null, metadataSettings, ClientData: metadataFile, NativeState: metadataSource));
+    window.Show(); Wait(window.Initialization);
+    var metadataTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+    Click((TabItem)metadataTabs.Items[0]!);
+    editor = window.DeckLibrary;
+    var metadataView = editor.Metadata;
+    Check(metadataView.SavedTags.Text == "No tags" && metadataView.SavedWebsite.Text == "No website",
+        "newly imported deck renders explicit empty metadata through its compiled AXAML view");
+    var metadataRevision = window.Library.State.Revision;
+    Click(metadataView.OpenButton);
+    Fill(metadataView.TagsBox, "Discard this tag"); Fill(metadataView.WebsiteBox, "https://example.test/discard");
+    Click(metadataView.OpenButton);
+    Check(!metadataView.OpenButton.IsEnabled && metadataView.TagsBox.Text == "Discard this tag",
+        "repeated metadata edit pointer activation cannot reset unsaved input");
+    Click(metadataView.CancelButton); Click(metadataView.OpenButton);
+    Check(metadataView.TagsBox.Text == "" && metadataView.WebsiteBox.Text == "" && window.Library.State.Revision == metadataRevision,
+        "cancel and reopen restore saved metadata without changing persisted revision");
+    var metadataLongTag = new string('A', 64);
+    var metadataLongWebsite = "https://example.test/" + new string('w', 380);
+    Fill(metadataView.TagsBox, metadataLongTag + "\nArena\narena");
+    Fill(metadataView.WebsiteBox, "ftp://example.test/unsupported");
+    var metadataBeforeInvalid = File.ReadAllBytes(metadataFile);
+    Click(metadataView.SaveButton); Wait(editor.PendingAction);
+    Check(!window.Library.Ready && metadataView.Editor.IsEffectivelyVisible
+        && metadataView.WebsiteBox.Text == "ftp://example.test/unsupported"
+        && editor.Status.Contains("website", StringComparison.OrdinalIgnoreCase)
+        && File.ReadAllBytes(metadataFile).SequenceEqual(metadataBeforeInvalid),
+        "invalid metadata save keeps exact stored bytes and unsaved input with a visible backend error");
+    Click(editor.ReloadButton); Wait(editor.PendingAction);
+    Check(window.Library.Ready && metadataView.Editor.IsEffectivelyVisible
+        && metadataView.TagsBox.Text == metadataLongTag + "\nArena\narena"
+        && metadataView.WebsiteBox.Text == "ftp://example.test/unsupported",
+        "actual Reload recovers metadata edit availability without discarding the rejected unsaved draft");
+    Fill(metadataView.WebsiteBox, metadataLongWebsite);
+    Click(metadataView.SaveButton); Wait(editor.PendingAction);
+    Check(window.Library.State.Decks.Single(deck => deck.Id == metadataDeckA).Metadata.Tags.SequenceEqual(new[] { metadataLongTag, "Arena", "arena" })
+        && window.Library.State.Decks.Single(deck => deck.Id == metadataDeckA).Metadata.Website == metadataLongWebsite
+        && window.Library.State.SelectedDeckId == metadataDeckA && !metadataView.Editor.IsVisible,
+        "pointer save persists exact-case tags and website without changing library tracking selection");
+    window.Close();
+    // A newly constructed native UI must read the same saved metadata from the real Rust store.
+    metadataPublisher.Offer(NativeFrame("Constructed", 2));
+    window = CreateWindow(new(null, metadataSettings, ClientData: metadataFile, NativeState: metadataSource));
+    window.Show(); Wait(window.Initialization);
+    metadataTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+    Click((TabItem)metadataTabs.Items[0]!); editor = window.DeckLibrary; metadataView = editor.Metadata;
+    Click(metadataView.OpenButton);
+    Check(metadataView.TagsBox.Text == metadataLongTag + "\nArena\narena" && metadataView.WebsiteBox.Text == metadataLongWebsite,
+        "reconstructed metadata editor reloads the persisted tags and website");
+    Click(metadataView.CancelButton);
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height;
+        Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
+        metadataView.BringIntoView(); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
+        Check(metadataView.SavedTags.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap
+            && metadataView.SavedWebsite.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap
+            && metadataView.SavedTags.Bounds.Width <= editor.SelectedPanel.Bounds.Width
+            && metadataView.SavedWebsite.Bounds.Width <= editor.SelectedPanel.Bounds.Width
+            && metadataView.SavedTags.Bounds.Height <= 60 && metadataView.SavedWebsite.Bounds.Height <= 60
+            && InsideScrollViewport(metadataView.OpenButton) && InsideScrollViewport(metadataView.SavedTags)
+            && InsideScrollViewport(metadataView.SavedWebsite),
+            $"{size.Width}: long saved metadata remains bounded inside the actual selected-deck panel");
+        FitsWindowBounds(metadataView.OpenButton, $"{size.Width}: metadata edit action fits alongside both bounded summaries without further scrolling");
+        FitsWindowBounds(metadataView.SavedTags, $"{size.Width}: complete bounded tag summary shares the edit action viewport");
+        FitsWindowBounds(metadataView.SavedWebsite, $"{size.Width}: bounded website summary shares the edit action viewport");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"metadata-saved-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Click(metadataView.OpenButton);
+        Fill(metadataView.WebsiteBox, metadataLongWebsite);
+        FitsWindowBounds(metadataView.WebsiteBox, $"{size.Width}: metadata website input remains reachable at representative width");
+        Click(metadataView.CancelButton);
+    }
+    Click(editor.EditButton); Fill(editor.NotesBox, "Unsaved card notes beside metadata");
+    Click(editor.OverviewButton); Click(metadataView.OpenButton);
+    Fill(metadataView.TagsBox, "Unsaved metadata\n日本語");
+    Fill(metadataView.WebsiteBox, "https://example.test/updated");
+    var metadataBeforeObservation = window.Library.State.Revision;
+    var metadataMatch = new MatchRecord(observedMatch, null, DateTimeOffset.UtcNow.ToString("o"), "Metadata observation", "Win", "Mage", "Warrior", 9, null, "");
+    metadataPublisher.Offer(NativeFrame("Menu", 3, matches: [metadataMatch]));
+    PumpUntil(() => window.Library.State.Matches.Length == 1 && window.Library.State.Revision > metadataBeforeObservation,
+        "actual native observation polling records a match while metadata editor is open");
+    Check(metadataView.Editor.IsEffectivelyVisible && metadataView.TagsBox.Text == "Unsaved metadata\n日本語"
+        && metadataView.WebsiteBox.Text == "https://example.test/updated" && editor.NotesBox.Text == "Unsaved card notes beside metadata"
+        && window.Library.State.Decks.Single(deck => deck.Id == metadataDeckA).Metadata.Website == metadataLongWebsite,
+        "same-deck background observation preserves unsaved metadata and card notes without implicitly saving either");
+    Click(metadataView.SaveButton); Wait(editor.PendingAction);
+    Check(editor.NotesBox.Text == "Unsaved card notes beside metadata" && window.Library.State.Matches.Single().DeckId == metadataDeckA,
+        "metadata-only save preserves unsaved card notes and the observed match association");
+    var metadataSaved = window.Library.State.Decks.Single(deck => deck.Id == metadataDeckA).Metadata;
+    Click(editor.EditButton); Click(editor.SaveButton); Wait(editor.PendingAction);
+    Check(window.Library.State.Decks.Single(deck => deck.Id == metadataDeckA).Metadata.Tags.SequenceEqual(metadataSaved.Tags)
+        && window.Library.State.Decks.Single(deck => deck.Id == metadataDeckA).Metadata.Website == metadataSaved.Website,
+        "ordinary card-and-note save cannot erase metadata omitted by its unchanged request contract");
+    Click(editor.OverviewButton); Click(metadataView.OpenButton);
+    Fill(metadataView.TagsBox, "Unsaved switch-away text");
+    Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single(item => item.DataContext is DeckEntry deck && deck.Id == metadataDeckB));
+    Check(!metadataView.Editor.IsVisible && metadataView.SavedTags.Text == "No tags" && metadataView.SavedWebsite.Text == "No website",
+        "switching decks clears the prior metadata editor and displays only the newly selected deck's metadata");
+    Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single(item => item.DataContext is DeckEntry deck && deck.Id == metadataDeckA));
+    Click(metadataView.OpenButton); Fill(metadataView.TagsBox, ""); Fill(metadataView.WebsiteBox, "");
+    Click(metadataView.SaveButton); Wait(editor.PendingAction);
+    var metadataReopened = new ClientLibrary(metadataFile); Wait(metadataReopened.ReloadAsync());
+    var metadataCleared = metadataReopened.State.Decks.Single(deck => deck.Id == metadataDeckA);
+    Check(metadataCleared.Metadata.Tags.Length == 0 && metadataCleared.Metadata.Website is null
+        && metadataCleared.Notes == "Unsaved card notes beside metadata" && metadataReopened.State.Matches.Single().DeckId == metadataDeckA
+        && metadataReopened.State.SelectedDeckId == metadataDeckA,
+        "explicit pointer clearing survives a second storage read without losing deck notes, selection or match identity");
+    window.Close(); metadataPublisher.Dispose(); Wait(metadataPublisher.Completion);
+    Check(metadataFailures == 0 && metadataPublisher.Completion.IsCompletedSuccessfully,
+        "metadata observation journey reaps its actual publisher without failure");
     var failedOutput = Path.Combine(evidence, $"publisher-block-{Guid.NewGuid():N}", "state.json");
     var publicationFailed = 0;
     using var failedPublisher = new NativeSnapshotWriter(failedOutput, _ => [123, 125], () => Interlocked.Increment(ref publicationFailed));

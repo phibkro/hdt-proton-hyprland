@@ -10,13 +10,28 @@ public sealed class LibraryView : DeckLibrarySurface
     private string? _editing;
     private bool _working, _creating, _updatingDeckList;
     private ulong _shownRevision = ulong.MaxValue;
+    public DeckMetadataView Metadata => (DeckMetadataView)MetadataControl;
     public HistoryView History => (HistoryView)HistoryControl;
     public CardCatalogView Catalog => (CardCatalogView)CatalogControl;
     public Task PendingAction { get; private set; } = Task.CompletedTask;
     public string Status => StatusText.Text ?? "";
-    public LibraryView(ClientLibrary library, CancellationToken lifetime = default) : base(new CardCatalogView(lifetime), new HistoryView(library, new HistoryScope.Deck(null)))
+    public LibraryView(ClientLibrary library, CancellationToken lifetime = default) : base(new CardCatalogView(lifetime), new HistoryView(library, new HistoryScope.Deck(null)), new DeckMetadataView())
     {
         _library = library;
+        Metadata.OpenButton.Click += (_, _) =>
+        {
+            if (_editing is not null && _library.State.Decks.FirstOrDefault(deck => deck.Id == _editing) is { Archived: false } deck)
+                Metadata.Open(ProjectMetadata(deck.Metadata));
+        };
+        Metadata.CancelButton.Click += (_, _) => Metadata.Close();
+        Metadata.SaveButton.Click += (_, _) =>
+        {
+            if (_editing is null) return;
+            var id = _editing;
+            var tags = (Metadata.TagsBox.Text ?? "").Split('\n').Select(tag => tag.Trim()).Where(tag => tag.Length > 0).ToArray();
+            var website = string.IsNullOrWhiteSpace(Metadata.WebsiteBox.Text) ? null : Metadata.WebsiteBox.Text.Trim();
+            Start(async () => { await _library.SetMetadataAsync(id, new(tags, website)); Metadata.Close(); });
+        };
         Catalog.ChangeCard += (card, change) =>
         {
             if (_working || !_library.Ready) return;
@@ -99,7 +114,7 @@ public sealed class LibraryView : DeckLibrarySurface
     }
     private void ClearEditor()
     {
-        _creating = true; _editing = null; ClearInputs();
+        _creating = true; _editing = null; ClearInputs(); Metadata.Close();
         RefreshButtons(); RefreshSelected();
     }
     public void FocusImport() => OpenEditor(CodeBox);
@@ -111,6 +126,7 @@ public sealed class LibraryView : DeckLibrarySurface
     }
     private void Edit(DeckEntry deck)
     {
+        if (_editing != deck.Id) Metadata.Close();
         LoadEditor(Project(deck), _editing != deck.Id);
         _creating = false; _editing = deck.Id;
         RefreshButtons(); RefreshSelected();
@@ -153,9 +169,13 @@ public sealed class LibraryView : DeckLibrarySurface
     private void RefreshSelected()
     {
         var deck = _library.State.Decks.FirstOrDefault(entry => entry.Id == _editing);
+        Metadata.IsVisible = deck is not null;
+        if (deck is not null) Metadata.ShowSaved(ProjectMetadata(deck.Metadata));
         History.Select(new HistoryScope.Deck(deck?.Id));
         ShowSelected(deck is null ? LibrarySelection.Empty : LibrarySelection.NewSaved(Project(deck)));
     }
+    private static DeckMetadataDisplay ProjectMetadata(DeckMetadata metadata) => new(
+        Microsoft.FSharp.Collections.ListModule.OfSeq(metadata.Tags), metadata.Website ?? "");
     private static LibraryDeckDisplay Project(DeckEntry deck) => new(
         deck.Name, deck.HeroClass, deck.Content.HeroDbfId, deck.Content.Format, deck.Notes,
         Microsoft.FSharp.Collections.ListModule.OfSeq(deck.Content.Cards.Select(card => new LibraryCardDisplay(card.DbfId, card.Count))),
@@ -165,6 +185,7 @@ public sealed class LibraryView : DeckLibrarySurface
         var deck = _library.State.Decks.FirstOrDefault(deck => deck.Id == _editing);
         var selection = deck is null ? LibraryEditorSelection.NoneSelected : deck.Archived ? LibraryEditorSelection.Archived : LibraryEditorSelection.Active;
         ApplyAvailability(_working, _library.Busy, _library.Ready, ShowArchived.IsChecked == true, selection);
+        Metadata.ApplyAvailability(_library.Ready && selection == LibraryEditorSelection.Active, _working || _library.Busy);
     }
 }
 

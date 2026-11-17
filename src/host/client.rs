@@ -14,6 +14,93 @@ use std::{
     path::Path,
 };
 const STORE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_TAGS: usize = 16;
+const MAX_TAG_CHARACTERS: usize = 64;
+const MAX_WEBSITE_BYTES: usize = 2048;
+
+/// Only this module can construct metadata; both stored and command wires use the validator.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(try_from = "StoredMetadata", rename_all = "camelCase")]
+pub struct DeckMetadata {
+    tags: Vec<String>,
+    website: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredMetadata {
+    tags: Vec<String>,
+    website: Option<String>,
+}
+impl DeckMetadata {
+    fn new(tags: Vec<String>, website: Option<String>) -> Result<Self> {
+        ensure!(
+            tags.len() <= MAX_TAGS,
+            "metadata permits at most {MAX_TAGS} tags"
+        );
+        let mut distinct = std::collections::HashSet::new();
+        for tag in &tags {
+            ensure!(
+                !tag.is_empty()
+                    && tag == tag.trim()
+                    && tag.chars().count() <= MAX_TAG_CHARACTERS
+                    && !tag.chars().any(char::is_control),
+                "tags require 1..={MAX_TAG_CHARACTERS} characters, no edge whitespace or control characters"
+            );
+            ensure!(distinct.insert(tag), "duplicate case-sensitive tag");
+        }
+        if let Some(address) = &website {
+            ensure!(
+                address.len() <= MAX_WEBSITE_BYTES
+                    && !address.chars().any(char::is_whitespace)
+                    && !address.chars().any(char::is_control),
+                "website exceeds {MAX_WEBSITE_BYTES} bytes or contains whitespace/control characters"
+            );
+            let parsed =
+                url::Url::parse(address).context("website is not an absolute HTTP(S) URL")?;
+            ensure!(
+                matches!(parsed.scheme(), "http" | "https")
+                    && parsed.has_host()
+                    && parsed.username().is_empty()
+                    && parsed.password().is_none(),
+                "website requires an absolute HTTP(S) URL with a host and no user information"
+            );
+        }
+        Ok(Self { tags, website })
+    }
+}
+impl TryFrom<StoredMetadata> for DeckMetadata {
+    type Error = anyhow::Error;
+    fn try_from(value: StoredMetadata) -> Result<Self> {
+        Self::new(value.tags, value.website)
+    }
+}
+
+/// Required tagged website command distinguishes omission from explicit clearing.
+#[derive(Debug, Deserialize)]
+#[serde(try_from = "MetadataCommand")]
+pub struct DeckMetadataUpdate(DeckMetadata);
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MetadataCommand {
+    tags: Vec<String>,
+    website: WebsiteChange,
+}
+#[derive(Deserialize)]
+#[serde(tag = "action", rename_all = "camelCase", deny_unknown_fields)]
+enum WebsiteChange {
+    Set { value: String },
+    Clear {},
+}
+impl TryFrom<MetadataCommand> for DeckMetadataUpdate {
+    type Error = anyhow::Error;
+    fn try_from(value: MetadataCommand) -> Result<Self> {
+        let address = match value.website {
+            WebsiteChange::Set { value } => Some(value),
+            WebsiteChange::Clear {} => None,
+        };
+        Ok(Self(DeckMetadata::new(value.tags, address)?))
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DeckDraft {
@@ -26,6 +113,8 @@ pub struct DeckDraft {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DeckEntry {
+    #[serde(default)]
+    pub metadata: DeckMetadata,
     pub id: String,
     pub name: String,
     pub hero_class: String,
@@ -164,6 +253,11 @@ pub enum Request {
         expected_revision: u64,
         id: Option<String>,
     },
+    SetDeckMetadata {
+        expected_revision: u64,
+        id: String,
+        metadata: DeckMetadataUpdate,
+    },
     SetArchived {
         expected_revision: u64,
         id: String,
@@ -202,6 +296,7 @@ fn upsert(state: &mut ClientState, deck: DeckDraft) -> Result<()> {
     } else {
         let id = uuid::Uuid::new_v4().to_string();
         state.decks.push(DeckEntry {
+            metadata: DeckMetadata::default(),
             id: id.clone(),
             name: deck.name,
             hero_class: deck.hero_class,
@@ -267,6 +362,9 @@ pub fn execute(path: &Path, request: Request) -> Result<serde_json::Value> {
         | Request::SetArchived {
             expected_revision, ..
         }
+        | Request::SetDeckMetadata {
+            expected_revision, ..
+        }
         | Request::RecordMatch {
             expected_revision, ..
         } => *expected_revision,
@@ -301,6 +399,19 @@ pub fn execute(path: &Path, request: Request) -> Result<serde_json::Value> {
             },
         )?,
         Request::SelectDeck { id, .. } => state.selected_deck_id = id,
+        Request::SetDeckMetadata { id, metadata, .. } => {
+            let deck = state
+                .decks
+                .iter_mut()
+                .find(|deck| deck.id == id)
+                .context("deck does not exist")?;
+            ensure!(
+                !deck.archived,
+                "restore the deck before editing its metadata"
+            );
+            deck.metadata = metadata.0;
+            deck.updated_at = Timestamp::now().rfc3339();
+        }
         Request::SetArchived { id, archived, .. } => {
             let deck = state
                 .decks

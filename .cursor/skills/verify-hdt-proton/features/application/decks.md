@@ -31,7 +31,13 @@ checks additionally require an observed collection, not an invented empty one.
   Malformed catalog recovery must preserve the saved deck.
 - Run the [WPF transition sequence](../overlay-ui.md#driving-it-with-xvfb-and-wpf-replay).
   **New** must open the original deck-type dialog. This does not verify editor
-  save, tags, versions, cloning, missing cards, or automatic selection.
+  save, original tag management, versions, cloning, missing cards, or automatic selection.
+- Run the [local metadata workflow](../native-avalonia.md#local-deck-metadata).
+  Edit tags and a website, cancel/reopen, save/reconstruct, reject an invalid
+  website without changing stored bytes, then reload and recover. Keep metadata
+  and notes unsaved during a real supplied-observation history write. This proves
+  local metadata only; original global tag management and URL-triggered web
+  update/open actions remain separate unavailable native journeys.
 - Those remaining original actions need dedicated owned-instance journeys.
   For version and deletion checks, retain old identities and history associations
   before and after the action. No executable acceptance currently covers them.

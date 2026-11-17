@@ -5,7 +5,8 @@ namespace Hdt.Avalonia;
 public sealed record CardCount(uint DbfId, uint Count);
 public sealed record SideboardCard(uint OwnerDbfId, uint DbfId, uint Count);
 public sealed record DeckContent(uint HeroDbfId, uint Format, CardCount[] Cards, SideboardCard[] Sideboards);
-public sealed record DeckEntry(string Id, string Name, string HeroClass, DeckContent Content, string Notes, bool Archived, string CreatedAt, string UpdatedAt)
+public sealed record DeckMetadata(string[] Tags, string? Website);
+public sealed record DeckEntry(string Id, string Name, string HeroClass, DeckContent Content, string Notes, bool Archived, string CreatedAt, string UpdatedAt, DeckMetadata Metadata)
 {
     public override string ToString() => $"{Name} • {HeroClass} • {Content.Cards.Sum(card => (long)card.Count)} cards";
 }
@@ -27,6 +28,11 @@ public sealed class ClientLibrary(string path, CancellationToken cancellation = 
     public async Task ReloadAsync() => await ExecuteAsync(new { operation = "list" });
     public Task SaveAsync(string? id, string name, string heroClass, DeckContent content, string notes)
         => ExecuteAsync(new { operation = "upsertDeck", expectedRevision = State.Revision, deck = new { id, name, heroClass, content, notes } });
+    public Task SetMetadataAsync(string id, DeckMetadata metadata)
+    {
+        object website = metadata.Website is null ? new { action = "clear" } : new { action = "set", value = metadata.Website };
+        return ExecuteAsync(new { operation = "setDeckMetadata", expectedRevision = State.Revision, id, metadata = new { tags = metadata.Tags, website } });
+    }
     public Task ImportAsync(string? name, string code)
         => ExecuteAsync(new { operation = "importDeck", expectedRevision = State.Revision, name, code });
     public Task SelectAsync(string id) => ExecuteAsync(new { operation = "selectDeck", expectedRevision = State.Revision, id });
@@ -45,7 +51,7 @@ public sealed class ClientLibrary(string path, CancellationToken cancellation = 
         {
             var state = await RequestAsync<ClientState>(request);
             if (state.SchemaVersion != 1 || state.Decks is null || state.Matches is null
-                || state.Decks.Any(deck => deck is null || deck.Content?.Cards is null || deck.Content.Sideboards is null))
+                || state.Decks.Any(deck => deck is null || deck.Content?.Cards is null || deck.Content.Sideboards is null || deck.Metadata?.Tags is null))
                 throw new InvalidDataException("Native library returned an incompatible state contract.");
             State = state;
             Ready = true; Status = $"Native library • revision {State.Revision} • {State.Decks.Count(deck => !deck.Archived)} decks • {State.Matches.Length} matches";

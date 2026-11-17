@@ -171,7 +171,7 @@ type HistorySurface(compact: bool) as this =
         row
 
 /// Owns the complete library/editor visual tree; controllers attach existing actions.
-type DeckLibrarySurface(catalog: Control, history: Control) as this =
+type DeckLibrarySurface(catalog: Control, history: Control, metadata: Control) as this =
     inherit UserControl()
     let status = TrackerLayout.Text("")
 
@@ -309,6 +309,7 @@ type DeckLibrarySurface(catalog: Control, history: Control) as this =
                 cards
                 TrackerLayout.Text("NOTES", 12.0)
                 notes
+                metadata
                 TrackerLayout.Text("MANA CURVE", 12.0)
                 TrackerLayout.Text(
                     "Unavailable: saved deck codes contain card identities and counts, not mana costs. No curve is guessed.",
@@ -356,6 +357,7 @@ type DeckLibrarySurface(catalog: Control, history: Control) as this =
     member _.ShowArchived = archived
     member _.ReloadButton = reload
     member _.CopyButton = copy
+    member _.MetadataControl = metadata
     member _.HistoryControl = history
     member _.CatalogControl = catalog
 

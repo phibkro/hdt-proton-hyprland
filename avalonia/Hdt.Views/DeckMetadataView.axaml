@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Hdt.Avalonia.DeckMetadataView">
+  <UserControl.Styles>
+    <Style Selector="TextBlock">
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </UserControl.Styles>
+  <StackPanel Spacing="8">
+    <TextBlock Text="TAGS AND WEBSITE" FontSize="12" />
+    <Button x:Name="OpenMetadata" Content="Edit tags and website" />
+    <TextBlock x:Name="SavedTags" MaxLines="3" TextTrimming="CharacterEllipsis" />
+    <TextBlock x:Name="SavedWebsite" MaxLines="3" TextTrimming="CharacterEllipsis" />
+    <Border x:Name="MetadataEditor" IsVisible="False">
+      <StackPanel Spacing="8">
+        <TextBlock Text="Tags: one case-sensitive tag per line" />
+        <TextBox x:Name="TagsInput" AcceptsReturn="True" Height="90"
+                 MaxLength="16384" TextWrapping="Wrap" />
+        <TextBlock Text="Optional HTTP(S) website" />
+        <TextBox x:Name="WebsiteInput" MaxLength="16384" TextWrapping="Wrap" />
+        <WrapPanel>
+          <Button x:Name="SaveMetadata" Content="Save metadata" Margin="0,0,6,6" />
+          <Button x:Name="CancelMetadata" Content="Cancel" Margin="0,0,0,6" />
+        </WrapPanel>
+        <TextBlock Text="Leave the website blank to clear it. Clear all tag lines to remove tags." FontSize="12" />
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

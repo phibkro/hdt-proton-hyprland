@@ -569,3 +569,23 @@ path. Linux/X11 only; no compositor-independent Wayland overlay is implied.
 
 Read [the bounded ownership/acceptance contract](../docs/specs/native-ui-isolation.md)
 and [the executable verification recipe](../.cursor/skills/verify-hdt-proton/features/native-avalonia.md#independent-ui-lifetimes-explicit-opt-in).
+
+## Local deck tags and website
+
+Choose a saved deck, then **Edit tags and website** in its selected-deck panel.
+Enter one case-sensitive tag per line and an optional HTTP(S) website. Save,
+cancel and reopen independently of the card editor; leave fields blank to clear
+them. The Rust transaction layer validates tag and address limits. The website
+is plain saved text; original HDT's web update and browser commands are not
+implemented. Archived decks retain metadata and become editable after restore.
+
+Old schema1 libraries without metadata read as empty tags/no website without an
+eager rewrite. Ordinary card saves preserve metadata because only the explicit
+metadata operation can replace it. Validation and stale-revision failures leave
+the stored library unchanged. The optional website command uses distinct set and
+clear shapes, so omitted input cannot silently clear an existing address.
+
+URL validation uses the existing ecosystem's [WHATWG URL parser](https://docs.rs/url/2.5.8/url/struct.Url.html),
+with HTTP(S), host and user-information checks in the Rust metadata constructor.
+No network request is made. See the [metadata verification journey](../.cursor/skills/verify-hdt-proton/features/native-avalonia.md#local-deck-metadata)
+for the executable acceptance and remaining original-app behavior.
