@@ -4,6 +4,15 @@ let
 in
 {
   packages = (with pkgs; [ bash shellcheck actionlint bun nodejs_24 protontricks winetricks steam-run util-linux procps ripgrep jq unzip git rsync gitleaks libnotify xorg.xwininfo xorg.xprop xorg.xorgserver xcompmgr openbox xdotool imagemagick bubblewrap gcc pkg-config libx11 libxi libxcomposite libxrender ]) ++ import ./nix/tooling.nix { inherit pkgs; };
+  # Match the native C object producer to the shell's Rust linker toolchain.
+  # alloca enables Clang LTO for an inherited literal CC=clang.
+  env.CC = "${pkgs.stdenv.cc}/bin/cc";
+  env.AR = "${pkgs.stdenv.cc.bintools}/bin/ar";
+  # Package setup hooks can replace CC after the Nix environment is assembled.
+  enterShell = ''
+    export CC="${config.env.CC}"
+    export AR="${config.env.AR}"
+  '';
   env.CARGO_HOME = "${config.devenv.root}/cache/cargo";
   env.CARGO_TARGET_DIR = "${config.devenv.root}/local/rust-target";
   env.REA_PROJECT = config.devenv.root;

@@ -159,6 +159,7 @@ test.each([false, true])(
         "false",
         "false",
         String(referenceViews),
+        "",
       ]);
       const runs = await readdir(nodePath.join(temp, "local/replay/runs"));
       expect(runs.length).toBe(1);

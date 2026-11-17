@@ -9,7 +9,7 @@ native_dir=${HDT_NATIVE_DIR:-$data_root/evidence}
 case "$command" in
     config | overlay-link | surface-probe | surface-check | install-plugin | configure-overlay | overlay-rule | control-input) exec bash "$source_root/scripts/native-host.sh" "$command" "$@" ;;
     trace-export) exec bash "$source_root/scripts/native-host.sh" trace-export "$@" ;;
-    observe) exec bash "$source_root/scripts/native-host.sh" observe "$@" ;;
+    observe | libxi-check) exec bash "$source_root/scripts/native-host.sh" "$command" "$@" ;;
     open | restart) exec bash "$source_root/scripts/desktop.sh" "$command" "$@" ;;
     watch) exec bash "$source_root/scripts/autostart.sh" "$@" ;;
     setup) exec bash "$source_root/scripts/setup.sh" "$@" ;;
@@ -36,7 +36,7 @@ case "$command" in
         exec bash "$source_root/scripts/native-host.sh" raw-launch "$@"
         ;;
     *)
-        echo 'Usage: hdt-proton [open|restart|watch|setup|status|trace-export|observe|raw-launch|overlay-launch|steam-options|steam-run|build-surface-probe]' >&2
+        echo 'Usage: hdt-proton [open|restart|watch|setup|status|trace-export|observe|libxi-check|raw-launch|overlay-launch|steam-options|steam-run|build-surface-probe]' >&2
         exit 2
         ;;
 esac

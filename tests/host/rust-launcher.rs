@@ -92,3 +92,69 @@ fn exact_preload_filter_preserves_similar_names_and_absent_loader_variable() {
         Some(&OsString::from(similar))
     );
 }
+
+#[test]
+fn libxi_override_is_explicit_and_preserves_unrelated_environment() {
+    use hdt_host::launch::libxi_environment;
+    let temporary = tempfile::tempdir().unwrap();
+    let library = temporary.path().join("libXi.so.6");
+    let mut header = [0u8; 64];
+    header[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
+    header[16..20].copy_from_slice(&[3, 0, 62, 0]);
+    std::fs::write(&library, header).unwrap();
+    let mut input = environment(&[
+        ("LD_PRELOAD", "/keep/custom.so"),
+        ("WINEPREFIX", "/keep/prefix"),
+    ]);
+    let original = input.clone();
+    let selected = libxi_environment(&mut input, &library).unwrap();
+    assert_eq!(
+        input.get(std::ffi::OsStr::new("LD_PRELOAD")),
+        Some(&OsString::from(format!(
+            "{}:/keep/custom.so",
+            selected.display()
+        )))
+    );
+    assert_eq!(
+        input.get(std::ffi::OsStr::new("WINEPREFIX")),
+        original.get(std::ffi::OsStr::new("WINEPREFIX"))
+    );
+    libxi_environment(&mut input, &library).unwrap();
+    assert_eq!(
+        input
+            .get(std::ffi::OsStr::new("LD_PRELOAD"))
+            .unwrap()
+            .to_string_lossy()
+            .matches("libXi.so.6")
+            .count(),
+        1
+    );
+    let mut conflicting = environment(&[("LD_PRELOAD", "/other/libXi.so.6")]);
+    assert!(libxi_environment(&mut conflicting, &library).is_err());
+    assert_eq!(
+        conflicting,
+        environment(&[("LD_PRELOAD", "/other/libXi.so.6")])
+    );
+}
+
+#[test]
+fn libxi_override_refuses_wrong_architecture_and_loader_list_paths() {
+    use hdt_host::launch::libxi_library;
+    assert!(libxi_library(Path::new("relative/libXi.so.6")).is_err());
+    let temporary = tempfile::tempdir().unwrap();
+    let library = temporary.path().join("libXi.so.6");
+    std::fs::write(&library, [0u8; 64]).unwrap();
+    assert!(libxi_library(&library).is_err());
+    let mut header = [0u8; 64];
+    header[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
+    header[16..20].copy_from_slice(&[3, 0, 183, 0]);
+    std::fs::write(&library, header).unwrap();
+    assert!(libxi_library(&library).is_err());
+    header[18] = 62;
+    let separator = temporary.path().join("two paths");
+    std::fs::create_dir(&separator).unwrap();
+    let library = separator.join("libXi.so.6");
+    std::fs::write(&library, header).unwrap();
+    assert!(libxi_library(&library).is_err());
+    assert!(libxi_library(temporary.path()).is_err());
+}

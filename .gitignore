@@ -226,3 +226,8 @@
 !/tests/native/libxi-open-device.sh
 !/docs/investigations/libxi-open-device.md
 !/docs/specs/libxi-standalone.md
+
+!/nix/libxi.nix
+!/docs/specs/hdt-runtime-integration.md
+!/docs/specs/steam-controller-namespace.md
+!/tests/cli/libxi.test.ts
