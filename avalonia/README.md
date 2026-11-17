@@ -431,13 +431,15 @@ dimensions, opaque BGRA pixels, session, monotonic sequence and observation time
 No game discovery or external process IO runs on the UI dispatcher. The child
 has bounded status/diagnostic pipes and preparation/write deadlines.
 
-The current child is **not independent UI fault isolation**: the main process
-renders its pixels, owns its lifetime and supplies its frame stream. A frozen main
-renderer stops new pixels; stale frames unmap and parent death ends the child.
-There is no independent error visual. The requested future boundary is separate
-main/overlay processes fed from independently supervised shared observations,
-with explicit IPC, stale-fact clearing and responsive overlay error visuals.
-That architecture is not implemented by this layout pass.
+This ordinary Main-owned route is **not independent UI fault isolation**: Main
+renders its pixels, owns its lifetime and supplies its frame stream. A frozen
+Main stops new pixels; stale frames unmap and parent death ends the child. This
+route has no independent error visual. The implemented
+[opt-in independent Main and overlay processes](#opt-in-independent-main-and-overlay-processes)
+route below uses a Rust supervisor and sibling renderers that read observations
+independently, clear stale facts and show unavailable notices. Select that route
+explicitly for separate UI failure domains; it does not make the original HDT
+observation producer independent of WPF.
 
 This first panel is opaque, X11/XWayland-only, fixed scale, and shows up to three
 Arena offers or 22 tracked deck/board entries. It has no artwork, tooltips,

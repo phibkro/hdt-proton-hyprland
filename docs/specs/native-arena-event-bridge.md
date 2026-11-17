@@ -83,9 +83,14 @@ delivery/sample failures hidden inside the original watcher/provider.
 Admission-control the lane first. `HdtAppDir` must identify an existing local set
 of original assemblies; this command performs no full HDT bootstrap. The optional
 references are excluded from ordinary CI/native distribution. No vendor binary is
-committed. In the pinned `nix-shell avalonia/shell.nix` environment:
+committed. From the repository root in the pinned `nix-shell avalonia/shell.nix`
+environment, build the locked Rust host and select that exact output after the
+shell hook has run; do not assume a helper from another target directory exists:
 
 ```sh
+cargo build --locked -j2
+export HDT_HOST_BINARY="$CARGO_TARGET_DIR/debug/hdt-host"
+test -x "$HDT_HOST_BINARY"
 dotnet build avalonia/Hdt.Checks/Hdt.Checks.csproj -m:2 \
   -p:RestoreLockedMode=true -p:UseSharedCompilation=false \
   -p:WatcherAcceptance=true -p:HdtAppDir="$HDT_APP_DIR"

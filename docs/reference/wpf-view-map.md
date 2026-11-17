@@ -60,11 +60,11 @@ Auxiliary windows
 └── Battlegrounds session / mechanic windows
 ```
 
-`Windows/OverlayWindow.xaml` owns the overlay's control hierarchy. The separate
-`feat/avalonia-ui` preview branch maintains its capability inventory in
-`avalonia/README.md`; that implementation is not part of this main-based
-reference branch. Source existence, model-fixture rendering and live game
-observation are separate evidence.
+`Windows/OverlayWindow.xaml` owns original HDT's overlay control hierarchy.
+The opt-in native preview maintains its capability inventory in
+[avalonia/README.md](../../avalonia/README.md). This reference describes original
+HDT separately from that native implementation. Source existence, model-fixture
+rendering and live game observation are separate evidence.
 
 | Interaction | State owner and effect |
 |---|---|
@@ -76,30 +76,35 @@ observation are separate evidence.
 | Open a guide or tooltip | Local transient UI; closing or changing mode must clear that subtree. |
 | Source becomes unavailable | Native client clears expired facts; absence is not a zero rating or empty valid draft. |
 
-## Process boundary target
+## Native process boundaries
+
+Original HDT hosts its WPF windows in one application. The ordinary native
+preview also retains a Main-owned overlay route: Main renders pixels and owns a
+Rust display child. That route separates display operations, not UI failure
+domains; a frozen Main stops new pixels and parent death ends the child.
+
+The implemented opt-in [`native-session` route](../../avalonia/README.md#opt-in-independent-main-and-overlay-processes)
+uses this ownership tree:
 
 ```text
-Independent supervisor
-├── Tracker / shared-state publisher
-├── Main UI process       ← bounded state snapshots / commands
-└── Overlay UI process    ← bounded state snapshots / commands
+Original HDT / optional observation publisher (separate WPF application)
+└── Bounded shared observation file
+
+Rust native-session supervisor
+├── Main UI process       ← reads observation file independently
+└── Overlay UI process    ← reads observation file independently
 ```
 
-Each UI owns a view tree and receives shared state independently. A frozen main
-UI must not be the relay for overlay data. The publisher owns authoritative
-tracking state and persisted preferences; views own temporary selection,
-scroll position and popups. Commands need explicit outcomes; snapshot identity,
-sequence and freshness prevent old advice from remaining current after failure.
-The supervisor owns each process lifecycle, so one UI's exit need not terminate
-the other. A responsive overlay can clear stale advice and display a small
-unavailable/reconnecting status independently of its main-window sibling.
-
-**This split is not implemented yet.** Original HDT hosts its WPF windows in one
-application. The current Avalonia preview generates overlay rasters in the main
-process and owns a Rust display child whose lifetime is tied to that parent.
-That child separates display operations, not the UI failure domain. Independent
-overlay rendering, supervision, command routing and recovery require separate
-implementation and fault-injection acceptance.
+Each native UI owns a view tree; Main is not the relay for overlay data. Main
+alone writes native preferences and the native library, while views own temporary
+selection, scroll position and popups. Snapshot identity, sequence and freshness
+prevent old advice from remaining current after source failure. The Rust owner
+holds the session lease, reports dispatcher acknowledgements and reaps each exact
+role before an explicit restart; there are no automatic restarts. One UI's exit
+or freeze need not stop its sibling. The overlay can clear stale advice and show
+an unavailable notice independently of Main, while still hiding when the game
+is unfocused. Private fault-injection acceptance covers these process boundaries;
+it does not establish live-game acceptance or a separate acquisition backend.
 
 UI isolation also differs from acquisition isolation. The optional native-client
 bridge currently captures cached HDT models on HDT's UI dispatcher before its
