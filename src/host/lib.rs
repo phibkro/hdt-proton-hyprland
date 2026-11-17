@@ -5,5 +5,6 @@ pub mod journal;
 pub mod launch;
 pub mod setup;
 pub mod status;
+pub mod timestamp;
 pub mod trace;
 pub mod x11;

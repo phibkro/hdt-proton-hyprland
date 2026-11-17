@@ -153,6 +153,7 @@
 !/src/host/main.rs
 !/src/host/setup.rs
 !/src/host/status.rs
+!/src/host/timestamp.rs
 !/src/host/trace.rs
 !/src/host/x11.rs
 !/src/hyprland/
