@@ -33,6 +33,10 @@ to read the checked-in project skill by path.
 2. Read the project verification skill and its feature index. Use the creation
    skill only when a project skill is missing or a genuinely new surface needs
    its launch/doctor/drive/evidence/cleanup model.
+   For native migration changes, name the IDs from the
+   [application map](../../.cursor/skills/verify-hdt-proton/features/application/README.md)
+   and update their [parity rows](../reference/hdt-feature-parity.md). Identify
+   source, rendered, persistence, display-server, and live evidence separately.
 3. Apply the maintenance skill: one concurrent read-only source reader per
    feature; the coordinator reconciles recipes and owns all runtime driving.
    Readers return source entry points, likely drift and one practical recipe.

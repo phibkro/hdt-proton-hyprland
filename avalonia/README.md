@@ -4,6 +4,12 @@ An independently authored .NET/Avalonia application with a Linux-first Rust IO b
 not a replacement for HDT. It opens a native window with deck management, deckstring import/export, a persisted
 match-history view, an Arena replay view and local Arena preferences. It never reads game memory or sends game input.
 
+The [feature parity ledger](../docs/reference/hdt-feature-parity.md) is the
+migration coverage reference. Its linked pstack-style feature map describes
+original user journeys, including unmigrated ones. The
+[development sequence](../docs/development/native-roadmap.md) uses those gaps to
+choose bounded implementation and acceptance work.
+
 ```
 Arena observation replay ──validated v1/v2/v3 contract──▶ native draft view
 Native deck editor ────────Rust transactions─────▶ private native library
