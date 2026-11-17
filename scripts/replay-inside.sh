@@ -405,6 +405,7 @@ for ((attempt = 0; attempt < 40; attempt++)); do
     sleep 0.1
 done
 jq -e '.cardPreviews==[]' "$run/state.json" >/dev/null
+cp "$run/state.json" "$run/card-preview-after.json"
 sleep 0.7
 magick import -window root "$run/card-preview-after-root.png"
 geometry=$(jq -er '.cardPreviews[0]|"\(.width)x\(.height)+\(.x)+\(.y)"' "$run/card-preview-shown.json")
@@ -412,6 +413,11 @@ for phase in before shown after; do
     magick "$run/card-preview-$phase-root.png" -crop "$geometry" +repage "$run/card-preview-$phase.png"
 done
 bash "$snapshot/tests/replay/visual-triplet.sh" "$run/card-preview-before.png" "$run/card-preview-shown.png" "$run/card-preview-after.png" "$run/card-preview-visual"
+# The real shown frame retained as "after" must fail the same visual assertion.
+negative_status=0
+bash "$snapshot/tests/replay/visual-triplet.sh" "$run/card-preview-before.png" "$run/card-preview-shown.png" "$run/card-preview-shown.png" "$run/card-preview-retained-negative" || negative_status=$?
+[[ $negative_status == 1 ]]
+jq -e '.passed==false' "$run/card-preview-retained-negative/result.json" >/dev/null
 send preview-card-remove
 send new
 sleep 1
