@@ -5,6 +5,7 @@ use serde::Deserialize;
 use std::{
     ffi::OsString,
     fs,
+    path::Path,
     process::Command,
     sync::{
         Arc,
@@ -45,7 +46,12 @@ struct Link {
     original: u32,
 }
 fn command(program: impl AsRef<std::ffi::OsStr>, arguments: &[OsString]) -> Result<String> {
-    let output = Command::new(program).args(arguments).output()?;
+    let mut process = Command::new(program);
+    process.args(arguments);
+    output(process)
+}
+fn output(mut process: Command) -> Result<String> {
+    let output = process.output()?;
     ensure!(
         output.status.success(),
         "{}",
@@ -62,6 +68,13 @@ fn hypr(arguments: &[&str]) -> Result<String> {
 fn lua(script: &str) -> Result<()> {
     hypr(&["eval", script]).map(|_| ())
 }
+fn read_regions(path: &Path) -> Result<Option<Regions>> {
+    match fs::read(path) {
+        Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
 fn valid_rectangles(rectangles: &[[i64; 4]], width: i64, height: i64) -> bool {
     rectangles.len() <= 2048
         && rectangles.iter().all(|r| {
@@ -76,6 +89,7 @@ fn valid_rectangles(rectangles: &[[i64; 4]], width: i64, height: i64) -> bool {
 struct Links {
     entries: Vec<(u32, Link)>,
     class: String,
+    namespace: crate::launch::Session,
 }
 impl Drop for Links {
     fn drop(&mut self) {
@@ -90,18 +104,22 @@ impl Drop for Links {
         }
         if let Ok(exe) = std::env::current_exe() {
             for (pid, link) in self.entries.iter().rev() {
-                if let Err(e) = command(
-                    &exe,
-                    &[
-                        "overlay-link".into(),
-                        "restore".into(),
-                        pid.to_string().into(),
-                        self.class.clone().into(),
-                        link.overlay.to_string().into(),
-                        link.game.to_string().into(),
-                        link.original.to_string().into(),
-                    ],
-                ) {
+                if let Err(e) = self
+                    .namespace
+                    .link_command(
+                        &exe,
+                        &[
+                            "overlay-link".into(),
+                            "restore".into(),
+                            pid.to_string().into(),
+                            self.class.clone().into(),
+                            link.overlay.to_string().into(),
+                            link.game.to_string().into(),
+                            link.original.to_string().into(),
+                        ],
+                    )
+                    .and_then(output)
+                {
                     failures.push(e.to_string());
                 }
             }
@@ -112,9 +130,9 @@ impl Drop for Links {
     }
 }
 fn tick(cfg: &Config, nonce: &str, links: &mut Links, pair: &mut String) -> Result<()> {
-    let data: Regions = serde_json::from_slice(&fs::read(
-        cfg.project_root.join("evidence/input-region.json"),
-    )?)?;
+    let Some(data) = read_regions(&cfg.project_root.join("evidence/input-region.json"))? else {
+        return Ok(());
+    };
     if data.session != nonce {
         return Ok(());
     }
@@ -140,8 +158,8 @@ fn tick(cfg: &Config, nonce: &str, links: &mut Links, pair: &mut String) -> Resu
             overlay.pid, overlay.address, game.pid, game.address
         );
         if next != *pair {
-            let link: Link = serde_json::from_str(&command(
-                std::env::current_exe()?,
+            let link: Link = serde_json::from_str(&output(links.namespace.link_command(
+                &std::env::current_exe()?,
                 &[
                     "overlay-link".into(),
                     "apply".into(),
@@ -149,7 +167,7 @@ fn tick(cfg: &Config, nonce: &str, links: &mut Links, pair: &mut String) -> Resu
                     game.pid.to_string().into(),
                     cfg.window_class.clone().into(),
                 ],
-            )?)?;
+            )?)?)?;
             ensure!(
                 link.overlay != 0 && link.game != 0,
                 "Invalid overlay relationship readback"
@@ -204,6 +222,7 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<()> {
         .and_then(|s| s.to_str())
         .filter(|s| !s.is_empty())
         .context("Expected control-region session nonce")?;
+    let namespace = crate::launch::controller_session(&cfg.prefix, args)?;
     let stopped = Arc::new(AtomicBool::new(false));
     let mut registrations = Vec::new();
     for signal in [signal_hook::consts::SIGTERM, signal_hook::consts::SIGINT] {
@@ -212,15 +231,13 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<()> {
     let mut links = Links {
         entries: Vec::new(),
         class: cfg.window_class.clone(),
+        namespace,
     };
     let mut pair = String::new();
     let mut previous = String::new();
     while !stopped.load(Ordering::Relaxed) {
         match tick(cfg, nonce, &mut links, &mut pair) {
             Ok(()) => previous.clear(),
-            Err(e)
-                if e.downcast_ref::<std::io::Error>()
-                    .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) => {}
             Err(e) => {
                 let message = e.to_string();
                 if message != previous {
@@ -240,6 +257,16 @@ pub fn run(cfg: &Config, args: &[OsString]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_missing_region_input_is_normal_waiting() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let missing = temporary.path().join("missing");
+        assert!(read_regions(&missing)?.is_none());
+        assert!(command(&missing, &[]).is_err());
+        fs::write(&missing, b"malformed")?;
+        assert!(read_regions(&missing).is_err());
+        Ok(())
+    }
     #[test]
     fn rejects_overflow_and_outside_controls() {
         assert!(!valid_rectangles(&[[i64::MAX, 0, 1, 1]], 100, 100));
