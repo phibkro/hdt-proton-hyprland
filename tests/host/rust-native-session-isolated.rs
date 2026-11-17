@@ -128,7 +128,7 @@ fn signal(pid: i32, signal: nix::sys::signal::Signal) {
 }
 fn publish(source: &Value, sequence: i32) {
     let mut source = source.clone();
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = hdt_host::timestamp::Timestamp::now().rfc3339();
     source["sequence"] = json!(sequence);
     source["observedAt"] = json!(now);
     source["arena"]["sequence"] = json!(sequence);

@@ -136,3 +136,63 @@ fn sideboards_roundtrip_and_invalid_inputs_cannot_mutate_state() {
         assert!(!path.exists());
     }
 }
+
+#[test]
+fn existing_library_and_dotnet_match_times_survive_the_timestamp_migration() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("library.json");
+    let baseline = ok(
+        &path,
+        json!({"operation":"upsertDeck","expectedRevision":0,"deck":{"id":null,"name":"Time compatibility","heroClass":"Mage","content":{"heroDbfId":637,"format":2,"cards":[{"dbfId":77,"count":1}],"sideboards":[]},"notes":"Preserve this note"}}),
+    );
+    let deck_id = baseline["decks"][0]["id"].clone();
+    // These are existing wire formats, including .NET's seven fractional digits.
+    for timestamp in [
+        "2026-01-01T00:00:00Z",
+        "2026-01-01T00:00:00.123+00:00",
+        "2026-01-01T01:00:00.1234567+01:00",
+        "1969-12-31T23:59:59.999999999Z",
+    ] {
+        let mut stored = baseline.clone();
+        stored["decks"][0]["createdAt"] = json!(timestamp);
+        stored["decks"][0]["updatedAt"] = json!(timestamp);
+        let bytes = serde_json::to_vec(&stored).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        assert_eq!(ok(&path, json!({"operation":"list"})), stored);
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            bytes,
+            "browsing must not rewrite old timestamps"
+        );
+        let record = json!({"id":"6d67ed8a-1b65-48e6-b047-bbd79dd2161d","deckId":deck_id,"observedAt":timestamp,"mode":"Arena","result":"Win","playerHero":"Mage","opponentHero":"Warrior","turns":8,"placement":null,"notes":""});
+        let updated = ok(
+            &path,
+            json!({"operation":"recordMatch","expectedRevision":1,"record":record}),
+        );
+        assert_eq!(updated["matches"][0]["observedAt"], timestamp);
+        assert_eq!(updated["decks"], stored["decks"]);
+    }
+    for invalid in [
+        "2026-02-30T00:00:00Z",
+        "2026-01-01T00:00:00",
+        "2026-01-01T00:00:00+25:00",
+        "2026-01-01T00:00:00Z[UTC]",
+    ] {
+        let bytes = serde_json::to_vec(&baseline).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        let record = json!({"id":"6d67ed8a-1b65-48e6-b047-bbd79dd2161d","deckId":deck_id,"observedAt":invalid,"mode":"Arena","result":"Win","playerHero":"Mage","opponentHero":"Warrior","turns":8,"placement":null,"notes":""});
+        let rejected = request(
+            &path,
+            json!({"operation":"recordMatch","expectedRevision":1,"record":record}),
+        );
+        assert!(
+            !rejected.status.success(),
+            "invalid match time accepted: {invalid}"
+        );
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            bytes,
+            "invalid timestamp must not mutate history"
+        );
+    }
+}

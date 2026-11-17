@@ -1,9 +1,9 @@
 use crate::config::Config;
+use crate::timestamp::Timestamp;
 use anyhow::{Context, Result, bail};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{fs, io, path::Path, process::Command, time::SystemTime};
+use std::{fs, io, path::Path, process::Command};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Client {
@@ -146,8 +146,9 @@ pub fn run(cfg: &Config) -> Result<()> {
         for name in ["Power.log", "Arena.log", "LoadingScreen.log"] {
             match fs::metadata(logs.join(latest).join(name)) {
                 Ok(m) => {
-                    let date: DateTime<Utc> = m.modified()?.into();
-                    files.push(json!({"name":name,"bytes":m.len(),"modifiedUTC":date.to_rfc3339_opts(chrono::SecondsFormat::Millis,true)}));
+                    let date = Timestamp::from_system_time(m.modified()?)?;
+                    files
+                        .push(json!({"name":name,"bytes":m.len(),"modifiedUTC":date.utc_millis()}));
                 }
                 Err(e) if e.kind() == io::ErrorKind::NotFound => {
                     files.push(json!({"name":name,"absent":true}))
@@ -169,10 +170,10 @@ pub fn run(cfg: &Config) -> Result<()> {
     let control = optional(&cfg.project_root.join("evidence/control-input.json"))?
         .map(|s| serde_json::from_str::<Value>(&s))
         .transpose()?;
-    let control = control.map(|c| { let fresh = c.get("observedUTC").and_then(Value::as_str).and_then(|s| DateTime::parse_from_rfc3339(s).ok()).is_some_and(|t| (Utc::now()-t.with_timezone(&Utc)).num_milliseconds().abs() < 2000); json!({"heartbeatFresh":fresh,"regionSnapshotFresh":c.get("fresh"),"controls":c.get("controls"),"pointerOverControl":c.get("pointerOverControl")}) });
-    let observed: DateTime<Utc> = SystemTime::now().into();
+    let control = control.map(|c| { let fresh = c.get("observedUTC").and_then(Value::as_str).and_then(|s| Timestamp::parse_rfc3339(s).ok()).is_some_and(|t| Timestamp::now().elapsed_millis_since(t).abs() < 2000); json!({"heartbeatFresh":fresh,"regionSnapshotFresh":c.get("fresh"),"controls":c.get("controls"),"pointerOverControl":c.get("pointerOverControl")}) });
+    let observed = Timestamp::now();
     let result = json!({
-        "observedUTC": observed.to_rfc3339_opts(chrono::SecondsFormat::Millis,true),
+        "observedUTC": observed.utc_millis(),
         "windows": windows.iter().map(|c|json!({"title":c.title,"position":c.at,"size":c.size,"xwayland":c.xwayland,"fullscreen":c.fullscreen})).collect::<Vec<_>>(),
         "monitors": monitors.iter().map(|m|json!({"name":m.name,"width":m.width,"height":m.height,"scale":m.scale})).collect::<Vec<_>>(),
         "latestGameLogSession": latest.map(|s|s.to_string_lossy()),"files":files,
@@ -196,8 +197,7 @@ pub fn surface_check(cfg: &Config, args: &[std::ffi::OsString]) -> Result<()> {
         .get("observedUTC")
         .and_then(Value::as_str)
         .context("Missing hover observation time")?;
-    let age = (Utc::now() - DateTime::parse_from_rfc3339(observed)?.with_timezone(&Utc))
-        .num_milliseconds();
+    let age = Timestamp::now().elapsed_millis_since(Timestamp::parse_rfc3339(observed)?);
     if !(0..=2500).contains(&age) {
         bail!("Hover state is stale");
     }
@@ -270,7 +270,7 @@ pub fn surface_check(cfg: &Config, args: &[std::ffi::OsString]) -> Result<()> {
         );
     }
     let surface: Value = serde_json::from_slice(&output.stdout)?;
-    let result = json!({"observedUTC":Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis,true),"bounds":bounds,"regionSource":if explicit {"explicit"} else {"lastPreview"},"state":state,"surface":surface});
+    let result = json!({"observedUTC":Timestamp::now().utc_millis(),"bounds":bounds,"regionSource":if explicit {"explicit"} else {"lastPreview"},"state":state,"surface":surface});
     crate::setup::private_dir(&cfg.project_root.join("evidence"))?;
     let text = serde_json::to_string_pretty(&result)?;
     let mut file = fs::OpenOptions::new()

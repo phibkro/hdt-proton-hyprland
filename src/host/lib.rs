@@ -9,6 +9,7 @@ pub mod launch;
 pub mod setup;
 pub mod snapshot;
 pub mod status;
+pub mod timestamp;
 pub mod trace;
 pub mod x11;
 

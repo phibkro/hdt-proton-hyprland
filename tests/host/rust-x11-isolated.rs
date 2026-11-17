@@ -948,7 +948,7 @@ fn native_overlay_acceptance(conn: &RustConnection, display: &str, root: u32, pi
         stdin.write_all(b"\n").unwrap();
         stdin.flush().unwrap();
     };
-    let now = || chrono::Utc::now().timestamp_millis();
+    let now = || hdt_host::timestamp::Timestamp::now().unix_millis();
     frame["observedMs"] = json!(now());
     frame["sequence"] = json!(100);
     send(&mut stdin, &frame);
@@ -1137,7 +1137,7 @@ fn native_overlay_desktop_acceptance(
     let mut sequence = 100;
     let mut publish = || {
         sequence += 1;
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = hdt_host::timestamp::Timestamp::now().rfc3339();
         observation["sequence"] = json!(sequence);
         observation["observedAt"] = json!(now);
         observation["arena"]["sequence"] = json!(sequence);

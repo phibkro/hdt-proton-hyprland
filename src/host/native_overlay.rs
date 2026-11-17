@@ -471,8 +471,8 @@ fn run_window(game: u32, pid: u32, class: &str) -> Result<()> {
                                     && (frame.sequence < *sequence || frame.observed_ms < *time)
                             });
                     if backwards
-                        || chrono::Utc::now()
-                            .timestamp_millis()
+                        || crate::timestamp::Timestamp::now()
+                            .unix_millis()
                             .abs_diff(frame.observed_ms)
                             > 5000
                     {
@@ -497,8 +497,8 @@ fn run_window(game: u32, pid: u32, class: &str) -> Result<()> {
                                 && (frame.sequence < *sequence || frame.observed_ms < *time)
                         });
                     if backwards
-                        || chrono::Utc::now()
-                            .timestamp_millis()
+                        || crate::timestamp::Timestamp::now()
+                            .unix_millis()
                             .abs_diff(frame.observed_ms)
                             > 5000
                     {
@@ -560,7 +560,10 @@ fn run_window(game: u32, pid: u32, class: &str) -> Result<()> {
             && active.value32().and_then(|mut values| values.next()) == Some(game);
         let fresh = last.as_ref().is_some_and(|(_, _, time, received)| {
             received.elapsed() <= Duration::from_secs(5)
-                && chrono::Utc::now().timestamp_millis().abs_diff(*time) <= 5000
+                && crate::timestamp::Timestamp::now()
+                    .unix_millis()
+                    .abs_diff(*time)
+                    <= 5000
         });
         let mapped = conn.get_window_attributes(game)?.reply()?.map_state == MapState::VIEWABLE;
         let should_show =

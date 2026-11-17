@@ -2,9 +2,9 @@
 use crate::{
     deckcode::{self, DeckContent},
     snapshot,
+    timestamp::Timestamp,
 };
 use anyhow::{Context, Result, ensure};
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
     ffi::OsString,
@@ -78,10 +78,8 @@ impl ClientState {
         let mut ids = std::collections::HashSet::new();
         for deck in &self.decks {
             uuid::Uuid::parse_str(&deck.id).context("invalid deck ID")?;
-            chrono::DateTime::parse_from_rfc3339(&deck.created_at)
-                .context("invalid deck creation time")?;
-            chrono::DateTime::parse_from_rfc3339(&deck.updated_at)
-                .context("invalid deck update time")?;
+            Timestamp::parse_rfc3339(&deck.created_at).context("invalid deck creation time")?;
+            Timestamp::parse_rfc3339(&deck.updated_at).context("invalid deck update time")?;
             ensure!(ids.insert(&deck.id), "duplicate deck ID");
             validate_draft(&DeckDraft {
                 id: Some(deck.id.clone()),
@@ -122,7 +120,7 @@ fn validate_draft(deck: &DeckDraft) -> Result<()> {
 }
 fn validate_match(record: &MatchRecord) -> Result<()> {
     uuid::Uuid::parse_str(&record.id).context("invalid match ID")?;
-    chrono::DateTime::parse_from_rfc3339(&record.observed_at).context("invalid match time")?;
+    Timestamp::parse_rfc3339(&record.observed_at).context("invalid match time")?;
     ensure!(
         ["Win", "Loss", "Draw", "Unknown"].contains(&record.result.as_str()),
         "unknown match result"
@@ -189,7 +187,7 @@ fn load(path: &Path) -> Result<ClientState> {
 }
 fn upsert(state: &mut ClientState, deck: DeckDraft) -> Result<()> {
     validate_draft(&deck)?;
-    let now = Utc::now().to_rfc3339();
+    let now = Timestamp::now().rfc3339();
     if let Some(id) = deck.id {
         let existing = state
             .decks
@@ -310,7 +308,7 @@ pub fn execute(path: &Path, request: Request) -> Result<serde_json::Value> {
                 .find(|deck| deck.id == id)
                 .context("deck does not exist")?;
             deck.archived = archived;
-            deck.updated_at = chrono::Utc::now().to_rfc3339();
+            deck.updated_at = Timestamp::now().rfc3339();
             if archived && state.selected_deck_id.as_ref() == Some(&id) {
                 state.selected_deck_id = None;
             }
