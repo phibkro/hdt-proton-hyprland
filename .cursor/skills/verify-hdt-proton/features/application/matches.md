@@ -27,6 +27,11 @@ Original live tracking requires the user's game and a fresh game log.
   Require one persisted record, deduplication, and correct native association.
 - Repeat publication of the same result and inspect persisted history. Existing
   records and unsaved deck edits must remain intact.
+- In the native rendered journey, browse two saved decks with distinct results.
+  **My Games** rows and totals must match only the displayed deck. Switch to
+  **Stats** and require all records, including an unassociated result. Browsing
+  must leave stored associations and revisions unchanged. Archive, no-selection,
+  and empty-history states must not retain the previous deck's rows.
 - Follow [live state checks](../overlay-ui.md#driving-it-with-xvfb-and-wpf-replay)
   while the user plays. Compare start, end, fresh log output, and the saved match.
   A responsive window alone does not verify tracking.

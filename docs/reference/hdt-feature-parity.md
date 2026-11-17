@@ -11,6 +11,12 @@ owns executable checks.
 
 Original source baseline: `2698623dc0e91491671a614ae176f9db68831aa7`.
 Native implementation reviewed: PR38 head `2318d86b67e5b00951360c900f5b60880bfe1563`.
+The selected-deck history increment is `cfd096a8443277186d466913fabd4c7c2d39ab57`.
+Its product and test files match tested commit `0510615` byte for byte after
+rebasing onto the documentation map. The locked build passed with zero warnings
+and errors. Its rendered suite passed 280 checks and cleaned up 12 windows,
+one actor, and four writers. This remains headless control and real persistence
+evidence, not live-game acceptance.
 The original checkout contains 226 application XAML files. These include controls
 and resources, so that count is not a feature denominator. The installed HDT
 1.60.1 binary's correspondence to this source is unverified.
@@ -86,7 +92,7 @@ Native implementation: [observation model](../../avalonia/Hdt.Avalonia/NativeObs
 |---|---|---|
 | `match-detection` | Partial | Reads supplied mode, session, and completed observations. No independent native log or memory acquisition. |
 | `match-live` | Partial | Rendered known cards, public boards, counts, health, zero-versus-unknown, and mode clearing. Draw/origin, secret, and full turn-state reconstruction are absent. |
-| `match-history` | Partial | File IO stores supplied records and deduplicates identities. Native selection associates observed in-progress games. No Windows database import or per-selected-deck history filter at this baseline. |
+| `match-history` | Partial | File IO stores supplied records and deduplicates identities. Rendered selected-deck history filters rows and totals by the displayed deck, while global Stats retains all records. No Windows database import or independent match acquisition. |
 | `match-statistics` | Partial | Global record rows and total/win/loss summary. No original date/mode/matchup analysis, charts, or full per-deck analytics. |
 | `match-correction` | Absent | No native add/edit/move/discard-result dialogs or replay navigation. |
 | `match-arena-run` | Partial | Individual supplied Arena results can persist. No run/reward aggregate workflow. |

@@ -96,7 +96,7 @@ public sealed class MainWindow : Window
             ItemsSource = new TabItem[] {
             new() { Header = "My Decks", Content = DeckLibrary },
             new() { Header = "Arena Draft", Content = content },
-            new() { Header = "Stats", Content = new HistoryView(Library) },
+            new() { Header = "Stats", Content = new HistoryView(Library, new HistoryScope.All()) },
             new() { Header = "Options", Content = SettingsPanel },
             new() { Header = "Help", Content = Notice("Migration preview", "Native deck library and Arena rendering. Optional read-only Proton observations provide known cards and supplied history; native acquisition, account login and combat odds are not implemented. Native X11 overlays require explicit opt-in. No actions are sent to Hearthstone.") },
             new() { Header = "Live Game", Content = GameView }
