@@ -157,12 +157,20 @@ resources absent. The
 provides the config-directory option. The existing timeout, exact-child cleanup
 and private evidence manifest apply to both parents.
 
+The executed labwc probe on the selected NVIDIA render node advertised seat 9,
+compositor 6, xdg-shell 6 and SHM 2, but no DMA-BUF global. EGL reported an
+incompatible GBM backend; Vulkan found only a CPU renderer and could not match
+the DRM device. Labwc fell back to Pixman and SHM allocation. The validator
+correctly failed with one missing requirement. This establishes a renderer
+prerequisite failure in this restricted environment, rather than a remaining
+protocol-version mismatch. Its cause has not been isolated further.
+
 Accept only actual registry success and a hardware renderer with usable DMA-BUF
-feedback. Render-node-only NVIDIA initialization may fail; exposing additional
-devices or forcing software rendering is not an approved fallback. A failure
-ends this experiment before Hyprland, WPF or input starts. No labwc experiment
-has been executed yet, and this investigation adds no support claim for labwc
-as an operator desktop.
+feedback. Exposing additional devices or forcing software rendering is not an
+approved fallback. A failure ends the experiment before Hyprland, WPF or input
+starts. Those child stages remain unexecuted, and this investigation adds no
+support claim for labwc as an operator desktop. A separately provisioned
+compatible virtual GPU remains an alternative requiring its own bounded setup.
 
 ## Capture original views
 
