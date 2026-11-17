@@ -175,7 +175,7 @@ impl InputJournal {
         let sink = self.sink.as_mut().context("Journal is not open.")?;
         self.seq += 1;
         let mut line = serde_json::to_vec(
-            &json!({"seq":self.seq,"utc":chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis,true),"elapsedMS":self.started.elapsed().as_secs_f64()*1000.0,"kind":kind,"data":data}),
+            &json!({"seq":self.seq,"utc":crate::timestamp::Timestamp::now().utc_millis(),"elapsedMS":self.started.elapsed().as_secs_f64()*1000.0,"kind":kind,"data":data}),
         )?;
         line.push(b'\n');
         ensure!(

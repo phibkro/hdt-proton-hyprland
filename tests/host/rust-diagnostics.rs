@@ -1,6 +1,7 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use hdt_host::{
     journal::{From, InputJournal, Source},
+    timestamp::Timestamp,
     trace,
 };
 use serde_json::{Value, json};
@@ -102,6 +103,16 @@ fn exact_bytes_rotation_rewrite_truncation_and_private_evidence() {
             & 0o077,
         0
     );
+    for record in &records {
+        let wire = record["utc"].as_str().unwrap();
+        assert_eq!(
+            wire.len(),
+            24,
+            "journal timestamp must stay YYYY-MM-DDTHH:MM:SS.mmmZ"
+        );
+        assert!(wire.ends_with('Z'));
+        Timestamp::parse_rfc3339(wire).unwrap();
+    }
     assert_eq!(records.last().unwrap()["kind"], "journal.stop");
     assert!(collector.poll().is_err());
     collector.close("again").unwrap();

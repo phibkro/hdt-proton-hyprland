@@ -123,3 +123,24 @@ event and WPF/diagnostics replays, including Battlegrounds tabs, on the isolated
 Proton 11.0 seed. Live Steam/Hyprland acceptance then passed on Experimental;
 see the compatibility record for its scope. The isolated Experimental startup
 timeout remains unresolved.
+
+## Timestamp boundary
+
+`src/host/timestamp.rs` owns RFC3339 parsing, UTC millisecond status/journal
+output, native record formatting and signed age calculations. It uses
+[`time`](https://docs.rs/time/latest/time/struct.OffsetDateTime.html); Chrono was
+removed after its maintenance advisory. The boundary retains existing numeric
+offsets, .NET seven-digit fractions, automatic 0/3/6/9-digit native record
+precision and leap-second representation. Freshness callers retain their own
+explicit inclusive or exclusive thresholds.
+
+The adapter has fixed legacy-input and boundary tests checked against the former
+Chrono 0.4.45 behavior. Journal integration tests also inspect the actual serialized
+rows. Leap-endpoint duration behavior follows the explicitly retained
+[Chrono 0.4.45 rule](https://github.com/chronotope/chrono/blob/v0.4.45/src/naive/time/mod.rs#L741)
+(MIT OR Apache-2.0): crossing an endpoint's UTC base second adds or subtracts
+a second independently of the date difference. Tests distinguish this from
+Unix epoch subtraction. These checks cover timestamp compatibility; they do not establish overlay
+or live game behavior. Jiff was considered, but its default
+[Temporal parser](https://docs.rs/jiff/latest/jiff/fmt/temporal/) accepts a broader
+input language than this RFC3339 boundary needs.
