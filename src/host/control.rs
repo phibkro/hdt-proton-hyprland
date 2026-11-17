@@ -211,7 +211,7 @@ fn tick(cfg: &Config, nonce: &str, links: &mut Links, pair: &mut String) -> Resu
     fs::write(
         cfg.project_root.join("evidence/control-input.json"),
         serde_json::to_vec(
-            &serde_json::json!({"observedUTC":chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis,true),"fresh":fresh,"controls":rectangles.len(),"pointerOverControl":hit}),
+            &serde_json::json!({"observedUTC":crate::timestamp::Timestamp::now().utc_millis(),"fresh":fresh,"controls":rectangles.len(),"pointerOverControl":hit}),
         )?,
     )?;
     Ok(())
