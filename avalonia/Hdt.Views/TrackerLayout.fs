@@ -12,6 +12,11 @@ type TrackerLayout private () =
     static member val Line: IBrush = SolidColorBrush(Color.Parse("#394653"))
     static member val Accent: IBrush = SolidColorBrush(Color.Parse("#2489BD"))
 
+    static member Required<'T when 'T :> Control>(view: Control, name: string) =
+        match view.FindControl<'T>(name) with
+        | null -> invalidOp $"XAML is missing the required control {name}."
+        | control -> control
+
     static member Text(text: string, [<Optional; DefaultParameterValue(13.0)>] size: float) =
         TextBlock(Text = text, FontSize = size, TextWrapping = TextWrapping.Wrap)
 

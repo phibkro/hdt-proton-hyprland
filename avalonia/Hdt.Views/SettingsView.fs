@@ -16,10 +16,7 @@ type SettingsLayout() as this =
     inherit UserControl()
     do AvaloniaXamlLoader.Load(this)
 
-    member internal this.Required<'T when 'T :> Control>(name: string) =
-        match this.FindControl<'T>(name) with
-        | null -> invalidOp $"Settings XAML is missing the required control {name}."
-        | control -> control
+    member internal this.Required<'T when 'T :> Control>(name: string) = TrackerLayout.Required<'T>(this, name)
 
 [<Sealed>]
 type SettingsView(arena: Control, overlay: Control, paths: SettingsPaths) as this =

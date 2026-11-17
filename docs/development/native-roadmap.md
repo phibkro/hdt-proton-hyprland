@@ -54,3 +54,13 @@ Use pstack's maintenance skill for a full verification audit. It requires source
 readers and coordinator-driven runtime coverage for every mapped feature. A
 source-only map expansion is not a completed maintenance pass. Unavailable account,
 seasonal, compositor, or live-game routes stay explicitly untested.
+
+## Remaining layout coverage
+
+The native rendered driver's `FitsWindowBounds` helper in
+`avalonia/Hdt.Checks/Program.cs` checks window bounds only. Existing callers do not
+prove that a control is unclipped by ancestor scroll viewports. The metadata
+journey additionally uses `InsideScrollViewport` to require its edit action and
+both summaries inside the same actual viewport. Extend that ancestor check to
+other scrolling journeys when their layouts change; retain pointer and pixel
+evidence rather than interpreting window containment as full visibility.
