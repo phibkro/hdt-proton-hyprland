@@ -121,6 +121,8 @@ type HistorySurface(compact: bool) as this =
     inherit UserControl()
     let summary = TextBlock(FontSize = if compact then 16.0 else 22.0)
 
+    let empty = TrackerLayout.Text("")
+
     let matches =
         ListBox(MinHeight = (if compact then 100.0 else 180.0), MaxHeight = (if compact then 250.0 else 500.0))
 
@@ -131,6 +133,7 @@ type HistorySurface(compact: bool) as this =
         body.Children.AddRange(
             [
                 summary
+                empty
                 matches
                 TrackerLayout.Text(
                     "Only supplied observations are recorded. There is no automatic import from Windows HDT's database."
@@ -141,6 +144,13 @@ type HistorySurface(compact: bool) as this =
         this.Content <- body
 
     member _.Matches = matches
+    member _.Summary = summary.Text
+    member _.EmptyMessage = empty.Text
+
+    member _.ShowEmpty(message: string) =
+        empty.Text <- message
+        empty.IsVisible <- message.Length > 0
+
 
     member _.ShowSummary(total: int, wins: int, losses: int) =
         summary.Text <- $"{total} supplied games • {wins} wins / {losses} losses"
@@ -346,6 +356,7 @@ type DeckLibrarySurface(catalog: Control, history: Control) as this =
     member _.ShowArchived = archived
     member _.ReloadButton = reload
     member _.CopyButton = copy
+    member _.HistoryControl = history
     member _.CatalogControl = catalog
 
     member _.ShowHistoryDeck(deckName: string | null) =

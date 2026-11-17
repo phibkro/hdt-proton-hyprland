@@ -519,6 +519,72 @@ try
         window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-sideboards-long-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     }
     window.Close();
+    var historyPath = Path.Combine(evidence, "deck-history-library.json");
+    var historySeed = new ClientLibrary(historyPath);
+    Wait(historySeed.ReloadAsync());
+    Wait(historySeed.SaveAsync(null, "History deck A", "Mage", new(637, 2, [new(77, 1)], []), "Saved A"));
+    var deckA = historySeed.State.Decks.Single().Id;
+    Wait(historySeed.SaveAsync(null, "History deck B", "Warrior", new(637, 2, [new(100, 1)], []), "Saved B"));
+    var deckB = historySeed.State.Decks.Last().Id;
+    var matchA = new MatchRecord(Guid.NewGuid().ToString(), deckA, DateTimeOffset.UtcNow.ToString("o"), "History A", "Win", "Mage", "Warrior", 8, null, "");
+    var matchB = matchA with { Id = Guid.NewGuid().ToString(), DeckId = deckB, Mode = "History B", Result = "Loss" };
+    var unmatched = matchA with { Id = Guid.NewGuid().ToString(), DeckId = null, Mode = "Unassociated", Result = "Draw" };
+    foreach (var match in new[] { matchA, matchB, unmatched }) Wait(historySeed.RecordAsync(match));
+    window = CreateWindow(new(null, Path.Combine(evidence, "deck-history-settings.json"), ClientData: historyPath));
+    window.Show(); Wait(window.Initialization);
+    editor = window.DeckLibrary;
+    var historyTabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+    void ChooseHistoryDeck(string id)
+    {
+        Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single(item => item.DataContext is DeckEntry entry && entry.Id == id));
+    }
+    string[] ShownHistoryIds(HistoryView view) => view.Matches.Items.Cast<MatchRecord>().Select(match => match.Id).ToArray();
+    Check(ShownHistoryIds(editor.History).SequenceEqual(new[] { matchB.Id }) && editor.History.Summary == "1 supplied games • 0 wins / 1 losses",
+        "reconstructed selected-deck history excludes other-deck and anonymous persisted records");
+    var deckHistoryRevision = window.Library.State.Revision;
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height;
+        ChooseHistoryDeck(deckA);
+        Check(ShownHistoryIds(editor.History).SequenceEqual(new[] { matchA.Id }) && editor.History.Summary == "1 supplied games • 1 wins / 0 losses",
+            $"{size.Width}: actual deck-row pointer selection changes both history rows and derived counts");
+        Fits(editor.GamesPanel, $"{size.Width}: selected-deck games stay visible within library layout");
+        ChooseHistoryDeck(deckB);
+        Check(ShownHistoryIds(editor.History).SequenceEqual(new[] { matchB.Id }) && window.Library.State.Revision == deckHistoryRevision,
+            $"{size.Width}: browsing another deck neither shows stale history nor writes selection or stored associations");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"deck-history-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+    Click(editor.EditButton); Fill(editor.NotesBox, "Unsaved history draft");
+    var extraB = matchB with { Id = Guid.NewGuid().ToString(), Result = "Win" };
+    Wait(window.Library.RecordAsync(extraB));
+    Check(ShownHistoryIds(editor.History).SequenceEqual(new[] { extraB.Id, matchB.Id })
+        && editor.History.Summary == "2 supplied games • 1 wins / 1 losses" && editor.NotesBox.Text == "Unsaved history draft" && editor.EditorPane.IsExpanded,
+        "background history refresh preserves unsaved editor state while showing only the displayed deck's new game");
+    Click((TabItem)historyTabs.Items[2]!);
+    var globalHistory = window.GetVisualDescendants().OfType<HistoryView>().Single(view => view != editor.History);
+    Check(ShownHistoryIds(globalHistory).ToHashSet().SetEquals(new[] { matchA.Id, matchB.Id, unmatched.Id, extraB.Id })
+        && globalHistory.Summary == "4 supplied games • 2 wins / 1 losses",
+        "global Stats retains every persisted game including anonymous and other-deck records");
+    Click((TabItem)historyTabs.Items[0]!); Click(editor.EditButton);
+    Click(editor.ArchiveButton); Wait(editor.PendingAction);
+    Check(editor.History.Matches.ItemCount == 0 && editor.History.EmptyMessage == "Select a saved deck to see its games.",
+        "archiving clears displayed-deck history and asks for explicit selection");
+    Click(editor.ShowArchived); ChooseHistoryDeck(deckB);
+    Check(ShownHistoryIds(editor.History).SequenceEqual(new[] { extraB.Id, matchB.Id }), "archived deck preserves its own historical games");
+    Click(editor.ArchiveButton); Wait(editor.PendingAction);
+    Click(editor.NewButton);
+    Check(editor.History.Matches.ItemCount == 0 && editor.History.EmptyMessage == "Select a saved deck to see its games.",
+        "New deck clears prior history rather than presenting an anonymous-record group");
+    Wait(window.Library.SaveAsync(null, "History empty deck", "Mage", new(637, 2, [new(77, 1)], []), ""));
+    ChooseHistoryDeck(window.Library.State.Decks.Last().Id);
+    Check(editor.History.Matches.ItemCount == 0 && editor.History.EmptyMessage == "No supplied games recorded." && editor.History.Summary == "0 supplied games • 0 wins / 0 losses",
+        "saved deck with no matches has a distinct truthful empty history");
+    var verifiedHistory = new ClientLibrary(historyPath); Wait(verifiedHistory.ReloadAsync());
+    Check(verifiedHistory.State.Matches.Single(match => match.Id == matchA.Id).DeckId == deckA
+        && verifiedHistory.State.Matches.Single(match => match.Id == matchB.Id).DeckId == deckB
+        && verifiedHistory.State.Matches.Single(match => match.Id == unmatched.Id).DeckId is null,
+        "actual storage retains original deck associations and anonymous records after all navigation and archive transitions");
+    window.Close();
     var heroFrame = frames[0] with
     {
         SchemaVersion = 2,

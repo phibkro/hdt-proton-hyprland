@@ -10,10 +10,11 @@ public sealed class LibraryView : DeckLibrarySurface
     private string? _editing;
     private bool _working, _creating, _updatingDeckList;
     private ulong _shownRevision = ulong.MaxValue;
+    public HistoryView History => (HistoryView)HistoryControl;
     public CardCatalogView Catalog => (CardCatalogView)CatalogControl;
     public Task PendingAction { get; private set; } = Task.CompletedTask;
     public string Status => StatusText.Text ?? "";
-    public LibraryView(ClientLibrary library, CancellationToken lifetime = default) : base(new CardCatalogView(lifetime), new HistoryView(library, compact: true))
+    public LibraryView(ClientLibrary library, CancellationToken lifetime = default) : base(new CardCatalogView(lifetime), new HistoryView(library, new HistoryScope.Deck(null)))
     {
         _library = library;
         Catalog.ChangeCard += (card, change) =>
@@ -152,6 +153,7 @@ public sealed class LibraryView : DeckLibrarySurface
     private void RefreshSelected()
     {
         var deck = _library.State.Decks.FirstOrDefault(entry => entry.Id == _editing);
+        History.Select(new HistoryScope.Deck(deck?.Id));
         ShowSelected(deck is null ? LibrarySelection.Empty : LibrarySelection.NewSaved(Project(deck)));
     }
     private static LibraryDeckDisplay Project(DeckEntry deck) => new(
@@ -166,18 +168,42 @@ public sealed class LibraryView : DeckLibrarySurface
     }
 }
 
+public abstract record HistoryScope
+{
+    private HistoryScope() { }
+    public sealed record All : HistoryScope;
+    public sealed record Deck(string? Id) : HistoryScope;
+}
+
 public sealed class HistoryView : HistorySurface
 {
-    public HistoryView(ClientLibrary library, bool compact = false) : base(compact)
+    private readonly ClientLibrary _library;
+    private HistoryScope _scope;
+    public HistoryView(ClientLibrary library, HistoryScope scope) : base(scope is HistoryScope.Deck)
     {
-        void Refresh()
-        {
-            ShowSummary(library.State.Matches.Length, library.State.Matches.Count(match => match.Result == "Win"), library.State.Matches.Count(match => match.Result == "Loss"));
-            Matches.ItemsSource = library.State.Matches.Reverse().ToArray();
-        }
+        _library = library; _scope = scope;
         library.Changed += Refresh;
         Matches.ItemTemplate = new FuncDataTemplate<MatchRecord>((match, _) => match is null ? null :
             Row(match.Result, match.Mode, match.PlayerHero, match.OpponentHero, match.Turns, match.ObservedAt));
         Refresh();
+    }
+    public void Select(HistoryScope.Deck scope)
+    {
+        if (_scope == scope) return;
+        _scope = scope; Refresh();
+    }
+    private void Refresh()
+    {
+        var records = _scope switch
+        {
+            HistoryScope.All => _library.State.Matches,
+            HistoryScope.Deck { Id: { } id } => _library.State.Matches.Where(match => match.DeckId == id).ToArray(),
+            HistoryScope.Deck => [],
+            _ => throw new InvalidOperationException("Unknown history scope.")
+        };
+        ShowSummary(records.Length, records.Count(match => match.Result == "Win"), records.Count(match => match.Result == "Loss"));
+        ShowEmpty(_scope is HistoryScope.Deck { Id: null } ? "Select a saved deck to see its games."
+            : records.Length == 0 ? "No supplied games recorded." : "");
+        Matches.ItemsSource = records.Reverse().ToArray();
     }
 }
