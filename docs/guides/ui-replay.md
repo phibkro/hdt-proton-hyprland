@@ -82,28 +82,29 @@ input. Those remain distinct gates.
 ## Check the isolated compositor prerequisite
 
 The nested-Hyprland visual journey is not implemented yet. The bounded parent
-probe collects a private Weston registry and checks whether it can host the
-Aquamarine 0.15.1 Wayland backend. It does not start Hyprland, HDT or Hearthstone,
-capture overlay pixels, or drive the current desktop.
+probe collects an explicitly selected private parent's registry and checks
+whether it can host the Aquamarine 0.15.1 Wayland backend. It does not start
+Hyprland, HDT or Hearthstone, capture overlay pixels, or drive the current desktop.
 
 After checking machine headroom, supply the exact unprivileged Hyprland binary
 and one render node explicitly:
 
 ```sh
 devenv shell -- bash tests/replay/hyprland-probe.sh \
-  /nix/store/SELECTED-HYPRLAND/bin/Hyprland /dev/dri/renderD128
+  --parent weston /nix/store/SELECTED-HYPRLAND/bin/Hyprland /dev/dri/renderD128
 ```
 
 Replace the example binary path with the selected store executable. The probe
 requires its version report to identify Aquamarine 0.15.1; another backend needs
-its own source review. It runs Weston headless with a private home, runtime,
-display socket, network and process namespace. Only the selected render node is
+its own source review. It runs the selected parent headless with a private home,
+runtime, display socket, network and process namespace. Only the selected render node is
 exposed; it still shares the host GPU driver. No physical input devices or host
 display sockets are exposed. The 30-second supervisor retains evidence on failure.
 
-Inspect `parent-capabilities.json`, `parent-registry.txt`, `weston.log`,
-`compositor-version.json`, `source-sha256.txt` and `result.json` in the printed
-private evidence directory. The two executed scripts are copied and mounted
+Inspect `parent-capabilities.json`, `parent-registry.txt`, `parent-stderr.log`,
+`compositor-version.json`, `parent-version.txt`, `source-sha256.txt` and
+`result.json` in the printed private evidence directory. Weston also writes
+`weston.log`. The two executed scripts are copied and mounted
 read-only for the run. A nonzero result is a failed prerequisite, not a skipped
 visual test. A zero result establishes registry compatibility only; allocation,
 child rendering, capture and input still need separate executable checks.
@@ -142,18 +143,19 @@ Sway 1.12 and Cage 0.2.1 were also examined: their
 [Cage](https://github.com/cage-kiosk/cage/blob/v0.2.1/cage.c) shell initialization
 uses version 5, so those versions do not meet this backend's shell requirement.
 
-The next experiment should retain the existing private namespace and selected
-render node, replace only the parent, and collect its registry before starting
+Select the alternative parent explicitly with `--parent labwc`. The probe
+requires the reviewed labwc/wlroots version pair, retains the existing private
+namespace and selected render node, and collects its registry without starting
 any child compositor. The pinned
 [wlroots environment contract](https://gitlab.freedesktop.org/wlroots/wlroots/-/blob/0.20.2/docs/env_vars.md)
 supports `WLR_BACKENDS=headless`, `WLR_HEADLESS_OUTPUTS=1` and an explicit
-`WLR_RENDER_DRM_DEVICE`. Use an owned empty config directory, suppress activation
-environment updates with `LABWC_UPDATE_ACTIVATION_ENV=0`, and keep all host
-display, bus and input resources absent. The
+`WLR_RENDER_DRM_DEVICE`. The probe uses an owned empty config directory and
+session scripts, suppresses activation environment updates with
+`LABWC_UPDATE_ACTIVATION_ENV=0`, and keeps all host display, bus and input
+resources absent. The
 [labwc command contract](https://github.com/labwc/labwc/blob/0.20.2/docs/labwc.1.scd)
-provides a config-directory option and a session command whose exit terminates
-the compositor; the session can collect the registry and invoke the validator.
-Retain the existing timeout, exact-child cleanup and private evidence manifest.
+provides the config-directory option. The existing timeout, exact-child cleanup
+and private evidence manifest apply to both parents.
 
 Accept only actual registry success and a hardware renderer with usable DMA-BUF
 feedback. Render-node-only NVIDIA initialization may fail; exposing additional
