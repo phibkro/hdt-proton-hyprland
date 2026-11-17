@@ -368,6 +368,11 @@ try
     Check(editor.Decks.ItemCount == 2, "clearing search restores saved decks without rewriting the library");
     Click(deckAction);
     Fits(editor.NameBox, "minimum width top Deck action exposes selected name before helper scrolling");
+    Click(editor.OverviewButton);
+    Check(!editor.EditorPane.IsExpanded && editor.SelectedPanel.IsEffectivelyVisible,
+        "minimum width pointer overview restores the selected-deck edit control");
+    Click(editor.EditButton);
+    Fits(editor.NameBox, "minimum width Edit selected deck action exposes name before helper scrolling");
     Fill(editor.NotesBox, "Edited persistent notes");
     Click(editor.SaveButton); Wait(editor.PendingAction);
     Fits(editor.SaveButton, "minimum width save remains visible after pointer activation");

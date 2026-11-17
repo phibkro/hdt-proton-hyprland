@@ -22,7 +22,9 @@ its existing availability rules. Preserve the public shared-plugin compiler fixe
   library revision/deck count unchanged; retain rendered screenshots.
 - The same action while composing a new unsaved deck preserves its name/content.
 - With a saved selection, the actual top Deck action opens the existing name field
-  before the input helper can scroll it, including minimum width.
+  before the input helper can scroll it, including minimum width. At minimum width,
+  return with the actual overview control and repeat through Edit selected deck;
+  both entrypoints retain independent pointer coverage.
 - Existing rendered CRUD/search/import/export/archive/catalog/history and layout
   acceptance passes using the real Rust IO boundary. No new WPF, acquisition or
   desktop parity claim follows from native headless rendering.
