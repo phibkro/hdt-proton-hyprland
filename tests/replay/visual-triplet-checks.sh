@@ -7,6 +7,8 @@ chmod 700 "$run"
 magick -size 320x180 xc:'#303030' "$run/before.png"
 magick "$run/before.png" -fill navy -draw 'rectangle 80,60 240,120' "$run/shown.png"
 bash "$root/tests/replay/visual-triplet.sh" "$run/before.png" "$run/shown.png" "$run/before.png" "$run/positive"
+# The inclusive 161 by 61 rectangle must be counted as pixels, not color error.
+jq -e '.shownFraction* .pixels==9821 and .remainingFraction==0' "$run/positive/result.json" >/dev/null
 reject() {
     local status=0
     bash "$root/tests/replay/visual-triplet.sh" "$run/before.png" "$1" "$2" "$run/$3" || status=$?
