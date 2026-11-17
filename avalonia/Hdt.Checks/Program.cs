@@ -454,15 +454,70 @@ try
     Click(editor.SaveButton); Wait(editor.PendingAction);
     Check(window.Library.State.Decks.Last().Name == "Catalog-built native deck" && window.Library.State.Decks.Last().Content.Cards.Single() == new CardCount(777, 2)
         && window.Library.State.Decks.Last().Content.HeroDbfId == 637, "catalog-built deck persists through real Rust library transaction");
-    Fill(editor.SideboardsBox, "777 100 1");
+    const string savedSideboards = "777 100 1\n777 4294967294 99\n4294967295 4294967294 100";
+    Fill(editor.CardsBox, "777 2\n4294967295 1");
+    Fill(editor.SideboardsBox, savedSideboards);
     Click(editor.SaveButton); Wait(editor.PendingAction);
-    Check(window.Library.State.Decks.Last().Content.Sideboards.Single() == new SideboardCard(777, 100, 1),
-        "F# sideboard editor persists exact owner, card and multiplicity through Rust");
+    Check(window.Library.State.Decks.Last().Content.Sideboards.SequenceEqual(new[] {
+        new SideboardCard(777, 100, 1), new SideboardCard(777, 4294967294, 99), new SideboardCard(4294967295, 4294967294, 100) }),
+        "F# sideboard editor persists exact owners, card identities and large multiplicities through Rust");
     Click(editor.NewButton);
     Fill(editor.SearchBox, "Catalog-built native deck");
     Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single());
-    Check(editor.SideboardsBox.Text == "777 100 1" && editor.CardsBox.Text == "777 2" && editor.HeroBox.Text == "637" && editor.FormatBox.Text == "2",
+    Check(editor.SideboardsBox.Text == savedSideboards && editor.CardsBox.Text == "777 2\n4294967295 1" && editor.HeroBox.Text == "637" && editor.FormatBox.Text == "2",
         "F# editor reload projects saved sideboards, cards, hero and format after clearing unsaved fields");
+    Click(editor.OverviewButton);
+    StackPanel SideboardGroup(uint owner) => editor.SelectedPanel.GetVisualDescendants().OfType<StackPanel>()
+        .Single(panel => panel.Children.OfType<TextBlock>().Any(text => text.Text == $"SIDEBOARD • owner DBF {owner}"));
+    bool SideboardVisible() => editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text?.StartsWith("SIDEBOARD • owner DBF", StringComparison.Ordinal) == true);
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height; Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
+        Check(SideboardVisible(), $"{size.Width}: saved sideboards appear in the actual selected-deck overview");
+        Check(SideboardGroup(777).GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "99 × DBF 4294967294")
+            && SideboardGroup(uint.MaxValue).GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "100 × DBF 4294967294"),
+            $"{size.Width}: saved sideboards render exact copies separately under each actual owner");
+        Check(editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "MAGE • 3 cards\nHero DBF 637 • format 2"),
+            $"{size.Width}: main-deck count excludes sideboard copies");
+        foreach (var group in new[] { SideboardGroup(777), SideboardGroup(uint.MaxValue) })
+        {
+            Check(group.Bounds.Width > 0 && group.Bounds.Width <= editor.SelectedPanel.Bounds.Width,
+                $"{size.Width}: sideboard group remains within selected-deck column");
+            foreach (var label in group.GetVisualDescendants().OfType<TextBlock>())
+                Check(label.TextWrapping == global::Avalonia.Media.TextWrapping.Wrap && label.Bounds.Width <= group.Bounds.Width,
+                    $"{size.Width}: long sideboard identity and count labels wrap within their group");
+        }
+        Fits(editor.BrowserPanel, $"{size.Width}: sideboard overview keeps deck browser visible");
+        Fits(editor.GamesPanel, $"{size.Width}: sideboard overview keeps games visible");
+        Fits(editor.SelectedPanel, $"{size.Width}: sideboard overview keeps selected column visible");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-sideboards-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+    Click(editor.EditButton); Fill(editor.SideboardsBox, "777 100 2"); Click(editor.OverviewButton);
+    Check(SideboardGroup(777).GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "99 × DBF 4294967294"),
+        "unsaved sideboard edit cannot replace saved overview facts");
+    Click(editor.NewButton);
+    Check(!SideboardVisible(), "New clears prior sideboard owner groups and rows");
+    Fill(editor.SearchBox, "Native fixture deck");
+    Click(editor.Decks.GetVisualDescendants().OfType<ListBoxItem>().Single()); Click(editor.OverviewButton);
+    Check(!SideboardVisible() && editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "Native fixture deck"),
+        "selecting a saved deck without sideboards leaves no stale sideboard heading or rows");
+    Click(editor.NewButton); Fill(editor.NameBox, "Long sideboard fixture"); Fill(editor.HeroBox, "637"); Fill(editor.CardsBox, "777 1");
+    Fill(editor.SideboardsBox, string.Join('\n', Enumerable.Range(200, 25).Select(id => $"777 {id} 1")));
+    Click(editor.SaveButton); Wait(editor.PendingAction); Click(editor.OverviewButton);
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height; Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); window.CaptureRenderedFrame();
+        var selectedScroll = editor.SelectedPanel.GetVisualDescendants().OfType<ScrollViewer>().Single();
+        var pointer = editor.SelectedPanel.TranslatePoint(new Point(editor.SelectedPanel.Bounds.Width / 2, editor.SelectedPanel.Bounds.Height / 2), window)!.Value;
+        window.MouseMove(pointer); window.MouseWheel(pointer, new Vector(0, -100), RawInputModifiers.None); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame();
+        Check(selectedScroll.Offset.Y > 0 && SideboardGroup(777).GetVisualDescendants().OfType<TextBlock>().Count() == 26,
+            $"{size.Width}: actual wheel input scrolls all saved long-sideboard rows without losing entries");
+        Fits(SideboardGroup(777).GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == "1 × DBF 224"),
+            $"{size.Width}: final sideboard row is reachable through actual wheel input");
+        Fits(editor.BrowserPanel, $"{size.Width}: long sideboard cannot expand or overlap the deck browser");
+        Fits(editor.GamesPanel, $"{size.Width}: long sideboard cannot expand or overlap the games panel");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"layout-sideboards-long-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
     window.Close();
     var heroFrame = frames[0] with
     {

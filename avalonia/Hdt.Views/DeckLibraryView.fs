@@ -247,6 +247,13 @@ type DeckLibrarySurface(catalog: Control, history: Control) as this =
         panel.Children.AddRange(controls)
         panel
 
+    let cardRow (dbfId: uint32) (count: uint32) =
+        Border(
+            Background = TrackerLayout.Line,
+            Padding = Thickness(7.0, 5.0),
+            Child = TrackerLayout.Text($"{count} × DBF {dbfId}")
+        )
+
     do
         let tools = StackPanel(Spacing = 8.0)
         tools.Children.AddRange([ search; newDeck; archived; historyDeck ])
@@ -438,13 +445,19 @@ type DeckLibrarySurface(catalog: Control, history: Control) as this =
                     deck.Notes
 
             for card in deck.Cards do
-                cards.Children.Add(
-                    Border(
-                        Background = TrackerLayout.Line,
-                        Padding = Thickness(7.0, 5.0),
-                        Child = TrackerLayout.Text($"{card.Count} × DBF {card.DbfId}")
-                    )
-                )
+                cards.Children.Add(cardRow card.DbfId card.Count)
+
+            let sideboards =
+                deck.Sideboards |> List.groupBy (fun card -> card.OwnerDbfId) |> List.sortBy fst
+
+            for owner, entries in sideboards do
+                let group = StackPanel(Spacing = 3.0)
+                group.Children.Add(TrackerLayout.Text($"SIDEBOARD • owner DBF {owner}", 12.0))
+
+                for card in entries |> List.sortBy (fun card -> card.DbfId) do
+                    group.Children.Add(cardRow card.DbfId card.Count)
+
+                cards.Children.Add(group)
 
     static member DeckRow(name: string, heroClass: string, count: int64) =
         let row = StackPanel(Spacing = 4.0, Margin = Thickness(2.0, 5.0))
