@@ -8,6 +8,11 @@ in
   # alloca enables Clang LTO for an inherited literal CC=clang.
   env.CC = "${pkgs.stdenv.cc}/bin/cc";
   env.AR = "${pkgs.stdenv.cc.bintools}/bin/ar";
+  # Package setup hooks can replace CC after the Nix environment is assembled.
+  enterShell = ''
+    export CC="${config.env.CC}"
+    export AR="${config.env.AR}"
+  '';
   env.CARGO_HOME = "${config.devenv.root}/cache/cargo";
   env.CARGO_TARGET_DIR = "${config.devenv.root}/local/rust-target";
   env.REA_PROJECT = config.devenv.root;
