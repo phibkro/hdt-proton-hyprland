@@ -247,6 +247,19 @@ try
     Check(editor.SelectedPanel.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "No deck selected")
         && editor.SaveButton.IsEnabled == (window.Library.Ready && !window.Library.Busy),
         "empty F# library renders explicit empty selection with verified-storage availability");
+    var deckAction = window.GetVisualDescendants().OfType<Menu>().Single().Items.Cast<MenuItem>().Single(item => item.Header?.ToString() == "Deck");
+    var emptyRevision = window.Library.State.Revision;
+    foreach (var size in new[] { (Width: 1120, Height: 760), (Width: 800, Height: 600) })
+    {
+        window.Width = size.Width; window.Height = size.Height;
+        Click(deckAction);
+        Check(!editor.EditorPane.IsExpanded && editor.SelectedPanel.IsEffectivelyVisible
+            && editor.Status == "Select a saved deck before editing." && window.Library.State.Revision == emptyRevision
+            && window.Library.State.Decks.Length == 0, $"{size.Width}: top Deck requires a saved selection without opening or creating a deck");
+        Fits(editor.StatusText, $"{size.Width}: missing-selection instruction is visible");
+        window.CaptureRenderedFrame()?.Save(Path.Combine(evidence, $"deck-action-empty-{size.Width}.png"), global::Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+    window.Width = 1120; window.Height = 760;
     void Fill(TextBox box, string text)
     {
         Click(box);
@@ -261,6 +274,10 @@ try
     Click(editor.NewButton);
     Fits(editor.NameBox, "New action exposes the name field before input helper scrolling");
     Fill(editor.NameBox, "Native fixture deck");
+    Click(deckAction);
+    Check(editor.EditorPane.IsExpanded && editor.NameBox.Text == "Native fixture deck"
+        && window.Library.State.Revision == emptyRevision && editor.Status == "Select a saved deck before editing.",
+        "top Deck preserves a new unsaved deck instead of treating it as a saved selection");
     Fill(editor.ClassBox, "Mage");
     Fill(editor.HeroBox, "637");
     Fill(editor.CardsBox, "77 1\n100 2");
@@ -349,8 +366,8 @@ try
     Check(editor.Decks.ItemCount == 0, "deck browser search filters actual persisted decks");
     Fill(editor.SearchBox, "");
     Check(editor.Decks.ItemCount == 2, "clearing search restores saved decks without rewriting the library");
-    Click(editor.EditButton);
-    Fits(editor.NameBox, "minimum width Edit action exposes name before helper scrolling");
+    Click(deckAction);
+    Fits(editor.NameBox, "minimum width top Deck action exposes selected name before helper scrolling");
     Fill(editor.NotesBox, "Edited persistent notes");
     Click(editor.SaveButton); Wait(editor.PendingAction);
     Fits(editor.SaveButton, "minimum width save remains visible after pointer activation");

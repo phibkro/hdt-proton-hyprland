@@ -26,11 +26,13 @@ platform parity. The F# Arena display model and choice renderer are shared by
 Main and overlay; C# projects validated observations into that model without
 changing wire formats or treating unavailable advice as live ratings.
 
-The Options page, live-game view, Arena choice visuals and shared section layout live in the F# `Hdt.Views` library.
-The C# application supplies its Arena and native overlay controls plus explicit
-display paths; the F# library does not depend on the application or read game
-state. Other views and the observation contracts remain C#. The same rendered
-acceptance driver covers both languages. See the [migration slice](../docs/specs/native-fsharp-options.md).
+The Options page, live-game view, Arena choice visuals, deck library/editor,
+optional catalog, history rows and shared section layout live in the F#
+`Hdt.Views` library. C# controllers supply validated display projections, injected
+controls, event coordination and bounded IO; the F# library does not depend on
+the application or read game state. Observation contracts remain C#. The same
+rendered acceptance driver covers both languages. See the [deck-library migration](../docs/specs/fsharp-deck-library.md)
+and [Options migration](../docs/specs/native-fsharp-options.md).
 
 F# formatting uses pinned Fantomas; restore it once before committing:
 

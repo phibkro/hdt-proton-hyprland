@@ -91,7 +91,11 @@ public sealed class LibraryView : DeckLibrarySurface
         SearchBox.Text = "";
         ClearEditor(); OpenEditor(NameBox);
     }
-    public void EditSelected() => OpenEditor(NameBox);
+    public void EditSelected()
+    {
+        if (_editing is null) { StatusText.Text = "Select a saved deck before editing."; return; }
+        OpenEditor(NameBox);
+    }
     private void ClearEditor()
     {
         _creating = true; _editing = null; ClearInputs();

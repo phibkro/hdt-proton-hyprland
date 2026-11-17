@@ -319,3 +319,5 @@
 !docs/specs/shared-plugin-compiler.md
 
 !tests/cli/plugin-compiler.test.ts
+
+!/docs/specs/native-deck-menu-selection.md
