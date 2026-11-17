@@ -35,4 +35,14 @@ jq -e '.requirements[]|select(.interface=="zwp_linux_dmabuf_v1")|.observed==null
 reject "$run/empty"
 printf "interface: 'wl_seat', version: not-a-number, name: 1\n" >"$run/malformed"
 reject "$run/malformed"
-echo 'Wayland parent validator: minimum versions, duplicate, old, missing, empty and malformed cases passed.'
+jq -e '.malformedRecords==1' "$run/result" >/dev/null
+# A malformed record must fail even when all required globals also look valid.
+cat "$run/compatible" "$run/malformed" >"$run/mixed"
+reject "$run/mixed"
+jq -e '.malformedRecords==1 and all(.requirements[];.passed)' "$run/result" >/dev/null
+# Partial numeric tokens and missing record fields are malformed, not versions.
+sed 's/version:  9/version:  9oops/' "$run/compatible" >"$run/partial"
+reject "$run/partial"
+sed 's/, name: 5//' "$run/compatible" >"$run/truncated"
+reject "$run/truncated"
+echo 'Wayland parent validator: minimum versions, duplicate, old, missing, empty, malformed and mixed cases passed.'

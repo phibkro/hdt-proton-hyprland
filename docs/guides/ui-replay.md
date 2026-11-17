@@ -123,8 +123,44 @@ devenv shell -- bash tests/replay/wayland-parent-checks.sh
 ```
 
 These run in CI and cover minimum versions, padded output, duplicate globals,
-old versions, missing globals, empty input and malformed records. They test the
+old versions, missing globals, empty input and malformed records, including
+malformed records mixed with otherwise compatible globals. `malformedRecords`
+must be zero as well as every required version passing. They test the
 validator, not compositor compatibility or overlay rendering.
+
+### Next parent candidate
+
+The project-pinned labwc 0.20.2 and wlroots 0.20.2 are a source-compatible
+candidate, not a tested replacement for Weston. Labwc declares
+[xdg-shell 6](https://github.com/labwc/labwc/blob/0.20.2/src/xdg.c) and
+[compositor 6 and DMA-BUF 4](https://github.com/labwc/labwc/blob/0.20.2/src/server.c);
+the corresponding
+[wlroots seat implementation](https://gitlab.freedesktop.org/wlroots/wlroots/-/blob/0.20.2/types/seat/wlr_seat.c)
+declares seat 9. DMA-BUF advertisement still depends on the actual renderer.
+Sway 1.12 and Cage 0.2.1 were also examined: their
+[Sway](https://github.com/swaywm/sway/blob/1.12/sway/server.c) and
+[Cage](https://github.com/cage-kiosk/cage/blob/v0.2.1/cage.c) shell initialization
+uses version 5, so those versions do not meet this backend's shell requirement.
+
+The next experiment should retain the existing private namespace and selected
+render node, replace only the parent, and collect its registry before starting
+any child compositor. The pinned
+[wlroots environment contract](https://gitlab.freedesktop.org/wlroots/wlroots/-/blob/0.20.2/docs/env_vars.md)
+supports `WLR_BACKENDS=headless`, `WLR_HEADLESS_OUTPUTS=1` and an explicit
+`WLR_RENDER_DRM_DEVICE`. Use an owned empty config directory, suppress activation
+environment updates with `LABWC_UPDATE_ACTIVATION_ENV=0`, and keep all host
+display, bus and input resources absent. The
+[labwc command contract](https://github.com/labwc/labwc/blob/0.20.2/docs/labwc.1.scd)
+provides a config-directory option and a session command whose exit terminates
+the compositor; the session can collect the registry and invoke the validator.
+Retain the existing timeout, exact-child cleanup and private evidence manifest.
+
+Accept only actual registry success and a hardware renderer with usable DMA-BUF
+feedback. Render-node-only NVIDIA initialization may fail; exposing additional
+devices or forcing software rendering is not an approved fallback. A failure
+ends this experiment before Hyprland, WPF or input starts. No labwc experiment
+has been executed yet, and this investigation adds no support claim for labwc
+as an operator desktop.
 
 ## Capture original views
 
