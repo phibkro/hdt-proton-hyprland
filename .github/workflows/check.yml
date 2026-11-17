@@ -66,6 +66,9 @@ jobs:
       - name: Evaluate analyzer sentinels
         if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: nix develop --command bash scripts/evaluate.sh sentinels
+      - name: Test screen-pixel classifier and negative controls
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: nix develop --command bash tests/replay/visual-triplet-checks.sh
 
   rust-quality:
     needs: scope

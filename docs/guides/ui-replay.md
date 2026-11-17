@@ -34,7 +34,29 @@ If a project-owned seed already exists, add `--reuse` to validate its CLR and HD
 
 Each run creates a fresh prefix and app directory from the seed. The sequence opens Settings with native mouse input, enters the Arena lobby, alternates two synthetic offers across 12 decisions, returns to the menu, resizes the main window, shows and hides a WPF popup, and executes HDT's New command. The New command must open HDT's actual deck-type dialog. `transitions.jsonl` records each scene and its card models.
 
-The host checks card identities, displayed score text, actual plaque levels, visible particle emitters, panel visibility, Settings state, and dialog type. Screenshots support visual inspection. The test does not automatically prove pixel clearing after every popup.
+The host checks card identities, displayed score text, actual plaque levels, visible particle emitters, panel visibility, Settings state, and dialog type.
+
+The normal sequence also compares actual screen pixels before, during and after
+the original Settings flyout and the generic transparent popup. Each comparison
+uses the same 320×180 screen region within one run; no baseline is approved or
+updated automatically. At least 1% of pixels must change while shown. After
+closing, at most 0.1% may differ from the baseline, with ImageMagick's 2% color
+tolerance using its [PDC metric](https://imagemagick.org/command-line-options/#metric)
+(the count of differing pixels, rather than absolute color error). Inspect `settings-visual/result.json`, `popup-visual/result.json`, the
+three crops and difference images. A visibility flag alone cannot pass these
+checks. Missing images, different dimensions and image-processing errors fail.
+
+Run the classifier's positive and negative controls without HDT:
+
+```sh
+devenv shell -- bash tests/replay/visual-triplet-checks.sh
+```
+
+Those controls reject a never-visible popup, retained popup pixels and a white
+surface after closing. They validate the classifier, not WPF rendering. The
+replay establishes the actual WPF path separately. This first visual test does
+not cover HDT's real card-preview control, every popup, game-relative alignment,
+Hyprland stacking, Alt-Tab or live-game input. Those remain distinct gates.
 
 ## Capture original views
 

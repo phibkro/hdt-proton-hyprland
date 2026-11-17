@@ -6,6 +6,7 @@ with pkgs;
   coreutils
   git
   jq
+  imagemagick
   ripgrep
   util-linux
   bun

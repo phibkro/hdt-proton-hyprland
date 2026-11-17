@@ -198,6 +198,8 @@
 /tests/replay/*
 !/tests/replay/FlightRecorderChecks.cs
 !/tests/replay/portable-wpf.sh
+!/tests/replay/visual-triplet.sh
+!/tests/replay/visual-triplet-checks.sh
 !/tooling/
 /tooling/*
 !/tooling/net/
