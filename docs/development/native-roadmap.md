@@ -6,20 +6,16 @@ to define its acceptance. Keep the existing Proton patch usable during migration
 
 ## Choose the next bounded journey
 
-1. Finish selected-deck recorded history under `match-history`. Keep global Stats
-   global. Derive rows and summary from one selected-record projection. Test two
-   decks, unassociated records, empty selection, archive transitions, persistence,
-   and unsaved editor state with real pointer navigation.
-2. Complete account-free library gaps under `deck-metadata` and `deck-versions`.
+1. Complete account-free library gaps under `deck-metadata` and `deck-versions`.
    Give each operation its own save, cancel, restart, and association tests. Inspect
    original menu and selected-deck behavior before choosing the native layout.
-3. Strengthen the acquisition boundary under `match-detection` and `arena-phases`.
+2. Strengthen the acquisition boundary under `match-detection` and `arena-phases`.
    Keep raw event receipt, published observations, rating generation, and rendered
    state separately observable. Add independent acquisition before claiming an
    independently usable tracker.
-4. Expand the existing Arena journey under `arena-relations` and `arena-redraft`.
+3. Expand the existing Arena journey under `arena-relations` and `arena-redraft`.
    Define supported payloads first. Old advice must clear when a phase is unsupported.
-5. Add Battlegrounds journeys separately under `bg-selection`, `bg-minions`,
+4. Add Battlegrounds journeys separately under `bg-selection`, `bg-minions`,
    `bg-guides`, and `bg-combat`. Repeated open/close, mode changes, and stale-data
    clearing belong in each interactive panel's acceptance.
 
@@ -28,6 +24,9 @@ Acquisition and Arena presentation depend on explicit observation contracts.
 Authenticated advice depends on actual service authorization and entitlement.
 Native compositor parity depends on a working isolated compositor route.
 Do not block account-free user journeys on unrelated desktop infrastructure.
+The selected-deck history increment supplies a reusable account-free acceptance
+pattern under `match-history`: explicit global and deck scopes, one projection
+for rows and totals, persisted associations, and unsaved-edit protection.
 
 ## Make each change reviewable
 

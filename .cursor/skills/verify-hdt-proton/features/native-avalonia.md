@@ -88,6 +88,14 @@ unverified unless separately observed.
 
 ## Native library workflow
 
+The same rendered driver verifies selected-deck **My Games** at default and
+minimum widths. Two decks and an unassociated record distinguish filtered history
+from global **Stats**. Require correct rows and totals after pointer selection,
+an explicit no-selection prompt, an empty selected-deck state, and archive
+transitions. A fresh window must preserve persisted associations. Navigation
+must not change the library revision. Background history updates must preserve
+unsaved notes. Inspect `deck-history-1120.png` and `deck-history-800.png`.
+
 The rendered driver must create/edit a deck using real pointer/keyboard input,
 export the golden code, import as a second stable identity, change tracking
 selection, preserve notes on archive, and show a persisted supplied match.
