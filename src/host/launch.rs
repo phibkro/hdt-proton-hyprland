@@ -679,8 +679,8 @@ mod tests {
                 selected.controller_arguments("nonce"),
                 [OsString::from("nonce"), "123".into(), "42".into()]
             );
-            // Stale host values are overridden/removed explicitly; unrelated
-            // caller environment remains inherited (no env_clear).
+            // Inspect explicit child overrides/removal. The separate environment
+            // projection below does not test this Command's inheritance policy.
             let overrides: BTreeMap<_, _> = command.get_envs().collect();
             assert_eq!(
                 overrides.get(std::ffi::OsStr::new("DISPLAY")),

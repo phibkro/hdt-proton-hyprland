@@ -19,8 +19,10 @@ A numeric nsenter target still has a check-to-exec lifetime race; these checks
 reject observed replacement and do not claim an atomic kernel process handle.
 Tests use owned synthetic proc fixtures and command/environment projections:
 shared flags/target, stale host display/auth override, absent-auth removal,
-nonce and unrelated caller settings preserved, prefix/start identity rejection,
-and missing-display refusal. They do not establish actual Steam connectivity.
+nonce arguments, prefix/start identity rejection and missing-display refusal.
+An independent environment projection preserves unrelated synthetic settings;
+it does not test the original Command's inheritance policy or guard a future
+env_clear change. These checks do not establish actual Steam connectivity.
 Root owns real same-session X11 apply/restore, controller status/input and cleanup
 acceptance. This lane launches no live namespace/app/service actions.
 
