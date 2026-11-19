@@ -45,7 +45,7 @@ public sealed class TrackerApp : Avalonia.Application
 }
 
 [Activity(Label = "HDT Android", MainLauncher = true,
-    Theme = "@android:style/Theme.Material.NoActionBar",
+    Theme = "@style/Theme.AppCompat.NoActionBar",
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public sealed class MainActivity : AvaloniaMainActivity
 {
