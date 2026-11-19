@@ -27,7 +27,13 @@ public sealed class CaptureService : Service
     private const int NotificationId = 1;
     private const long SampleIntervalMs = 750;
     private const int MaxSampleEdge = 1280;
+#if HDT_ANDROID_FIXTURE
+    // Hosted emulator OCR has variable CPU latency. Real device builds keep the
+    // normal freshness budget; the fixture exercises recognition and UI state.
+    private const long MaxObservationAgeMs = 30_000;
+#else
     private const long MaxObservationAgeMs = 3_000;
+#endif
 
     private readonly Handler main = new(Looper.MainLooper!);
     private readonly CancellationTokenSource lifetime = new();

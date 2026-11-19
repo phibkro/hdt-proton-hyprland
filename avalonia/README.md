@@ -474,8 +474,9 @@ resuming, and stopping and restarting the session. Window state and screenshot O
 the expected text actually appeared over the fixture.
 
 The x86-64 Debug tracker uses an isolated app ID and a four-card fixture catalog
-to eliminate live data dependencies. The workflow uploads emulator evidence
-on failure. After the test passes, it builds and uploads the signed ARM64
+to eliminate live data dependencies. It allows a longer OCR freshness window
+for the hosted emulator's variable CPU latency. The phone build retains its
+three-second freshness window. The workflow uploads emulator evidence on failure. After the test passes, it builds and uploads the signed ARM64
 preview as a workflow artifact. Real Hearthstone and GrapheneOS acceptance
 remain manual on physical devices.
 
