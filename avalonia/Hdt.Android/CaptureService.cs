@@ -26,6 +26,7 @@ public sealed class CaptureService : Service
     private const string Channel = "tracking";
     private const int NotificationId = 1;
     private const long SampleIntervalMs = 750;
+    private const int MaxSampleEdge = 1280;
     private const long MaxObservationAgeMs = 3_000;
 
     private readonly Handler main = new(Looper.MainLooper!);
@@ -93,7 +94,7 @@ public sealed class CaptureService : Service
             width = bounds.Width();
             height = bounds.Height();
             reader = NewReader(width, height);
-            display = projection.CreateVirtualDisplay("HDT capture", width, height, density,
+            display = projection.CreateVirtualDisplay("HDT capture", reader.Width, reader.Height, density,
                 (DisplayFlags)VirtualDisplayFlags.AutoMirror, reader.Surface, null, main)
                 ?? throw new InvalidOperationException("Android could not start the capture display.");
 
@@ -183,7 +184,7 @@ public sealed class CaptureService : Service
             if (bitmap is null)
                 return;
             reading = true;
-            _ = ReadOffers(bitmap, width, height, viewportRevision, now);
+            _ = ReadOffers(bitmap, reader.Width, reader.Height, viewportRevision, now);
         }
         catch (Exception error)
         {
@@ -340,8 +341,14 @@ public sealed class CaptureService : Service
 
     private int Dp(int value) => (int)Math.Round(value * density / 160d);
 
-    private static ImageReader NewReader(int width, int height) =>
-        ImageReader.NewInstance(width, height, (ImageFormatType)Format.Rgba8888, 3);
+    private static ImageReader NewReader(int width, int height)
+    {
+        var longestEdge = Math.Max(width, height);
+        var scale = Math.Min(1d, (double)MaxSampleEdge / longestEdge);
+        var sampleWidth = Math.Max(1, (int)Math.Round(width * scale));
+        var sampleHeight = Math.Max(1, (int)Math.Round(height * scale));
+        return ImageReader.NewInstance(sampleWidth, sampleHeight, (ImageFormatType)Format.Rgba8888, 3);
+    }
 
     private void Resize(int newWidth, int newHeight)
     {
@@ -356,7 +363,7 @@ public sealed class CaptureService : Service
             reader = replacement;
             try
             {
-                display.Resize(newWidth, newHeight, density);
+                display.Resize(replacement.Width, replacement.Height, density);
                 display.Surface = replacement.Surface;
                 width = newWidth;
                 height = newHeight;
