@@ -7,9 +7,13 @@
     <ApplicationTitle>HDT Android</ApplicationTitle>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
-    <RuntimeIdentifier>android-arm64</RuntimeIdentifier>
+    <RuntimeIdentifiers Condition="'$(RuntimeIdentifier)' == ''">android-arm64;android-x64</RuntimeIdentifiers>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(HdtAndroidFixture)' == 'true' And '$(Configuration)' == 'Debug' And '$(RuntimeIdentifier)' == 'android-x64'">
+    <ApplicationId>org.phibkro.hdt.android.fixture</ApplicationId>
+    <DefineConstants>$(DefineConstants);HDT_ANDROID_FIXTURE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia.Android" Version="$(AvaloniaVersion)" />

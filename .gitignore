@@ -217,6 +217,7 @@
 # Reviewed native client additions; every source/fixture path is explicit.
 !/.cursor/skills/verify-hdt-proton/features/native-avalonia.md
 !/.github/workflows/avalonia.yml
+!/.github/workflows/android.yml
 !/avalonia/
 /avalonia/*
 !/avalonia/Directory.Build.props
@@ -227,6 +228,11 @@
 !/avalonia/Hdt.Android/CaptureService.cs
 !/avalonia/Hdt.Android/Hdt.Android.csproj
 !/avalonia/Hdt.Android/packages.lock.json
+!/avalonia/Hdt.Android.Fixture/
+/avalonia/Hdt.Android.Fixture/*
+!/avalonia/Hdt.Android.Fixture/FixtureActivity.cs
+!/avalonia/Hdt.Android.Fixture/Hdt.Android.Fixture.csproj
+!/avalonia/Hdt.Android.Fixture/packages.lock.json
 !/avalonia/Hdt.Avalonia/
 /avalonia/Hdt.Avalonia/*
 !/avalonia/Hdt.Avalonia/Arena.cs
@@ -277,3 +283,4 @@
 !/avalonia/Hdt.Avalonia/TrackerLayout.cs
 !/avalonia/Hdt.Avalonia/SettingsView.cs
 !/scripts/check-native-failure.sh
+!/scripts/check-android-overlay.py

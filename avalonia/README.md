@@ -448,7 +448,8 @@ Android SDK 36, and a JDK 21 installation:
 ```sh
 cd avalonia
 dotnet workload restore Hdt.Android/Hdt.Android.csproj
-dotnet build Hdt.Android/Hdt.Android.csproj -t:SignAndroidPackage -p:RestoreLockedMode=true
+dotnet restore Hdt.Android/Hdt.Android.csproj --locked-mode
+dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -t:SignAndroidPackage -r android-arm64
 adb install -r Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android-Signed.apk
 ```
 
@@ -461,3 +462,35 @@ again. In the Android picker, choose **A single app** and select Hearthstone.
 Verify the panel shows the three visible titles in order, clears when the draft
 or Hearthstone is hidden, and goes away after **Stop tracking** or when screen
 sharing ends.
+
+### Android regression checks
+
+The **Android overlay** workflow boots an API 36 x86-64 Android Virtual Device
+on a KVM-enabled GitHub runner. The separate draft fixture draws synthetic
+card titles and changes its first offer when tapped. The test uses the real
+tracker activity, Android app-sharing picker, capture service, OCR and overlay.
+It exercises canceled consent, offer order, touch pass-through, hiding and
+resuming, and stopping and restarting the session. Window state and screenshot OCR check that
+the expected text actually appeared over the fixture.
+
+The x86-64 Debug tracker uses an isolated app ID and a four-card fixture catalog
+to eliminate live data dependencies. The workflow uploads emulator evidence
+on failure. After the test passes, it builds and uploads the signed ARM64
+preview as a workflow artifact. Real Hearthstone and GrapheneOS acceptance
+remain manual on physical devices.
+
+To rerun the journey locally, boot an English API 36 x86-64 emulator. Install
+ImageMagick and Tesseract on the host, then run from the repository root:
+
+```sh
+cd avalonia
+dotnet restore Hdt.Android/Hdt.Android.csproj --locked-mode
+dotnet restore Hdt.Android.Fixture/Hdt.Android.Fixture.csproj --locked-mode
+dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -t:SignAndroidPackage \
+  -r android-x64 -p:HdtAndroidFixture=true
+dotnet build Hdt.Android.Fixture/Hdt.Android.Fixture.csproj --no-restore -t:SignAndroidPackage
+cd ..
+python3 scripts/check-android-overlay.py --evidence local/android-evidence \
+  avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.android.fixture-Signed.apk \
+  avalonia/Hdt.Android.Fixture/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.testarena-Signed.apk
+```

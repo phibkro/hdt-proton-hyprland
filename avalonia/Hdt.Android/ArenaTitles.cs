@@ -34,6 +34,16 @@ internal sealed partial class ArenaTitles(Dictionary<string, string> catalog)
         return new(cards);
     }
 
+#if HDT_ANDROID_FIXTURE
+    internal static ArenaTitles FixtureCatalog() => new(new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["fierywaraxe"] = "Fiery War Axe",
+        ["fireball"] = "Fireball",
+        ["leeroyjenkins"] = "Leeroy Jenkins",
+        ["kingkrush"] = "King Krush",
+    });
+#endif
+
     internal string[] ReadOffers(IEnumerable<ScreenLine> lines, int width, int height)
     {
         if (width <= height)

@@ -131,7 +131,11 @@ public sealed class CaptureService : Service
     {
         try
         {
+#if HDT_ANDROID_FIXTURE
+            var catalog = ArenaTitles.FixtureCatalog();
+#else
             var catalog = await ArenaTitles.Load(cancellationToken).ConfigureAwait(false);
+#endif
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -305,6 +309,7 @@ public sealed class CaptureService : Service
                 Y = Dp(24),
                 Alpha = 0.75f
             };
+            layout.Title = "HDT Arena overlay";
             try
             {
                 windows!.AddView(text, layout);

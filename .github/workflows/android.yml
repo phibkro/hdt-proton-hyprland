@@ -1,0 +1,100 @@
+name: Android overlay
+
+on:
+  push:
+    branches: [main, feat/avalonia-ui]
+  pull_request:
+    branches: [main, feat/avalonia-ui]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-overlay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-overlay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: avalonia/global.json
+      - name: Select JDK 21 and enable KVM on this runner
+        run: |
+          test -x "$JAVA_HOME_21_X64/bin/javac"
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          test -c /dev/kvm
+          sudo chown "$USER" /dev/kvm
+          sudo chmod u+rw /dev/kvm
+      - name: Install Android SDK and screenshot OCR tools
+        run: |
+          sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0' \
+            'emulator' 'system-images;android-36;google_apis;x86_64'
+          sudo apt-get update
+          sudo apt-get install -y imagemagick tesseract-ocr
+      - name: Restore locked Android projects
+        working-directory: avalonia
+        run: |
+          dotnet workload restore Hdt.Android/Hdt.Android.csproj --skip-manifest-update
+          dotnet restore Hdt.Android/Hdt.Android.csproj --locked-mode
+          dotnet restore Hdt.Android.Fixture/Hdt.Android.Fixture.csproj --locked-mode
+      - name: Build emulator tracker and draft fixture
+        working-directory: avalonia
+        run: |
+          dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -t:SignAndroidPackage \
+            -r android-x64 -p:HdtAndroidFixture=true
+          dotnet build Hdt.Android.Fixture/Hdt.Android.Fixture.csproj --no-restore -t:SignAndroidPackage
+      - name: Exercise the real Android capture and overlay
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/android-evidence"
+          mkdir -p "$evidence"
+          sdk="${ANDROID_HOME:?}"
+          avd=hdt-ci-api36
+          serial=emulator-5554
+          "$sdk/emulator/emulator" -accel-check
+          printf 'no\n' | avdmanager create avd --name "$avd" --device pixel_8 \
+            --package 'system-images;android-36;google_apis;x86_64'
+          adb start-server
+          "$sdk/emulator/emulator" -avd "$avd" -port 5554 -accel on -no-window -no-audio \
+            -no-boot-anim -no-snapshot -gpu swiftshader -cores 2 -memory 3072 \
+            > "$evidence/emulator.log" 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          export HDT_EMULATOR_SERIAL="$serial"
+          timeout 240 bash -c '
+            adb -s "$HDT_EMULATOR_SERIAL" wait-for-device
+            until [[ $(adb -s "$HDT_EMULATOR_SERIAL" shell getprop sys.boot_completed | tr -d "\r") == 1 ]]; do
+              sleep 2
+            done
+          '
+          python3 scripts/check-android-overlay.py --serial "$serial" --evidence "$evidence" \
+            avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.android.fixture-Signed.apk \
+            avalonia/Hdt.Android.Fixture/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.testarena-Signed.apk
+      - name: Upload emulator diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-overlay-diagnostics
+          path: ${{ runner.temp }}/android-evidence/
+          if-no-files-found: ignore
+      - name: Build and verify ARM64 device preview
+        working-directory: avalonia
+        run: |
+          dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -t:SignAndroidPackage -r android-arm64
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
+            Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android-Signed.apk
+      - name: Upload ARM64 preview after regression checks
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hdt-android-arm64-preview
+          path: avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android-Signed.apk
+          if-no-files-found: error
