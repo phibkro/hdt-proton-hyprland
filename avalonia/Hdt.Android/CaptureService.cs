@@ -49,6 +49,9 @@ public sealed class CaptureService : Service
     private long lastReadAt;
     private long lastFrameTimestamp = -1;
     private string[] previous = [];
+#if HDT_ANDROID_FIXTURE
+    private int fixtureDiagnosticReads;
+#endif
 
     public override IBinder? OnBind(Intent? intent) => null;
 
@@ -253,8 +256,18 @@ public sealed class CaptureService : Service
                         using var box = line.BoundingBox;
                         return box is null ? default : new ScreenLine(line.Text, box.CenterX(), box.CenterY());
                     })
-                    .Where(line => line.Text is not null);
+                    .Where(line => line.Text is not null)
+                    .ToArray();
                 offers = titles!.ReadOffers(lines, frameWidth, frameHeight);
+#if HDT_ANDROID_FIXTURE
+                if (Interlocked.Increment(ref fixtureDiagnosticReads) <= 8)
+                {
+                    var elapsed = SystemClock.ElapsedRealtime() - capturedAt;
+                    var recognized = string.Join(" | ", lines.Select(line => $"{line.Text} at {line.X},{line.Y}"));
+                    global::Android.Util.Log.Info("HdtAndroid",
+                        $"Fixture OCR {elapsed} ms, {frameWidth}x{frameHeight}: {recognized}; matched {offers.Length}");
+                }
+#endif
             }
         }
         catch (Exception error)

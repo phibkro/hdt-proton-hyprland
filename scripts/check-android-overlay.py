@@ -243,9 +243,12 @@ def main():
     try:
         device.run(args.tracker, args.draft)
     except Exception:
+        device.screen()
         crash = device.adb("logcat", "-d", "-b", "crash", check=False).stdout
         if crash:
             print(crash.decode(errors="replace"), flush=True)
+        tracker_log = device.adb("logcat", "-d", "-s", "HdtAndroid", check=False).stdout
+        print(tracker_log.decode(errors="replace"), flush=True)
         (args.evidence / "windows.txt").write_bytes(device.adb("shell", "dumpsys", "window", "windows", check=False).stdout)
         raise
     finally:
