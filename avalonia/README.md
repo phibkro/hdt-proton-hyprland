@@ -518,8 +518,9 @@ because each source and presentation has a different acceptance boundary.
 The Android workflow can publish a GitHub prerelease with a standalone
 `hdt-android-arm64.apk` after the emulator checks pass. Obtainium tracks
 `https://github.com/phibkro/hdt-proton-hyprland` as a GitHub source. Enable
-**Include prereleases**, filter release tags with `^android-v` and use the
-`hdt-android-arm64.apk` asset.
+**Include prereleases** and set **Filter release titles by regex** to
+`^Android preview `. The release has one installable asset,
+`hdt-android-arm64.apk`.
 
 The release path uses an owner-controlled signing key. Back up the key and use
 it for every preview update. From an authenticated GitHub CLI on a trusted

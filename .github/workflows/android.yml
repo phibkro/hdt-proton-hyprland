@@ -144,7 +144,7 @@ jobs:
         run: |
           dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -c Release -t:PackageForAndroid \
             -r android-arm64 -p:PublishTrimmed=false -p:RunAOTCompilation=false -p:ApplicationVersion="$((GITHUB_RUN_NUMBER + 1))" \
-            -p:ApplicationDisplayVersion="0.1.$GITHUB_RUN_NUMBER"
+            -p:ApplicationDisplayVersion="android-v0.1.$GITHUB_RUN_NUMBER"
       - name: Sign and verify the Obtainium APK
         id: sign-release
         if: steps.release-key.outputs.configured == 'true'
