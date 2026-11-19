@@ -40,20 +40,25 @@ class Device:
         self.evidence = evidence
 
     def adb(self, *arguments, check=True):
-        return subprocess.run(
+        result = subprocess.run(
             ["adb", "-s", self.serial, *map(str, arguments)],
             capture_output=True,
-            check=check,
             timeout=100,
         )
+        if check and result.returncode:
+            details = (result.stdout + result.stderr).decode(errors="replace").strip()
+            raise RuntimeError(f"adb {' '.join(map(str, arguments))} failed: {details}")
+        return result
 
     def launch(self, package):
+        launcher = ("-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER")
         result = self.adb(
-            "shell", "am", "start", "-W", "-a", "android.intent.action.MAIN",
-            "-c", "android.intent.category.LAUNCHER", package,
+            "shell", "cmd", "package", "query-activities", "--components", *launcher, "-p", package,
         ).stdout.decode()
-        if "Error:" in result:
-            raise AssertionError(result)
+        components = [line.strip() for line in result.splitlines() if line.strip().startswith(f"{package}/")]
+        if len(components) != 1:
+            raise AssertionError(f"Expected one launcher activity for {package}: {result}")
+        self.adb("shell", "am", "start", "-W", *launcher, "-n", components[0])
 
     def tree(self):
         remote = "/data/local/tmp/hdt-overlay.xml"
@@ -180,6 +185,7 @@ class Device:
         self.adb("shell", "appops", "set", TRACKER, "SYSTEM_ALERT_WINDOW", "allow")
         self.launch(DRAFT)
         self.launch(TRACKER)
+        print("Checking canceled Android screen sharing", flush=True)
         tracker_ui = {"package": TRACKER, "fallback": True}
         self.click(("Start tracking",), **tracker_ui)
         wait_for("Screen sharing dialog did not open", lambda: self.find(
@@ -189,6 +195,7 @@ class Device:
             ("Screen sharing was canceled.",), **tracker_ui))
 
         self.click(("Start tracking",), **tracker_ui)
+        print("Selecting the synthetic draft in the Android app picker", flush=True)
         self.consent()
         print("Confirming rendered overlay above the draft", flush=True)
         point = self.expect_overlay(ORIGINAL)
