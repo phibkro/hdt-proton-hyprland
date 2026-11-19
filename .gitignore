@@ -220,6 +220,13 @@
 !/avalonia/
 /avalonia/*
 !/avalonia/Directory.Build.props
+!/avalonia/Hdt.Android/
+/avalonia/Hdt.Android/*
+!/avalonia/Hdt.Android/AndroidApp.cs
+!/avalonia/Hdt.Android/ArenaTitles.cs
+!/avalonia/Hdt.Android/CaptureService.cs
+!/avalonia/Hdt.Android/Hdt.Android.csproj
+!/avalonia/Hdt.Android/packages.lock.json
 !/avalonia/Hdt.Avalonia/
 /avalonia/Hdt.Avalonia/*
 !/avalonia/Hdt.Avalonia/Arena.cs

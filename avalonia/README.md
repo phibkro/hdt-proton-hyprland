@@ -431,3 +431,33 @@ copyright with all rights reserved; its website's CC0 notice does not license
 that data. This client reads supplied runtime files and distributes none of
 those files, card text or artwork. See the provider's
 [copyright notice](https://hearthstonejson.com/docs/cards.html).
+
+## Android Arena overlay preview
+
+The Android project opens a standalone Avalonia app. With the user's screen-sharing
+consent, an Android foreground service samples Hearthstone and opens a small,
+non-interactive overlay. On-device OCR looks for three recognized English card
+titles in a row and shows them after two matching reads. Ambiguous reads and stale
+offers clear the panel. This first slice shows offer names for a regular draft,
+with no ratings, pick history, or deck tracking. It fetches the English collectible
+card catalog directly from HearthstoneJSON at session start.
+
+Build an ARM64 APK with the pinned .NET SDK, the .NET Android workload,
+Android SDK 36, and a JDK 21 installation:
+
+```sh
+cd avalonia
+dotnet workload restore Hdt.Android/Hdt.Android.csproj
+dotnet build Hdt.Android/Hdt.Android.csproj -t:SignAndroidPackage -p:RestoreLockedMode=true
+adb install -r Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android-Signed.apk
+```
+
+Set `AndroidSdkDirectory` and `JavaSdkDirectory` as MSBuild properties if the SDK
+and JDK are in custom locations. The app requires Android 14 or later.
+
+On the phone, open an English-language Arena draft, open HDT Android, and tap
+**Start tracking**. Grant **Display over other apps**, then tap **Start tracking**
+again. In the Android picker, choose **A single app** and select Hearthstone.
+Verify the panel shows the three visible titles in order, clears when the draft
+or Hearthstone is hidden, and goes away after **Stop tracking** or when screen
+sharing ends.
