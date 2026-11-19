@@ -17,6 +17,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../Hdt.Avalonia/Arena.cs" Link="Shared/Arena.cs" />
+    <Compile Include="../Hdt.Avalonia/NativeObservation.cs" Link="Shared/NativeObservation.cs" />
+    <Compile Include="../Hdt.Avalonia/MatchRecord.cs" Link="Shared/MatchRecord.cs" />
+    <Compile Include="../Hdt.Avalonia/TrackerLayout.cs" Link="Shared/TrackerLayout.cs" />
     <EmbeddedResource Include="../fixtures/draft.json" LogicalName="Hdt.Mobile.DraftReplay.json" />
     <PackageReference Include="Avalonia.Android" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />

@@ -143,7 +143,7 @@ jobs:
         working-directory: avalonia
         run: |
           dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -c Release -t:PackageForAndroid \
-            -r android-arm64 -p:ApplicationVersion="$((GITHUB_RUN_NUMBER + 1))" \
+            -r android-arm64 -p:PublishTrimmed=false -p:RunAOTCompilation=false -p:ApplicationVersion="$((GITHUB_RUN_NUMBER + 1))" \
             -p:ApplicationDisplayVersion="0.1.$GITHUB_RUN_NUMBER"
       - name: Sign and verify the Obtainium APK
         id: sign-release
@@ -220,5 +220,5 @@ jobs:
           else
             gh release create "$tag" hdt-android-arm64.apk --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease --title "Android preview 0.1.$GITHUB_RUN_NUMBER" \
-              --notes 'ARM64 test preview. Includes the Arena demo and live English Arena offer OCR.'
+              --notes 'ARM64 test preview. Includes Arena and match demos and live English Arena offer OCR.'
           fi

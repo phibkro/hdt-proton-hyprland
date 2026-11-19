@@ -204,6 +204,17 @@ class Device:
         self.click(("Rewind",), **tracker_ui)
         wait_for("Arena demo did not rewind", lambda: self.find(
             ("No picks yet",), **tracker_ui))
+        self.click(("Match demo",), **tracker_ui)
+        wait_for("Match demo did not show the constructed deck", lambda: self.find(
+            ("Observed remaining deck",), **tracker_ui))
+        self.click(("Battlegrounds sample",), **tracker_ui)
+        wait_for("Match demo did not switch to Battlegrounds", lambda: self.find(
+            ("Battlegrounds sample observation",), **tracker_ui))
+        if self.find(("Observed remaining deck",), **tracker_ui):
+            raise AssertionError("Battlegrounds kept the constructed deck panel")
+        self.click(("Menu sample",), **tracker_ui)
+        wait_for("Match demo did not switch to the menu", lambda: self.find(
+            ("Menu sample observation",), **tracker_ui))
         self.click(("Live tracker",), **tracker_ui)
 
         print("Checking canceled Android screen sharing", flush=True)

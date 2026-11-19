@@ -116,8 +116,8 @@ public sealed class MainActivity : AvaloniaMainActivity
 
     internal void StopTracking()
     {
-        using var intent = new Intent(this, typeof(CaptureService));
-        StopService(intent);
+        using var intent = new Intent(this, typeof(CaptureService)).SetAction(CaptureService.StopAction);
+        StartService(intent);
     }
 }
 
@@ -160,10 +160,12 @@ internal sealed class TrackerView : UserControl
 
         Content = new TabControl
         {
+            SelectedIndex = 0,
             Items =
             {
                 new TabItem { Header = "Live tracker", Content = tracking },
                 new TabItem { Header = "Arena demo", Content = new ArenaDemoView() },
+                new TabItem { Header = "Match demo", Content = new MatchDemoView() },
             },
         };
 

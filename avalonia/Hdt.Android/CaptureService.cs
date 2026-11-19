@@ -22,7 +22,7 @@ namespace Hdt.Mobile;
 public sealed class CaptureService : Service
 {
     internal const string ConsentExtra = "capture-consent";
-    private const string StopAction = "org.phibkro.hdt.android.STOP";
+    internal const string StopAction = "org.phibkro.hdt.android.STOP";
     private const string Channel = "tracking";
     private const int NotificationId = 1;
     private const long SampleIntervalMs = 750;

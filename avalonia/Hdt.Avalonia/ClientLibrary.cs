@@ -9,11 +9,6 @@ public sealed record DeckEntry(string Id, string Name, string HeroClass, DeckCon
 {
     public override string ToString() => $"{Name} • {HeroClass} • {Content.Cards.Sum(card => (long)card.Count)} cards";
 }
-public sealed record MatchRecord(string Id, string? DeckId, string ObservedAt, string Mode, string Result,
-    string PlayerHero, string OpponentHero, uint Turns, byte? Placement, string Notes)
-{
-    public override string ToString() => $"{ObservedAt} • {Mode} • {Result} • {PlayerHero} vs {OpponentHero} • {Turns} turns";
-}
 public sealed record ClientState(byte SchemaVersion, ulong Revision, string? SelectedDeckId, DeckEntry[] Decks, MatchRecord[] Matches);
 public sealed record DeckExport(string Code, string Name);
 

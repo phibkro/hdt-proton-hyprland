@@ -507,8 +507,10 @@ because each source and presentation has a different acceptance boundary.
 | Arena replay and options | **Arena demo** advances and rewinds the bundled draft, shows picks, sample ratings and synergies, and remembers the two display preferences. |
 | Overlay preview | The demo renders the title panel in the app and shows when it would be hidden. It uses the same title formatting as the live Android panel. |
 | Live Arena overlay | Reads three English offer names and follows the shared app's visibility. Real Hearthstone recognition, freshness and placement need phone testing. |
-| Deck library, import/export, match history, statistics and constructed views | Remain desktop features. |
-| Battlegrounds and other auxiliary overlays | Missing from the Android preview. |
+| Constructed, Battlegrounds and menu | **Match demo** uses the desktop observation view in a phone layout. It shows public cards and counts, handles unknown values, and demonstrates switching modes and clearing obsolete state. |
+| Match history and basic statistics | **Match demo** shows sample results, placement and totals. Phone capture and persistence are pending. |
+| Deck library and import/export | Remain desktop features. |
+| Battlegrounds and other auxiliary overlays | Match observations are demoable in-app. System overlays, advice and combat simulation are pending. |
 | Account, collection, replay upload and online advice | Missing from the Android preview. |
 
 ### Obtainium preview channel
