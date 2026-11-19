@@ -72,22 +72,33 @@ jobs:
           sdk="${ANDROID_HOME:?}"
           avd=hdt-ci-api36
           serial=emulator-5554
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/hdt-avds"
+          mkdir -p "$ANDROID_AVD_HOME"
           "$sdk/emulator/emulator" -accel-check
-          printf 'no\n' | avdmanager create avd --name "$avd" \
-            --package 'system-images;android-36;google_apis;x86_64'
+          printf 'no\n' | "$sdk/cmdline-tools/latest/bin/avdmanager" create avd --name "$avd" \
+            --path "$ANDROID_AVD_HOME/$avd.avd" --package 'system-images;android-36;google_apis;x86_64'
+          "$sdk/emulator/emulator" -list-avds | grep -Fx "$avd"
+          sed -i -e 's/^hw.lcd.width=.*/hw.lcd.width=1080/' \
+            -e 's/^hw.lcd.height=.*/hw.lcd.height=2160/' \
+            -e 's/^hw.lcd.density=.*/hw.lcd.density=360/' "$ANDROID_AVD_HOME/$avd.avd/config.ini"
           adb start-server
           "$sdk/emulator/emulator" -avd "$avd" -port 5554 -accel on -no-window -no-audio \
             -no-boot-anim -no-snapshot -gpu swiftshader -cores 2 -memory 3072 \
             > "$evidence/emulator.log" 2>&1 &
           emulator_pid=$!
-          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
-          export HDT_EMULATOR_SERIAL="$serial"
-          timeout 240 bash -c '
-            adb -s "$HDT_EMULATOR_SERIAL" wait-for-device
-            until [[ $(adb -s "$HDT_EMULATOR_SERIAL" shell getprop sys.boot_completed | tr -d "\r") == 1 ]]; do
-              sleep 2
-            done
-          '
+          finish() {
+            status=$?
+            if [[ $status != 0 ]]; then tail -40 "$evidence/emulator.log"; fi
+            kill "$emulator_pid" 2>/dev/null || true
+          }
+          trap finish EXIT
+          for attempt in $(seq 1 120); do
+            kill -0 "$emulator_pid"
+            boot=$(timeout 2 adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+            if [[ "$boot" == 1 ]]; then break; fi
+            sleep 2
+          done
+          test "$boot" = 1
           python3 scripts/check-android-overlay.py --serial "$serial" --evidence "$evidence" \
             avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.android.fixture-Signed.apk \
             avalonia/Hdt.Android.Fixture/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.testarena-Signed.apk
