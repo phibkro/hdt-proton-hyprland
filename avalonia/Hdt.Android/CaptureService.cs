@@ -99,8 +99,11 @@ public sealed class CaptureService : Service
             using var bounds = windows.MaximumWindowMetrics.Bounds;
             width = bounds.Width();
             height = bounds.Height();
-            reader = NewReader(width, height);
-            display = projection.CreateVirtualDisplay("HDT capture", reader.Width, reader.Height, density,
+            // Keep one surface across rotation. The projection centers its
+            // aspect-fit image in this square; OCR reads only that image.
+            var edge = Math.Min(MaxSampleEdge, Math.Max(width, height));
+            reader = ImageReader.NewInstance(edge, edge, (ImageFormatType)Format.Rgba8888, 3);
+            display = projection.CreateVirtualDisplay("HDT capture", edge, edge, density,
                 (DisplayFlags)VirtualDisplayFlags.AutoMirror, reader.Surface, null, main)
                 ?? throw new InvalidOperationException("Android could not start the capture display.");
 
@@ -190,7 +193,7 @@ public sealed class CaptureService : Service
             if (bitmap is null)
                 return;
             reading = true;
-            _ = ReadOffers(bitmap, reader.Width, reader.Height, viewportRevision, now);
+            _ = ReadOffers(bitmap, reader.Width, reader.Height, width, height, viewportRevision, now);
         }
         catch (Exception error)
         {
@@ -245,13 +248,19 @@ public sealed class CaptureService : Service
         }
     }
 
-    private async Task ReadOffers(Bitmap bitmap, int frameWidth, int frameHeight, int revision, long capturedAt)
+    private async Task ReadOffers(Bitmap bitmap, int surfaceWidth, int surfaceHeight,
+        int contentWidth, int contentHeight, int revision, long capturedAt)
     {
+        var scale = Math.Min((double)surfaceWidth / contentWidth, (double)surfaceHeight / contentHeight);
+        var frameWidth = Math.Max(1, (int)Math.Round(contentWidth * scale));
+        var frameHeight = Math.Max(1, (int)Math.Round(contentHeight * scale));
         string[] offers = [];
         try
         {
             using (bitmap)
-            using (var input = InputImage.FromBitmap(bitmap, 0))
+            using (var fitted = Bitmap.CreateBitmap(bitmap, (surfaceWidth - frameWidth) / 2,
+                (surfaceHeight - frameHeight) / 2, frameWidth, frameHeight))
+            using (var input = InputImage.FromBitmap(fitted, 0))
             using (var task = recognizer!.Process(input))
             {
                 using var completion = new RecognitionCompletion();
@@ -347,44 +356,16 @@ public sealed class CaptureService : Service
 
     private int Dp(int value) => (int)Math.Round(value * density / 160d);
 
-    private static ImageReader NewReader(int width, int height)
-    {
-        var longestEdge = Math.Max(width, height);
-        var scale = Math.Min(1d, (double)MaxSampleEdge / longestEdge);
-        var sampleWidth = Math.Max(1, (int)Math.Round(width * scale));
-        var sampleHeight = Math.Max(1, (int)Math.Round(height * scale));
-        return ImageReader.NewInstance(sampleWidth, sampleHeight, (ImageFormatType)Format.Rgba8888, 3);
-    }
-
     private void Resize(int newWidth, int newHeight)
     {
-        if (display is null || (newWidth == width && newHeight == height))
+        if (display is null || newWidth <= 0 || newHeight <= 0
+            || (newWidth == width && newHeight == height))
             return;
+
+        width = newWidth;
+        height = newHeight;
         viewportRevision++;
         ClearOffers("Waiting for the resized Hearthstone view…");
-        try
-        {
-            var replacement = NewReader(newWidth, newHeight);
-            var oldReader = reader;
-            reader = replacement;
-            try
-            {
-                display.Resize(replacement.Width, replacement.Height, density);
-                display.Surface = replacement.Surface;
-                width = newWidth;
-                height = newHeight;
-                lastFrameTimestamp = -1;
-            }
-            finally
-            {
-                oldReader?.Close();
-                oldReader?.Dispose();
-            }
-        }
-        catch (Exception error)
-        {
-            Fail("Could not resize screen capture.", error);
-        }
     }
 
     private void SetVisibility(bool isVisible)
