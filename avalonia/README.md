@@ -495,3 +495,45 @@ python3 scripts/check-android-overlay.py --evidence local/android-evidence \
   avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.android.fixture-Signed.apk \
   avalonia/Hdt.Android.Fixture/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.testarena-Signed.apk
 ```
+
+### Android feature coverage
+
+The [upstream parity ledger](https://github.com/phibkro/hdt-proton-hyprland/blob/docs/hdt-feature-parity/docs/reference/hdt-feature-parity.md)
+tracks desktop HDT user journeys. Android coverage is tracked by workflow
+because each source and presentation has a different acceptance boundary.
+
+| Main window or overlay area | Android test coverage |
+|---|---|
+| Arena replay and options | **Arena demo** advances and rewinds the bundled draft, shows picks, sample ratings and synergies, and remembers the two display preferences. |
+| Overlay preview | The demo renders the title panel in the app and shows when it would be hidden. It uses the same title formatting as the live Android panel. |
+| Live Arena overlay | Reads three English offer names and follows the shared app's visibility. Real Hearthstone recognition, freshness and placement need phone testing. |
+| Deck library, import/export, match history, statistics and constructed views | Remain desktop features. |
+| Battlegrounds and other auxiliary overlays | Missing from the Android preview. |
+| Account, collection, replay upload and online advice | Missing from the Android preview. |
+
+### Obtainium preview channel
+
+The Android workflow can publish a GitHub prerelease with a standalone
+`hdt-android-arm64.apk` after the emulator checks pass. Obtainium tracks
+`https://github.com/phibkro/hdt-proton-hyprland` as a GitHub source. Enable
+**Include prereleases**, filter release tags with `^android-v` and use the
+`hdt-android-arm64.apk` asset.
+
+The release path uses an owner-controlled signing key. Back up the key and use
+it for every preview update. From an authenticated GitHub CLI on a trusted
+machine, create or provide a PKCS#12 keystore with alias `hdt-android` and use
+the same password for the store and key:
+
+```sh
+keytool -genkeypair -alias hdt-android -keyalg RSA -keysize 3072 \
+  -validity 10000 -storetype PKCS12 -keystore hdt-android.p12
+base64 -w0 hdt-android.p12 | gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 \
+  --repo phibkro/hdt-proton-hyprland
+gh secret set ANDROID_SIGNING_PASSWORD --repo phibkro/hdt-proton-hyprland
+```
+
+A push to `feat/avalonia-ui` or `main` then exercises checks, packages and signs
+the release APK, checks signer continuity against the prior preview, and
+publishes the asset. Until the signing secrets are present, Actions still
+provides its debug-signed sideload artifact. A previously installed debug
+APK may need to be uninstalled once before switching to the release signer.

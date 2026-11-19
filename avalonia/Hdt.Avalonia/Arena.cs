@@ -35,20 +35,8 @@ public enum ArenaMode { Inactive, Drafting }
 public sealed record ArenaObservation(int SchemaVersion, string SessionId, DateTimeOffset ObservedAt,
     int Sequence, ArenaMode Mode, int PickIndex, string? SelectedCardId, string Hero, bool Underground,
     ArenaCard[] PickedDeck, ArenaOffer[] Offers, string Description);
-public interface IArenaObservationSource
+public static class ArenaReplay
 {
-    string Description { get; }
-    Task<IReadOnlyList<ArenaObservation>> ReadAsync(CancellationToken cancellation = default);
-}
-public sealed class ReplaySource(string path) : IArenaObservationSource
-{
-    public string Description => "Replay file • no live game connection";
-    public async Task<IReadOnlyList<ArenaObservation>> ReadAsync(CancellationToken cancellation = default)
-    {
-        var frames = await SnapshotFiles.ReadJsonAsync<ArenaObservation[]>(path, SnapshotFiles.ReplayBytes, cancellation).ConfigureAwait(false);
-        Validate(frames);
-        return frames;
-    }
     public static void Validate(ArenaObservation[] frames)
     {
         if (frames.Length is < 1 or > 4096) throw new InvalidDataException("Replay requires 1..4096 observations.");
@@ -86,8 +74,6 @@ public sealed class ReplaySource(string path) : IArenaObservationSource
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true,
-        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter<ArenaMode>(allowIntegerValues: false),
-            new System.Text.Json.Serialization.JsonStringEnumConverter<NativeMode>(allowIntegerValues: false),
-            new System.Text.Json.Serialization.JsonStringEnumConverter<NativeAvailability>(allowIntegerValues: false) }
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter<ArenaMode>(allowIntegerValues: false) }
     };
 }

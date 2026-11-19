@@ -19,6 +19,8 @@ jobs:
   android-overlay:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      release-packaged: ${{ steps.sign-release.outputs.packaged }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -121,3 +123,102 @@ jobs:
           name: hdt-android-arm64-preview
           path: avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android-Signed.apk
           if-no-files-found: error
+      - name: Check whether the preview signing key is configured
+        id: release-key
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/feat/avalonia-ui' || github.ref == 'refs/heads/main')
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE" && -z "$KEY_PASSWORD" ]]; then
+            echo '::notice::Obtainium publication is waiting for the Android signing secrets.'
+          elif [[ -z "$KEYSTORE" || -z "$KEY_PASSWORD" ]]; then
+            echo '::error::Configure both Android signing secrets together.'
+            exit 1
+          else
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build the release ARM64 APK
+        if: steps.release-key.outputs.configured == 'true'
+        working-directory: avalonia
+        run: |
+          dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -c Release -t:PackageForAndroid \
+            -r android-arm64 -p:ApplicationVersion="$((GITHUB_RUN_NUMBER + 1))" \
+            -p:ApplicationDisplayVersion="0.1.$GITHUB_RUN_NUMBER"
+      - name: Sign and verify the Obtainium APK
+        id: sign-release
+        if: steps.release-key.outputs.configured == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          temporary=$(mktemp -d)
+          trap 'rm -rf -- "$temporary"' EXIT
+          printf '%s' "$KEYSTORE" | base64 --decode > "$temporary/signing.p12"
+          unset KEYSTORE
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          output="$RUNNER_TEMP/obtainium"
+          mkdir -p "$output"
+          unsigned=avalonia/Hdt.Android/bin/Release/net10.0-android36.0/android-arm64/org.phibkro.hdt.android.apk
+          "$tools/zipalign" -P 16 -f 4 "$unsigned" "$temporary/aligned.apk"
+          "$tools/apksigner" sign --ks "$temporary/signing.p12" --ks-key-alias hdt-android \
+            --ks-pass env:KEY_PASSWORD --key-pass env:KEY_PASSWORD \
+            --out "$output/hdt-android-arm64.apk" "$temporary/aligned.apk"
+          unset KEY_PASSWORD
+          signer() {
+            "$tools/apksigner" verify --print-certs "$1" |
+              awk '/^Signer #1 certificate SHA-256 digest: / { print $NF }'
+          }
+          digest=$(signer "$output/hdt-android-arm64.apk")
+          test -n "$digest"
+          previous=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isDraft \
+            --jq '[.[] | select((.isDraft | not) and (.tagName | startswith("android-v")))] | .[0].tagName // empty')
+          if [[ -n "$previous" ]]; then
+            gh release download "$previous" --repo "$GITHUB_REPOSITORY" \
+              --pattern hdt-android-arm64.apk --output "$temporary/previous.apk"
+            if [[ "$digest" != "$(signer "$temporary/previous.apk")" ]]; then
+              echo '::error::The APK signer differs from the previous Android preview.'
+              exit 1
+            fi
+          fi
+          echo 'packaged=true' >> "$GITHUB_OUTPUT"
+      - name: Upload the release-signed APK for publishing
+        if: steps.sign-release.outputs.packaged == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: obtainium-apk
+          path: ${{ runner.temp }}/obtainium/hdt-android-arm64.apk
+          if-no-files-found: error
+
+  publish-obtainium-preview:
+    needs: android-overlay
+    if: needs.android-overlay.outputs.release-packaged == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: android-preview-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: obtainium-apk
+      - name: Publish the APK as a GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="android-v0.1.$GITHUB_RUN_NUMBER"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+              --pattern hdt-android-arm64.apk --output "$RUNNER_TEMP/existing.apk"
+            cmp hdt-android-arm64.apk "$RUNNER_TEMP/existing.apk"
+          else
+            gh release create "$tag" hdt-android-arm64.apk --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease --title "Android preview 0.1.$GITHUB_RUN_NUMBER" \
+              --notes 'ARM64 test preview. Includes the Arena demo and live English Arena offer OCR.'
+          fi

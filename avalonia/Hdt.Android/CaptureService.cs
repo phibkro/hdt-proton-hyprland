@@ -351,7 +351,7 @@ public sealed class CaptureService : Service
             }
         }
 
-        panel.Text = string.Join("\n", offers);
+        panel.Text = ArenaOverlayText.Format(offers);
     }
 
     private int Dp(int value) => (int)Math.Round(value * density / 160d);

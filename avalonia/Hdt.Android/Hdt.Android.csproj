@@ -16,6 +16,8 @@
     <DefineConstants>$(DefineConstants);HDT_ANDROID_FIXTURE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Hdt.Avalonia/Arena.cs" Link="Shared/Arena.cs" />
+    <EmbeddedResource Include="../fixtures/draft.json" LogicalName="Hdt.Mobile.DraftReplay.json" />
     <PackageReference Include="Avalonia.Android" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />

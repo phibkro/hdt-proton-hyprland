@@ -190,8 +190,23 @@ class Device:
         self.adb("shell", "appops", "set", TRACKER, "SYSTEM_ALERT_WINDOW", "allow")
         self.launch(DRAFT)
         self.launch(TRACKER)
-        print("Checking canceled Android screen sharing", flush=True)
         tracker_ui = {"package": TRACKER, "fallback": True}
+        print("Checking the mobile Arena replay", flush=True)
+        self.click(("Arena demo",), **tracker_ui)
+        wait_for("Arena demo did not show the initial offer", lambda: self.find(
+            ("Illustrative spell",), partial=True, **tracker_ui))
+        self.click(("Next observation",), **tracker_ui)
+        wait_for("Arena demo did not advance to sample synergies", lambda: self.find(
+            ("Illustrative synergy",), partial=True, **tracker_ui))
+        self.click(("Next observation",), **tracker_ui)
+        wait_for("Arena demo did not hide the overlay after the draft", lambda: self.find(
+            ("Overlay hidden",), **tracker_ui))
+        self.click(("Rewind",), **tracker_ui)
+        wait_for("Arena demo did not rewind", lambda: self.find(
+            ("No picks yet",), **tracker_ui))
+        self.click(("Live tracker",), **tracker_ui)
+
+        print("Checking canceled Android screen sharing", flush=True)
         self.click(("Start tracking",), **tracker_ui)
         wait_for("Screen sharing dialog did not open", lambda: self.find(
             ("Cancel",), package="com.android.systemui"))

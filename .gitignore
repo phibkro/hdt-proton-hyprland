@@ -224,6 +224,7 @@
 !/avalonia/Hdt.Android/
 /avalonia/Hdt.Android/*
 !/avalonia/Hdt.Android/AndroidApp.cs
+!/avalonia/Hdt.Android/ArenaDemoView.cs
 !/avalonia/Hdt.Android/ArenaTitles.cs
 !/avalonia/Hdt.Android/CaptureService.cs
 !/avalonia/Hdt.Android/Hdt.Android.csproj
@@ -236,6 +237,7 @@
 !/avalonia/Hdt.Avalonia/
 /avalonia/Hdt.Avalonia/*
 !/avalonia/Hdt.Avalonia/Arena.cs
+!/avalonia/Hdt.Avalonia/ReplaySource.cs
 !/avalonia/Hdt.Avalonia/ClientLibrary.cs
 !/avalonia/Hdt.Avalonia/Hdt.Avalonia.csproj
 !/avalonia/Hdt.Avalonia/LibraryView.cs

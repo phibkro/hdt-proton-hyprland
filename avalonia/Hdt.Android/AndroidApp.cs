@@ -28,7 +28,7 @@ public sealed class AndroidApp(nint javaReference, JniHandleOwnership transfer)
 {
 }
 
-public sealed class TrackerApp : Avalonia.Application
+public sealed class TrackerApp : global::Avalonia.Application
 {
     public override void Initialize()
     {
@@ -132,7 +132,7 @@ internal sealed class TrackerView : UserControl
         start.Click += (_, _) => MainActivity.Current?.StartTracking();
         stop.Click += (_, _) => MainActivity.Current?.StopTracking();
 
-        Content = new ScrollViewer
+        var tracking = new ScrollViewer
         {
             Content = new StackPanel
             {
@@ -156,6 +156,15 @@ internal sealed class TrackerView : UserControl
                     status
                 }
             }
+        };
+
+        Content = new TabControl
+        {
+            Items =
+            {
+                new TabItem { Header = "Live tracker", Content = tracking },
+                new TabItem { Header = "Arena demo", Content = new ArenaDemoView() },
+            },
         };
 
         AttachedToVisualTree += (_, _) =>
