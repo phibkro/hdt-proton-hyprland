@@ -73,7 +73,7 @@ jobs:
           avd=hdt-ci-api36
           serial=emulator-5554
           "$sdk/emulator/emulator" -accel-check
-          printf 'no\n' | avdmanager create avd --name "$avd" --device pixel_8 \
+          printf 'no\n' | avdmanager create avd --name "$avd" \
             --package 'system-images;android-36;google_apis;x86_64'
           adb start-server
           "$sdk/emulator/emulator" -avd "$avd" -port 5554 -accel on -no-window -no-audio \
