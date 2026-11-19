@@ -444,11 +444,10 @@ public sealed class CaptureService : Service
         }
         RemovePanel();
         windowContext?.Dispose();
+        // Android can still deliver a callback already queued on the main
+        // handler after unregistering it. Let the Java peer live until GC.
         if (projectionEvents is not null)
-        {
             projection?.UnregisterCallback(projectionEvents);
-            projectionEvents.Dispose();
-        }
         display?.Release();
         display?.Dispose();
         reader?.Close();
@@ -461,9 +460,23 @@ public sealed class CaptureService : Service
 
     private sealed class ProjectionEvents(CaptureService service) : MediaProjection.Callback
     {
-        public override void OnStop() => service.End("Screen sharing ended.");
-        public override void OnCapturedContentResize(int width, int height) => service.Resize(width, height);
-        public override void OnCapturedContentVisibilityChanged(bool isVisible) => service.SetVisibility(isVisible);
+        public override void OnStop()
+        {
+            if (!service.lifetime.IsCancellationRequested)
+                service.End("Screen sharing ended.");
+        }
+
+        public override void OnCapturedContentResize(int width, int height)
+        {
+            if (!service.lifetime.IsCancellationRequested)
+                service.Resize(width, height);
+        }
+
+        public override void OnCapturedContentVisibilityChanged(bool isVisible)
+        {
+            if (!service.lifetime.IsCancellationRequested)
+                service.SetVisibility(isVisible);
+        }
     }
 
     private sealed class RecognitionCompletion : Java.Lang.Object, global::Android.Gms.Tasks.IOnCompleteListener
