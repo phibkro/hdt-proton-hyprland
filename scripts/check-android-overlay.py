@@ -3,6 +3,7 @@
 import argparse
 import csv
 import io
+import os
 import re
 import struct
 import subprocess
@@ -58,7 +59,8 @@ class Device:
         components = [line.strip() for line in result.splitlines() if line.strip().startswith(f"{package}/")]
         if len(components) != 1:
             raise AssertionError(f"Expected one launcher activity for {package}: {result}")
-        self.adb("shell", "am", "start", "-W", *launcher, "-n", components[0])
+        result = self.adb("shell", "am", "start", "-W", *launcher, "-n", components[0])
+        print(result.stdout.decode().strip(), flush=True)
 
     def tree(self):
         remote = "/data/local/tmp/hdt-overlay.xml"
@@ -83,14 +85,16 @@ class Device:
         crop_height = height // 4 if overlay else height
         if overlay and width <= height:
             return []
+        scale = 2 if overlay and width < 1200 else 1
         crop = subprocess.run(
             ["convert", "-", "-crop", f"{width - left}x{crop_height}+{left}+0",
-             "+repage", "-resize", "200%", "png:-"],
+             "+repage", "-resize", f"{scale * 100}%", "png:-"],
             input=png, capture_output=True, check=True, timeout=10,
         ).stdout
         tsv = subprocess.run(
             ["tesseract", "stdin", "stdout", "--psm", "6" if overlay else "11", "tsv"],
-            input=crop, capture_output=True, check=True, timeout=10,
+            input=crop, capture_output=True, check=True, timeout=20,
+            env={**os.environ, "OMP_THREAD_LIMIT": "1"},
         ).stdout.decode()
         groups = {}
         for row in csv.DictReader(io.StringIO(tsv), delimiter="\t", quoting=csv.QUOTE_NONE):
@@ -102,8 +106,8 @@ class Device:
         for group in groups.values():
             text = " ".join(row["text"] for row in group)
             first = group[0]
-            x = left + (int(first["left"]) + int(first["width"]) // 2) // 2
-            y = (int(first["top"]) + int(first["height"]) // 2) // 2
+            x = left + (int(first["left"]) + int(first["width"]) // 2) // scale
+            y = (int(first["top"]) + int(first["height"]) // 2) // scale
             lines.append((text, (x, y)))
         return sorted(lines, key=lambda line: line[1][1])
 
@@ -179,6 +183,7 @@ class Device:
         wait_for("Overlay still displays draft cards", hidden)
 
     def run(self, tracker_apk, draft_apk):
+        self.adb("logcat", "-c")
         self.adb("shell", "wm", "dismiss-keyguard")
         self.adb("install", "-r", tracker_apk)
         self.adb("install", "-r", draft_apk)
@@ -237,9 +242,15 @@ def main():
     device = Device(args.serial, args.evidence)
     try:
         device.run(args.tracker, args.draft)
+    except Exception:
+        crash = device.adb("logcat", "-d", "-b", "crash", check=False).stdout
+        if crash:
+            print(crash.decode(errors="replace"), flush=True)
+        (args.evidence / "windows.txt").write_bytes(device.adb("shell", "dumpsys", "window", "windows", check=False).stdout)
+        raise
     finally:
         (args.evidence / "logcat.txt").write_bytes(
-            device.adb("logcat", "-d", "-t", "1500", check=False).stdout)
+            device.adb("logcat", "-d", "-b", "all", check=False).stdout)
 
 
 if __name__ == "__main__":
