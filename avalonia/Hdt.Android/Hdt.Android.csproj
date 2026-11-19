@@ -11,6 +11,11 @@
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(HdtAndroidDev)' == 'true' And '$(Configuration)' == 'Debug' And '$(HdtAndroidFixture)' != 'true'">
+    <ApplicationId>org.phibkro.hdt.android.dev</ApplicationId>
+    <ApplicationTitle>HDT Android Dev</ApplicationTitle>
+    <DefineConstants>$(DefineConstants);HDT_ANDROID_DEV</DefineConstants>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(HdtAndroidFixture)' == 'true' And '$(Configuration)' == 'Debug' And '$(RuntimeIdentifier)' == 'android-x64'">
     <ApplicationId>org.phibkro.hdt.android.fixture</ApplicationId>
     <DefineConstants>$(DefineConstants);HDT_ANDROID_FIXTURE</DefineConstants>

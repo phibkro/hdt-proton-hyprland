@@ -30,6 +30,12 @@ public sealed class AndroidApp(nint javaReference, JniHandleOwnership transfer)
 
 public sealed class TrackerApp : global::Avalonia.Application
 {
+#if HDT_ANDROID_DEV
+    internal const string DisplayName = "HDT Android Dev";
+#else
+    internal const string DisplayName = "HDT Android";
+#endif
+
     public override void Initialize()
     {
         RequestedThemeVariant = ThemeVariant.Dark;
@@ -44,7 +50,7 @@ public sealed class TrackerApp : global::Avalonia.Application
     }
 }
 
-[Activity(Label = "HDT Android", MainLauncher = true,
+[Activity(Label = TrackerApp.DisplayName, MainLauncher = true,
     Theme = "@style/Theme.AppCompat.NoActionBar",
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public sealed class MainActivity : AvaloniaMainActivity
@@ -57,6 +63,7 @@ public sealed class MainActivity : AvaloniaMainActivity
         base.OnResume();
         Current = this;
         TrackingSession.Refresh();
+        AndroidDiagnostics.Refresh();
     }
 
     protected override void OnPause()
@@ -141,7 +148,7 @@ internal sealed class TrackerView : UserControl
                 Spacing = 16,
                 Children =
                 {
-                    new TextBlock { Text = "HDT Android", FontSize = 30, FontWeight = FontWeight.SemiBold },
+                    new TextBlock { Text = TrackerApp.DisplayName, FontSize = 30, FontWeight = FontWeight.SemiBold },
                     new TextBlock
                     {
                         Text = "Open an English-language Arena draft. Tap Start tracking, select A single app, and choose Hearthstone.",
@@ -158,7 +165,7 @@ internal sealed class TrackerView : UserControl
             }
         };
 
-        Content = new TabControl
+        var tabs = new TabControl
         {
             SelectedIndex = 0,
             Items =
@@ -168,6 +175,10 @@ internal sealed class TrackerView : UserControl
                 new TabItem { Header = "Match demo", Content = new MatchDemoView() },
             },
         };
+#if HDT_ANDROID_DEV
+        tabs.Items.Add(new TabItem { Header = "Diagnostics", Content = new DiagnosticsView() });
+#endif
+        Content = tabs;
 
         AttachedToVisualTree += (_, _) =>
         {
@@ -198,6 +209,7 @@ internal static class TrackingSession
     public static void Publish(TrackingState state)
     {
         Current = state;
+        AndroidDiagnostics.Record(state.Status);
         Refresh();
     }
 

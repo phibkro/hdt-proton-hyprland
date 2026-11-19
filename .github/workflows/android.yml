@@ -123,6 +123,19 @@ jobs:
           name: hdt-android-arm64-preview
           path: avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android-Signed.apk
           if-no-files-found: error
+      - name: Build and verify ARM64 diagnostics build
+        working-directory: avalonia
+        run: |
+          dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -t:SignAndroidPackage \
+            -r android-arm64 -p:HdtAndroidDev=true
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
+            Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android.dev-Signed.apk
+      - name: Upload ARM64 diagnostics build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hdt-android-arm64-dev
+          path: avalonia/Hdt.Android/bin/Debug/net10.0-android36.0/android-arm64/org.phibkro.hdt.android.dev-Signed.apk
+          if-no-files-found: error
       - name: Check whether the preview signing key is configured
         id: release-key
         if: github.event_name == 'push' && (github.ref == 'refs/heads/feat/avalonia-ui' || github.ref == 'refs/heads/main')

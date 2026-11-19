@@ -496,7 +496,40 @@ python3 scripts/check-android-overlay.py --evidence local/android-evidence \
   avalonia/Hdt.Android.Fixture/bin/Debug/net10.0-android36.0/android-x64/org.phibkro.hdt.testarena-Signed.apk
 ```
 
+### Android diagnostics build
+
+The Android workflow produces an `hdt-android-arm64-dev` artifact after the
+overlay checks. Its `org.phibkro.hdt.android.dev` package installs alongside
+the preview and requests overlay permission separately. Build it locally from
+`avalonia/` with the same SDK and workload as the preview.
+
+```sh
+dotnet restore Hdt.Android/Hdt.Android.csproj --locked-mode
+dotnet build Hdt.Android/Hdt.Android.csproj --no-restore -t:SignAndroidPackage \
+  -r android-arm64 -p:HdtAndroidDev=true
+```
+
+After reproducing an issue, open **Diagnostics** and tap **Copy report**.
+The report includes overlay permission, capture visibility, viewport changes,
+the latest OCR timing and match count, and up to 40 recent events. Reports are
+kept in memory. The panel collects no frames, recognized text or game logs.
+Use the [ADB log probe](../docs/reference/android-live-overlay.md#read-only-phone-probe)
+when testing whether the phone exposes Hearthstone logs to the authorized shell.
+
+For the diagnostics prerelease in Obtainium, add
+`https://github.com/phibkro/hdt-proton-hyprland` as a GitHub source, enable
+**Include prereleases**, and set **Filter release titles by regex** to
+`^Android dev `. The release asset is `hdt-android-dev-arm64.apk`. The
+matching APK version name uses the `android-dev-v` tag prefix. Keep the same
+signing key for subsequent diagnostics releases so Android can update in place.
+The dev APKs from Actions are intended for sideload testing and can have a
+different signer from the published diagnostics prerelease.
+
 ### Android feature coverage
+
+The [Android live overlay feature map](../docs/reference/android-live-overlay.md)
+traces the desktop event sources and identifies the Android acquisition and
+verification path for each overlay feature.
 
 The [upstream parity ledger](https://github.com/phibkro/hdt-proton-hyprland/blob/docs/hdt-feature-parity/docs/reference/hdt-feature-parity.md)
 tracks desktop HDT user journeys. Android coverage is tracked by workflow

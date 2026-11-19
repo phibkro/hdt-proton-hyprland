@@ -68,6 +68,7 @@
 !/docs/reference/
 /docs/reference/*
 !/docs/reference/architecture.md
+!/docs/reference/android-live-overlay.md
 !/docs/reference/commands.md
 !/docs/reference/compatibility.md
 !/docs/reference/components.md
@@ -228,6 +229,7 @@
 !/avalonia/Hdt.Android/MatchDemoView.cs
 !/avalonia/Hdt.Android/ArenaTitles.cs
 !/avalonia/Hdt.Android/CaptureService.cs
+!/avalonia/Hdt.Android/DiagnosticsView.cs
 !/avalonia/Hdt.Android/Hdt.Android.csproj
 !/avalonia/Hdt.Android/packages.lock.json
 !/avalonia/Hdt.Android.Fixture/
@@ -289,3 +291,4 @@
 !/avalonia/Hdt.Avalonia/SettingsView.cs
 !/scripts/check-native-failure.sh
 !/scripts/check-android-overlay.py
+!/scripts/probe-android-hearthstone-logs.py

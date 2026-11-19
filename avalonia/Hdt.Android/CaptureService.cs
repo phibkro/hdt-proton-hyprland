@@ -107,6 +107,8 @@ public sealed class CaptureService : Service
                 (DisplayFlags)VirtualDisplayFlags.AutoMirror, reader.Surface, null, main)
                 ?? throw new InvalidOperationException("Android could not start the capture display.");
 
+            AndroidDiagnostics.Record($"Projection started. Viewport {width}×{height}, surface {edge}×{edge}, density {density} dpi.");
+            AndroidDiagnostics.Sample("Waiting for the first readable frame.");
             Update("Loading the English card catalog…");
             _ = LoadCatalog(lifetime.Token);
         }
@@ -129,7 +131,7 @@ public sealed class CaptureService : Service
         using var openIntent = new Intent(this, typeof(MainActivity)).AddFlags(ActivityFlags.SingleTop);
         using var open = PendingIntent.GetActivity(this, 0, openIntent, PendingIntentFlags.Immutable);
         using var builder = new Notification.Builder(this, Channel)
-            .SetContentTitle("HDT Android")
+            .SetContentTitle(TrackerApp.DisplayName)
             .SetContentText("Screen sharing is active")
             .SetSmallIcon(global::Android.Resource.Drawable.IcMenuView)
             .SetContentIntent(open)
@@ -255,6 +257,10 @@ public sealed class CaptureService : Service
         var frameWidth = Math.Max(1, (int)Math.Round(contentWidth * scale));
         var frameHeight = Math.Max(1, (int)Math.Round(contentHeight * scale));
         string[] offers = [];
+#if HDT_ANDROID_DEV
+        var lineCount = 0;
+        string? recognitionError = null;
+#endif
         try
         {
             using (bitmap)
@@ -274,6 +280,9 @@ public sealed class CaptureService : Service
                     })
                     .Where(line => line.Text is not null)
                     .ToArray();
+#if HDT_ANDROID_DEV
+                lineCount = lines.Length;
+#endif
                 offers = titles!.ReadOffers(lines, frameWidth, frameHeight);
 #if HDT_ANDROID_FIXTURE
                 if (Interlocked.Increment(ref fixtureDiagnosticReads) <= 8)
@@ -288,14 +297,31 @@ public sealed class CaptureService : Service
         }
         catch (Exception error)
         {
+#if HDT_ANDROID_DEV
+            recognitionError = error.GetType().Name;
+#endif
             global::Android.Util.Log.Warn("HdtAndroid", $"Card recognition: {error.GetType().Name}");
         }
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             reading = false;
-            if (lifetime.IsCancellationRequested || !visible || revision != viewportRevision
-                || SystemClock.ElapsedRealtime() - capturedAt > MaxObservationAgeMs)
+            if (lifetime.IsCancellationRequested)
+                return;
+
+            var elapsed = SystemClock.ElapsedRealtime() - capturedAt;
+            if (!visible || revision != viewportRevision)
+            {
+                AndroidDiagnostics.Record("Dropped an OCR result after a visibility or viewport change.");
+                return;
+            }
+#if HDT_ANDROID_DEV
+            var outcome = recognitionError ?? (elapsed > MaxObservationAgeMs ? "expired"
+                : offers.Length == 0 ? "no matching offer set"
+                : offers.SequenceEqual(previous) ? "stable offer set" : "awaiting a second match");
+            AndroidDiagnostics.Sample($"OCR {elapsed} ms, crop {frameWidth}×{frameHeight}, {lineCount} lines, {offers.Length} matches. {outcome}.");
+#endif
+            if (elapsed > MaxObservationAgeMs)
                 return;
 
             lastReadAt = capturedAt;
@@ -343,6 +369,7 @@ public sealed class CaptureService : Service
             {
                 windows!.AddView(text, layout);
                 panel = text;
+                AndroidDiagnostics.Record("Arena overlay attached.");
             }
             catch
             {
@@ -365,6 +392,7 @@ public sealed class CaptureService : Service
         width = newWidth;
         height = newHeight;
         viewportRevision++;
+        AndroidDiagnostics.Record($"Captured viewport resized to {width}×{height}.");
         ClearOffers("Waiting for the resized Hearthstone view…");
     }
 
@@ -374,6 +402,7 @@ public sealed class CaptureService : Service
             return;
         visible = isVisible;
         viewportRevision++;
+        AndroidDiagnostics.Record(visible ? "Shared window visible." : "Shared window hidden.");
         ClearOffers(visible ? "Waiting for three readable Arena card titles…" : "Open Hearthstone to resume tracking.");
     }
 
@@ -400,6 +429,7 @@ public sealed class CaptureService : Service
         finally
         {
             view.Dispose();
+            AndroidDiagnostics.Record("Arena overlay detached.");
         }
     }
 
@@ -412,6 +442,7 @@ public sealed class CaptureService : Service
 
     private void Fail(string message, Exception error)
     {
+        AndroidDiagnostics.Record($"{message} {error.GetType().Name}");
         global::Android.Util.Log.Warn("HdtAndroid", $"{message} {error.GetType().Name}");
         End(message);
     }
